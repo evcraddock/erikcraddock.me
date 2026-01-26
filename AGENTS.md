@@ -50,6 +50,16 @@ Each task should result in something a human can see or interact with, even if r
 - If a feature is big, split it into multiple PRs that build on each other
 - It's better to merge 3 small PRs than 1 large one
 
+## Visual Verification
+
+When testing UI changes, **open a browser** instead of using curl. Humans need to see the result, not just verify HTML was returned.
+
+Use the `browser-tools` skill to open pages and take screenshots when verifying:
+
+- Page layouts and styling
+- Form interactions
+- Any user-facing changes
+
 ## Tech Stack
 
 - **Language**: TypeScript (strict mode)
