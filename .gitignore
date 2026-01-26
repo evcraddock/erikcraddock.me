@@ -1,0 +1,36 @@
+# Dependencies
+node_modules/
+
+# Build
+dist/
+build/
+*.tsbuildinfo
+
+# Environment
+.env
+.env.local
+.env.*.local
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+
+# Test
+coverage/
+
+# Logs
+*.log
+
+# AI agent config
+.claude/
+
+# SQLite
+*.db
+*.sqlite
+*.sqlite3
+
+# S3/MinIO local data
+.minio/
