@@ -35,7 +35,21 @@ export function Layout({ title, children }: LayoutProps) {
             >
               erikcraddock.me
             </a>
-            <ThemeToggle />
+            <div class="flex items-center gap-6">
+              <a
+                href="/about"
+                class="text-gray-600 hover:text-gray-900 dark:text-gray-400 dark:hover:text-gray-100"
+              >
+                About
+              </a>
+              <a
+                href="/sources"
+                class="text-gray-600 hover:text-gray-900 dark:text-gray-400 dark:hover:text-gray-100"
+              >
+                Sources
+              </a>
+              <ThemeToggle />
+            </div>
           </nav>
         </header>
         <main class="flex-1 max-w-4xl mx-auto px-4 py-8 w-full">{children}</main>
