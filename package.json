@@ -17,11 +17,13 @@
     "css:watch": "npx @tailwindcss/cli -i ./src/styles/main.css -o ./public/css/main.css --watch"
   },
   "dependencies": {
+    "@aws-sdk/client-s3": "^3.975.0",
     "@hono/node-server": "^1.19.9",
     "@tailwindcss/typography": "^0.5.19",
     "drizzle-orm": "^0.45.1",
     "hono": "^4.0.0",
-    "marked": "^17.0.1"
+    "marked": "^17.0.1",
+    "nodemailer": "^7.0.13"
   },
   "devDependencies": {
     "@eslint/js": "^9.0.0",
@@ -31,6 +33,7 @@
     "@types/bun": "^1.3.6",
     "@types/marked": "^5.0.2",
     "@types/node": "^20.0.0",
+    "@types/nodemailer": "^7.0.9",
     "@vitest/coverage-v8": "^1.0.0",
     "better-sqlite3": "^12.6.2",
     "drizzle-kit": "^0.31.8",

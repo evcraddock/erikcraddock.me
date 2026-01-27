@@ -1,0 +1,33 @@
+services:
+  # S3-compatible object storage for media uploads
+  garage:
+    image: dxflrs/garage:v1.0.1
+    container_name: erikcraddock-garage
+    restart: unless-stopped
+    ports:
+      - "3900:3900" # S3 API
+      - "3901:3901" # Admin API
+    volumes:
+      - garage_data:/var/lib/garage/data
+      - garage_meta:/var/lib/garage/meta
+      - ./garage.toml:/etc/garage.toml:ro
+    environment:
+      - RUST_LOG=garage=debug
+    command: ["-c", "/etc/garage.toml", "server"]
+
+  # Dev mail server for magic link testing
+  mailpit:
+    image: axllent/mailpit:v1.21
+    container_name: erikcraddock-mailpit
+    restart: unless-stopped
+    ports:
+      - "1025:1025" # SMTP
+      - "8025:8025" # Web UI
+    environment:
+      - MP_LOG_LEVEL=debug
+      - MP_SMTP_AUTH_ACCEPT_ANY=true
+      - MP_SMTP_AUTH_ALLOW_INSECURE=true
+
+volumes:
+  garage_data:
+  garage_meta:
