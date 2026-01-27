@@ -121,7 +121,23 @@ make dev-logs      # Ctrl+C to stop
 
 1. Create feature branch: `feat/<task-id>-<description>`
 2. Run `./scripts/pre-pr.sh` before opening PR
-3. After PR is created, use the `request-review` skill to spawn a separate agent to review the PR
+3. **Check logs for errors** before opening PR (see below)
+4. After PR is created, use the `request-review` skill to spawn a separate agent to review the PR
+
+### Check Logs Before PR
+
+Before creating a PR, verify there are no errors in the application logs:
+
+```bash
+make dev-tail 2>&1 | grep -E "(ERROR|WARN|error|Error)"
+```
+
+If errors are present:
+- Fix them before opening the PR
+- Don't ignore warnings without good reason
+- If an error is expected/acceptable, document why in the PR description
+
+This catches runtime issues that tests might miss (startup errors, middleware failures, etc.).
 
 ## Testing Requirements
 
