@@ -2,6 +2,7 @@ import { Hono } from "hono";
 import { desc, isNotNull } from "drizzle-orm";
 import { db, posts } from "../db";
 import { Layout } from "../templates/layout";
+import { truncate } from "../utils/text";
 
 const pages = new Hono();
 
@@ -27,10 +28,7 @@ pages.get("/", (c) => {
                     {post.title}
                   </h2>
                 ) : null}
-                <p class="text-gray-600 mb-2">
-                  {post.excerpt || post.content.slice(0, 200)}
-                  {!post.excerpt && post.content.length > 200 ? "..." : ""}
-                </p>
+                <p class="text-gray-600 mb-2">{post.excerpt || truncate(post.content, 200)}</p>
                 <time class="text-sm text-gray-400">
                   {post.published_at
                     ? new Date(post.published_at).toLocaleDateString("en-US", {
