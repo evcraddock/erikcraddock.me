@@ -70,6 +70,18 @@ Use the `browser-tools` skill to open pages and take screenshots when verifying:
 - **Styles**: Tailwind CSS
 - **Storage**: S3-compatible (Garage)
 
+## Development
+
+**ALWAYS start the dev server using `make dev`** - this runs all services (app, database, etc.) via the Makefile.
+
+Key Makefile targets:
+- `make dev` - Start development server (REQUIRED)
+- `make test` - Run tests
+- `make lint` - Run linter
+- `make fmt` - Format code
+
+Read the Makefile to understand available commands before starting work.
+
 ## Task Lifecycle
 
 - **Starting**: ALWAYS run `task-start-preflight` skill first
