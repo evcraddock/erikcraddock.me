@@ -2,6 +2,7 @@ import { Hono } from "hono";
 import { desc, eq, isNotNull } from "drizzle-orm";
 import { db, posts, tags, postTags } from "../db";
 import { Layout } from "../templates/layout";
+import { NotFound } from "../templates/not-found";
 import { truncate } from "../utils/text";
 
 const pages = new Hono();
@@ -54,15 +55,7 @@ pages.get("/posts/:id", (c) => {
   // Validate ID is a number
   if (Number.isNaN(id)) {
     return c.html(
-      <Layout title="Not Found | erikcraddock.me">
-        <div class="text-center py-12">
-          <h1 class="text-2xl font-bold text-gray-900 mb-4">Post Not Found</h1>
-          <p class="text-gray-600 mb-6">The post you're looking for doesn't exist.</p>
-          <a href="/" class="text-blue-600 hover:text-blue-800">
-            ← Back to home
-          </a>
-        </div>
-      </Layout>,
+      <NotFound title="Post Not Found" message="The post you're looking for doesn't exist." />,
       404
     );
   }
@@ -72,15 +65,7 @@ pages.get("/posts/:id", (c) => {
 
   if (!post) {
     return c.html(
-      <Layout title="Not Found | erikcraddock.me">
-        <div class="text-center py-12">
-          <h1 class="text-2xl font-bold text-gray-900 mb-4">Post Not Found</h1>
-          <p class="text-gray-600 mb-6">The post you're looking for doesn't exist.</p>
-          <a href="/" class="text-blue-600 hover:text-blue-800">
-            ← Back to home
-          </a>
-        </div>
-      </Layout>,
+      <NotFound title="Post Not Found" message="The post you're looking for doesn't exist." />,
       404
     );
   }
