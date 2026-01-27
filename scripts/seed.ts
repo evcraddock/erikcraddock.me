@@ -1,7 +1,11 @@
-import { db, posts, tags, postTags, sources } from "../src/db";
+import { eq } from "drizzle-orm";
+import { db, posts, tags, postTags, sources, authors } from "../src/db";
 
 async function seed() {
   console.log("🌱 Seeding database...");
+
+  // Always ensure admin author exists
+  await seedAdminAuthor();
 
   // Check if already seeded
   const existingPosts = db.select().from(posts).all();
@@ -18,6 +22,32 @@ async function seed() {
   } else {
     await seedSources();
   }
+}
+
+async function seedAdminAuthor() {
+  const adminEmail = process.env.ADMIN_EMAIL;
+
+  if (!adminEmail) {
+    console.log("⚠️  ADMIN_EMAIL not set, skipping admin author seed.");
+    return;
+  }
+
+  // Check if admin already exists
+  const existing = db.select().from(authors).where(eq(authors.email, adminEmail)).get();
+
+  if (existing) {
+    console.log(`Admin author already exists: ${adminEmail}`);
+    return;
+  }
+
+  db.insert(authors)
+    .values({
+      email: adminEmail,
+      created_at: new Date(),
+    })
+    .run();
+
+  console.log(`✅ Seeded admin author: ${adminEmail}`);
 }
 
 async function seedPosts() {
