@@ -123,6 +123,32 @@ make dev-logs      # Ctrl+C to stop
 2. Run `./scripts/pre-pr.sh` before opening PR
 3. After PR is created, use the `request-review` skill to spawn a separate agent to review the PR
 
+## Testing Requirements
+
+Every task must include tests for its acceptance criteria.
+
+**Acceptance criteria = test cases.** If you can verify it manually, write a test for it.
+
+**Before closing a task:**
+
+- [ ] New functionality has corresponding tests in `src/__tests__/` or colocated `*.test.ts`
+- [ ] Tests verify the acceptance criteria, not just "code runs"
+- [ ] `npm test` passes with the new tests
+
+**Don't verify acceptance criteria manually** - that's what tests are for.
+
+**Example:** If acceptance criteria says "Schema exports posts table":
+
+```typescript
+import { posts } from "@/db/schema";
+
+describe("schema", () => {
+  it("exports posts table", () => {
+    expect(posts).toBeDefined();
+  });
+});
+```
+
 ## Conventions
 
 - Use TypeScript strict mode
