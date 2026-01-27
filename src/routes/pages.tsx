@@ -21,18 +21,20 @@ pages.get("/", (c) => {
     <Layout title="Home | erikcraddock.me">
       <div class="space-y-8">
         {allPosts.length === 0 ? (
-          <p class="text-gray-600">No posts yet.</p>
+          <p class="text-gray-600 dark:text-gray-400">No posts yet.</p>
         ) : (
           allPosts.map((post) => (
-            <article key={post.id} class="border-b border-gray-200 pb-6">
+            <article key={post.id} class="border-b border-gray-200 dark:border-gray-700 pb-6">
               <a href={`/posts/${post.id}`} class="block group">
                 {post.title ? (
-                  <h2 class="text-xl font-semibold text-gray-900 group-hover:text-blue-600 mb-2">
+                  <h2 class="text-xl font-semibold text-gray-900 dark:text-gray-100 group-hover:text-blue-600 dark:group-hover:text-blue-400 mb-2">
                     {post.title}
                   </h2>
                 ) : null}
-                <p class="text-gray-600 mb-2">{post.excerpt || truncate(post.content, 200)}</p>
-                <time class="text-sm text-gray-400">
+                <p class="text-gray-600 dark:text-gray-400 mb-2">
+                  {post.excerpt || truncate(post.content, 200)}
+                </p>
+                <time class="text-sm text-gray-400 dark:text-gray-500">
                   {post.published_at
                     ? new Date(post.published_at).toLocaleDateString("en-US", {
                         year: "numeric",
@@ -90,15 +92,20 @@ pages.get("/posts/:id", (c) => {
     <Layout title={`${title} | erikcraddock.me`}>
       <article class="max-w-none">
         {/* Back link */}
-        <a href="/" class="text-blue-600 hover:text-blue-800 text-sm mb-6 inline-block">
+        <a
+          href="/"
+          class="text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300 text-sm mb-6 inline-block"
+        >
           ← Back to home
         </a>
 
         {/* Post header */}
-        {post.title ? <h1 class="text-3xl font-bold text-gray-900 mb-4">{post.title}</h1> : null}
+        {post.title ? (
+          <h1 class="text-3xl font-bold text-gray-900 dark:text-gray-100 mb-4">{post.title}</h1>
+        ) : null}
 
         {/* Meta: date and tags */}
-        <div class="flex flex-wrap items-center gap-4 text-sm text-gray-500 mb-8">
+        <div class="flex flex-wrap items-center gap-4 text-sm text-gray-500 dark:text-gray-400 mb-8">
           {post.published_at ? (
             <time>
               {new Date(post.published_at).toLocaleDateString("en-US", {
@@ -108,7 +115,7 @@ pages.get("/posts/:id", (c) => {
               })}
             </time>
           ) : (
-            <span class="text-yellow-600">Draft</span>
+            <span class="text-yellow-600 dark:text-yellow-500">Draft</span>
           )}
 
           {postTagsResult.length > 0 ? (
@@ -117,7 +124,7 @@ pages.get("/posts/:id", (c) => {
                 <a
                   key={tag.id}
                   href={`/tags/${tag.slug}`}
-                  class="bg-gray-100 hover:bg-gray-200 text-gray-700 px-2 py-1 rounded text-xs"
+                  class="bg-gray-100 hover:bg-gray-200 dark:bg-gray-700 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-300 px-2 py-1 rounded text-xs"
                 >
                   {tag.name}
                 </a>

@@ -1,7 +1,17 @@
 @import "tailwindcss";
 @plugin "@tailwindcss/typography";
 
-/* Customize typography plugin */
+/* Enable class-based dark mode */
+@variant dark (&:where(.dark, .dark *));
+
+/* Smooth theme transitions */
+html {
+  transition:
+    background-color 0.2s ease,
+    color 0.2s ease;
+}
+
+/* Customize typography plugin - Light mode */
 @utility prose {
   /* Blockquote styling */
   --tw-prose-quote-borders: var(--color-gray-300);
@@ -38,4 +48,25 @@
   :not(pre) > code::after {
     content: none;
   }
+}
+
+/* Dark mode typography overrides */
+.dark .prose {
+  --tw-prose-body: var(--color-gray-300);
+  --tw-prose-headings: var(--color-gray-100);
+  --tw-prose-links: var(--color-blue-400);
+  --tw-prose-bold: var(--color-gray-100);
+  --tw-prose-quotes: var(--color-gray-300);
+  --tw-prose-quote-borders: var(--color-gray-600);
+  --tw-prose-code: var(--color-gray-200);
+  --tw-prose-pre-bg: var(--color-gray-950);
+  --tw-prose-pre-code: var(--color-gray-200);
+}
+
+.dark .prose blockquote {
+  background-color: var(--color-gray-800);
+}
+
+.dark .prose :not(pre) > code {
+  background-color: var(--color-gray-700);
 }
