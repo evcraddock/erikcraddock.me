@@ -12,16 +12,21 @@ export function Layout({ title, children }: LayoutProps) {
         <meta charset="UTF-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1.0" />
         <title>{title}</title>
+        <link rel="stylesheet" href="/css/main.css" />
       </head>
-      <body>
-        <header>
-          <nav>
-            <a href="/">erikcraddock.me</a>
+      <body class="min-h-screen flex flex-col bg-gray-50 text-gray-900">
+        <header class="bg-white shadow-sm">
+          <nav class="max-w-4xl mx-auto px-4 py-4">
+            <a href="/" class="text-lg font-semibold text-gray-900 hover:text-gray-600">
+              erikcraddock.me
+            </a>
           </nav>
         </header>
-        <main>{children}</main>
-        <footer>
-          <p>&copy; {new Date().getFullYear()} Erik Craddock</p>
+        <main class="flex-1 max-w-4xl mx-auto px-4 py-8 w-full">{children}</main>
+        <footer class="bg-white border-t">
+          <div class="max-w-4xl mx-auto px-4 py-4 text-center text-gray-500 text-sm">
+            &copy; {new Date().getFullYear()} Erik Craddock
+          </div>
         </footer>
       </body>
     </html>

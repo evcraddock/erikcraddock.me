@@ -5,14 +5,16 @@
   "type": "module",
   "scripts": {
     "dev": "tsx watch src/index.tsx",
-    "build": "tsc",
+    "build": "npm run css:build && tsc",
     "start": "node dist/index.js",
     "lint": "eslint .",
     "format": "prettier --write .",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",
-    "test:coverage": "vitest run --coverage"
+    "test:coverage": "vitest run --coverage",
+    "css:build": "npx @tailwindcss/cli -i ./src/styles/main.css -o ./public/css/main.css --minify",
+    "css:watch": "npx @tailwindcss/cli -i ./src/styles/main.css -o ./public/css/main.css --watch"
   },
   "dependencies": {
     "@hono/node-server": "^1.19.9",
@@ -20,10 +22,14 @@
   },
   "devDependencies": {
     "@eslint/js": "^9.0.0",
+    "@tailwindcss/cli": "^4.1.18",
+    "@tailwindcss/postcss": "^4.1.18",
     "@types/node": "^20.0.0",
     "@vitest/coverage-v8": "^1.0.0",
     "eslint": "^9.0.0",
+    "postcss": "^8.5.6",
     "prettier": "^3.0.0",
+    "tailwindcss": "^4.1.18",
     "tsx": "^4.0.0",
     "typescript": "^5.0.0",
     "typescript-eslint": "^8.0.0",

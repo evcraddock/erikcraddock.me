@@ -6,6 +6,9 @@ dist/
 build/
 *.tsbuildinfo
 
+# Generated CSS
+public/css/main.css
+
 # Environment
 .env
 .env.local
