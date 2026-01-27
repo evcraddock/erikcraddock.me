@@ -1,1 +1,41 @@
 @import "tailwindcss";
+@plugin "@tailwindcss/typography";
+
+/* Customize typography plugin */
+@utility prose {
+  /* Blockquote styling */
+  --tw-prose-quote-borders: var(--color-gray-300);
+  --tw-prose-quotes: var(--color-gray-700);
+
+  /* Code styling */
+  --tw-prose-pre-bg: var(--color-gray-900);
+  --tw-prose-pre-code: var(--color-gray-100);
+  --tw-prose-code: var(--color-gray-800);
+
+  /* Remove quote marks */
+  blockquote {
+    font-style: normal;
+    font-weight: 400;
+    background-color: var(--color-gray-50);
+    padding: 1rem 1.5rem;
+    border-radius: 0 0.5rem 0.5rem 0;
+  }
+
+  blockquote p:first-of-type::before,
+  blockquote p:last-of-type::after {
+    content: none;
+  }
+
+  /* Inline code styling */
+  :not(pre) > code {
+    background-color: var(--color-gray-100);
+    padding: 0.125rem 0.375rem;
+    border-radius: 0.25rem;
+    font-weight: 400;
+  }
+
+  :not(pre) > code::before,
+  :not(pre) > code::after {
+    content: none;
+  }
+}

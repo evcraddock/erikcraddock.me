@@ -1,9 +1,11 @@
 import { Hono } from "hono";
+import { raw } from "hono/html";
 import { desc, eq, isNotNull } from "drizzle-orm";
 import { db, posts, tags, postTags } from "../db";
 import { Layout } from "../templates/layout";
 import { NotFound } from "../templates/not-found";
 import { truncate } from "../utils/text";
+import { renderMarkdown } from "../utils/markdown";
 
 const pages = new Hono();
 
@@ -125,15 +127,7 @@ pages.get("/posts/:id", (c) => {
         </div>
 
         {/* Post content */}
-        <div class="prose prose-gray max-w-none">
-          {post.content.split("\n").map((paragraph, i) =>
-            paragraph.trim() ? (
-              <p key={i} class="mb-4">
-                {paragraph}
-              </p>
-            ) : null
-          )}
-        </div>
+        <div class="prose prose-gray max-w-none">{raw(renderMarkdown(post.content))}</div>
       </article>
     </Layout>
   );

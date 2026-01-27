@@ -1,2 +1,2 @@
 app: LOG_LEVEL=debug bun run --hot src/index.tsx
-css: npm run css:watch
+css: DEBUG=tailwindcss:* npm run css:watch

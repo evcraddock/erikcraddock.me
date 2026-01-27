@@ -133,6 +133,7 @@ make dev-tail 2>&1 | grep -E "(ERROR|WARN|error|Error)"
 ```
 
 If errors are present:
+
 - Fix them before opening the PR
 - Don't ignore warnings without good reason
 - If an error is expected/acceptable, document why in the PR description
