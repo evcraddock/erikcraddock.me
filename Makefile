@@ -1,24 +1,114 @@
-.PHONY: dev dev-stop dev-status dev-logs check pre-pr help
+.PHONY: dev dev-stop dev-restart dev-status dev-logs dev-tail \
+        connect-app connect-css \
+        check pre-pr help
+
+SOCKET := ./.overmind.sock
+
+# =============================================================================
+# Help
+# =============================================================================
 
 help: ## Show this help
-	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "\033[36m%-15s\033[0m %s\n", $$1, $$2}'
+	@echo "erikcraddock.me Development"
+	@echo ""
+	@echo "Usage: make [target]"
+	@echo ""
+	@echo "Development:"
+	@echo "  dev             Start dev environment"
+	@echo "  dev-stop        Stop dev environment"
+	@echo "  dev-restart     Restart dev environment"
+	@echo "  dev-status      Show process status"
+	@echo "  dev-logs        Stream all logs (Ctrl+C to stop)"
+	@echo "  dev-tail        Show last 50 lines of logs"
+	@echo ""
+	@echo "Connect (Ctrl+b d to detach):"
+	@echo "  connect-app     Attach to app terminal"
+	@echo "  connect-css     Attach to css terminal"
+	@echo ""
+	@echo "Quality:"
+	@echo "  check           Run linting and tests"
+	@echo "  pre-pr          Run pre-PR checks"
 
-dev: ## Start the dev environment
-	@if [ "$$(make -s dev-status)" = "running" ]; then \
+# =============================================================================
+# Development Environment
+# =============================================================================
+
+dev: ## Start dev environment
+	@if [ -S $(SOCKET) ] && overmind ps -s $(SOCKET) > /dev/null 2>&1; then \
 		echo "Dev environment already running"; \
+		overmind ps -s $(SOCKET); \
 	else \
-		overmind start -f Procfile.dev; \
+		rm -f $(SOCKET); \
+		overmind start -f Procfile.dev -s $(SOCKET) -D; \
+		sleep 2; \
+		overmind ps -s $(SOCKET); \
+		echo ""; \
+		echo "Dev started: http://localhost:5000"; \
 	fi
 
-dev-stop: ## Stop the dev environment
-	overmind quit || true
-	@rm -f .overmind.sock
+dev-stop: ## Stop dev environment
+	@if [ -S $(SOCKET) ]; then overmind quit -s $(SOCKET) || true; fi
+	@rm -f $(SOCKET)
+	@tmux kill-session -t erikcraddock-me 2>/dev/null || true
+	@for sock in /tmp/tmux-$$(id -u)/overmind-erikcraddock-me-*; do \
+		if [ -S "$$sock" ]; then \
+			tmux -L "$$(basename $$sock)" kill-server 2>/dev/null || true; \
+		fi; \
+	done
 
-dev-status: ## Check if dev environment is running
-	@if [ -S .overmind.sock ]; then echo "running"; else echo "stopped"; fi
+dev-restart: dev-stop dev ## Restart dev environment
 
-dev-logs: ## Connect to dev environment logs
-	overmind connect
+dev-status: ## Show process status
+	@if [ -S $(SOCKET) ] && overmind ps -s $(SOCKET) > /dev/null 2>&1; then \
+		overmind ps -s $(SOCKET); \
+	else \
+		echo "Not running"; \
+	fi
+
+dev-logs: ## Stream all logs (Ctrl+C to stop)
+	@if [ -S $(SOCKET) ]; then \
+		overmind echo -s $(SOCKET); \
+	else \
+		echo "Dev environment not running. Start with: make dev"; \
+	fi
+
+dev-tail: ## Show last 50 lines of logs
+	@if [ ! -S $(SOCKET) ]; then \
+		echo "Dev environment not running. Start with: make dev"; \
+	else \
+		TMUX_SOCK=$$(ls -t /tmp/tmux-$$(id -u)/overmind-erikcraddock-me-* 2>/dev/null | head -1); \
+		if [ -n "$$TMUX_SOCK" ]; then \
+			echo "=== app ===" && \
+			tmux -L "$$(basename $$TMUX_SOCK)" capture-pane -t erikcraddock-me:app -p -S -25 2>/dev/null || echo "(no output)"; \
+			echo "" && \
+			echo "=== css ===" && \
+			tmux -L "$$(basename $$TMUX_SOCK)" capture-pane -t erikcraddock-me:css -p -S -25 2>/dev/null || echo "(no output)"; \
+		else \
+			echo "Could not find tmux socket"; \
+		fi; \
+	fi
+
+# =============================================================================
+# Connect to Service Terminals
+# =============================================================================
+
+connect-app: ## Attach to app terminal (Ctrl+b d to detach)
+	@if [ -S $(SOCKET) ]; then \
+		overmind connect app -s $(SOCKET); \
+	else \
+		echo "Dev environment not running. Start with: make dev"; \
+	fi
+
+connect-css: ## Attach to css terminal (Ctrl+b d to detach)
+	@if [ -S $(SOCKET) ]; then \
+		overmind connect css -s $(SOCKET); \
+	else \
+		echo "Dev environment not running. Start with: make dev"; \
+	fi
+
+# =============================================================================
+# Quality
+# =============================================================================
 
 check: ## Run linting and tests
 	npm run lint && npm test

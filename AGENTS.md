@@ -72,16 +72,45 @@ Use the `browser-tools` skill to open pages and take screenshots when verifying:
 
 ## Development
 
-**ALWAYS start the dev server using `make dev`** - this runs all services (app, database, etc.) via the Makefile.
+**ALWAYS start the dev server using `make dev`** - this runs all services via overmind.
 
-Key Makefile targets:
+### Makefile Commands
 
-- `make dev` - Start development server (REQUIRED)
-- `make test` - Run tests
-- `make lint` - Run linter
-- `make fmt` - Format code
+Run `make help` to see all commands. Key targets:
 
-Read the Makefile to understand available commands before starting work.
+**Development:**
+
+- `make dev` - Start dev environment (daemonized)
+- `make dev-stop` - Stop dev environment
+- `make dev-restart` - Restart dev environment
+- `make dev-status` - Show process status (running PIDs)
+- `make dev-logs` - Stream all logs (Ctrl+C to stop)
+- `make dev-tail` - Show last 50 lines of logs (non-blocking)
+
+**Connect to terminals** (Ctrl+b d to detach):
+
+- `make connect-app` - Attach to app terminal
+- `make connect-css` - Attach to CSS watcher terminal
+
+**Quality:**
+
+- `make check` - Run linting and tests
+- `make pre-pr` - Run pre-PR checks
+
+### Reading Logs
+
+For quick log inspection without blocking:
+
+```bash
+make dev-tail      # Last 50 lines from each service
+make dev-status    # Process status with PIDs
+```
+
+For streaming logs (blocks terminal):
+
+```bash
+make dev-logs      # Ctrl+C to stop
+```
 
 ## Task Lifecycle
 
