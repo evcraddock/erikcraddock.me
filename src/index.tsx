@@ -1,20 +1,14 @@
 import { Hono } from "hono";
 import { serveStatic } from "hono/bun";
-import { Layout } from "./templates/layout";
+import { pages } from "./routes/pages";
 
 const app = new Hono();
 
 // Serve static files from public/
 app.use("/css/*", serveStatic({ root: "./public" }));
 
-app.get("/", (c) => {
-  return c.html(
-    <Layout title="Home | erikcraddock.me">
-      <h1 class="text-3xl font-bold mb-4">Welcome</h1>
-      <p class="text-gray-600">Coming soon.</p>
-    </Layout>
-  );
-});
+// Mount routes
+app.route("/", pages);
 
 // ActivityPub actor endpoint (placeholder)
 app.get("/.well-known/webfinger", (c) => {
