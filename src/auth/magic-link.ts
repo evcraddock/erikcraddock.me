@@ -110,7 +110,10 @@ export async function verifyMagicLink(token: string): Promise<string | null> {
   }
 
   // Check if expired
-  if (link.expires_at < new Date()) {
+  // Drizzle with mode:"timestamp" returns Date objects, but test DB returns seconds as number
+  const expiresAtMs =
+    link.expires_at instanceof Date ? link.expires_at.getTime() : Number(link.expires_at) * 1000;
+  if (expiresAtMs < Date.now()) {
     logger.debug("auth", "Magic link expired", { email: link.email });
     return null;
   }
