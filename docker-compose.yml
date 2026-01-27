@@ -13,7 +13,7 @@ services:
       - ./garage.toml:/etc/garage.toml:ro
     environment:
       - RUST_LOG=garage=debug
-    command: ["-c", "/etc/garage.toml", "server"]
+    command: ["/garage", "-c", "/etc/garage.toml", "server"]
 
   # Dev mail server for magic link testing
   mailpit:
