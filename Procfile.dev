@@ -1,2 +1,2 @@
-app: bun run --hot src/index.tsx
+app: LOG_LEVEL=debug bun run --hot src/index.tsx
 css: npm run css:watch
