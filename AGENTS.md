@@ -75,6 +75,7 @@ Use the `browser-tools` skill to open pages and take screenshots when verifying:
 **ALWAYS start the dev server using `make dev`** - this runs all services (app, database, etc.) via the Makefile.
 
 Key Makefile targets:
+
 - `make dev` - Start development server (REQUIRED)
 - `make test` - Run tests
 - `make lint` - Run linter
