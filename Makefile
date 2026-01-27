@@ -1,5 +1,5 @@
 .PHONY: dev dev-stop dev-restart dev-status dev-logs dev-tail \
-        connect-app connect-css \
+        connect-app connect-css connect-docker \
         db-generate db-migrate db-push db-studio db-seed \
         check pre-pr help
 
@@ -25,6 +25,7 @@ help: ## Show this help
 	@echo "Connect (Ctrl+b d to detach):"
 	@echo "  connect-app     Attach to app terminal"
 	@echo "  connect-css     Attach to css terminal"
+	@echo "  connect-docker  Attach to docker terminal"
 	@echo ""
 	@echo "Database:"
 	@echo "  db-generate     Generate migrations from schema changes"
@@ -91,6 +92,9 @@ dev-tail: ## Show last 50 lines of logs
 			echo "" && \
 			echo "=== css ===" && \
 			tmux -L "$$(basename $$TMUX_SOCK)" capture-pane -t erikcraddock-me:css -p -S -25 2>/dev/null || echo "(no output)"; \
+			echo "" && \
+			echo "=== docker ===" && \
+			tmux -L "$$(basename $$TMUX_SOCK)" capture-pane -t erikcraddock-me:docker -p -S -25 2>/dev/null || echo "(no output)"; \
 		else \
 			echo "Could not find tmux socket"; \
 		fi; \
@@ -110,6 +114,13 @@ connect-app: ## Attach to app terminal (Ctrl+b d to detach)
 connect-css: ## Attach to css terminal (Ctrl+b d to detach)
 	@if [ -S $(SOCKET) ]; then \
 		overmind connect css -s $(SOCKET); \
+	else \
+		echo "Dev environment not running. Start with: make dev"; \
+	fi
+
+connect-docker: ## Attach to docker terminal (Ctrl+b d to detach)
+	@if [ -S $(SOCKET) ]; then \
+		overmind connect docker -s $(SOCKET); \
 	else \
 		echo "Dev environment not running. Start with: make dev"; \
 	fi

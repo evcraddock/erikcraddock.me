@@ -1,2 +1,3 @@
 app: LOG_LEVEL=debug bun run --hot src/index.tsx
 css: DEBUG=tailwindcss:* npm run css:watch
+docker: docker compose up --remove-orphans
