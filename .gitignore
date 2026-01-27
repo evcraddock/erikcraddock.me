@@ -35,5 +35,11 @@ coverage/
 *.sqlite
 *.sqlite3
 
+# Database data directory
+data/
+
+# Drizzle migrations (generated)
+drizzle/
+
 # S3/MinIO local data
 .minio/

@@ -1,5 +1,6 @@
 .PHONY: dev dev-stop dev-restart dev-status dev-logs dev-tail \
         connect-app connect-css \
+        db-generate db-migrate db-push db-studio \
         check pre-pr help
 
 SOCKET := ./.overmind.sock
@@ -24,6 +25,12 @@ help: ## Show this help
 	@echo "Connect (Ctrl+b d to detach):"
 	@echo "  connect-app     Attach to app terminal"
 	@echo "  connect-css     Attach to css terminal"
+	@echo ""
+	@echo "Database:"
+	@echo "  db-generate     Generate migrations from schema changes"
+	@echo "  db-migrate      Run pending migrations"
+	@echo "  db-push         Push schema directly to database (dev only)"
+	@echo "  db-studio       Open Drizzle Studio to browse database"
 	@echo ""
 	@echo "Quality:"
 	@echo "  check           Run linting and tests"
@@ -105,6 +112,26 @@ connect-css: ## Attach to css terminal (Ctrl+b d to detach)
 	else \
 		echo "Dev environment not running. Start with: make dev"; \
 	fi
+
+# =============================================================================
+# Database
+# =============================================================================
+
+db-generate: ## Generate migrations from schema changes
+	@mkdir -p data
+	npx drizzle-kit generate
+
+db-migrate: ## Run pending migrations
+	@mkdir -p data
+	npx drizzle-kit migrate
+
+db-push: ## Push schema directly to database (dev only)
+	@mkdir -p data
+	npx drizzle-kit push
+
+db-studio: ## Open Drizzle Studio to browse database
+	@mkdir -p data
+	npx drizzle-kit studio
 
 # =============================================================================
 # Quality
