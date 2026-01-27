@@ -1,9 +1,15 @@
 import { Hono } from "hono";
+import { Layout } from "./templates/layout";
 
 const app = new Hono();
 
 app.get("/", (c) => {
-  return c.text("Hello from erikcraddock.me!");
+  return c.html(
+    <Layout title="Home | erikcraddock.me">
+      <h1>Welcome</h1>
+      <p>Coming soon.</p>
+    </Layout>
+  );
 });
 
 // ActivityPub actor endpoint (placeholder)
@@ -12,7 +18,6 @@ app.get("/.well-known/webfinger", (c) => {
 });
 
 const port = Number(process.env.PORT) || 3000;
-console.log(`Server running on port ${port}`);
 
 export default {
   port,
