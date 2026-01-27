@@ -125,29 +125,32 @@ make dev-logs      # Ctrl+C to stop
 
 ## Testing Requirements
 
-Every task must include tests for its acceptance criteria.
+Write tests for code with logic. Don't write tests just to have tests.
 
-**Acceptance criteria = test cases.** If you can verify it manually, write a test for it.
+**Do test:**
+
+- Business logic and data transformations
+- Functions with conditionals or branching
+- API route handlers (integration tests)
+- Complex components with state or computed values
+- Edge cases and error handling
+
+**Don't test:**
+
+- Schema/type definitions — TypeScript validates these at compile time
+- Pure presentation components — use visual verification instead
+- Third-party library integration in isolation — test when used in real features
+- Simple pass-through functions with no logic
+
+**Why this policy:**
+
+Tests should catch bugs and prevent regressions. Testing that "a schema export exists" or "a static HTML element renders" provides no value — TypeScript and visual inspection already verify these. Save testing effort for code where bugs can hide.
 
 **Before closing a task:**
 
-- [ ] New functionality has corresponding tests in `src/__tests__/` or colocated `*.test.ts`
-- [ ] Tests verify the acceptance criteria, not just "code runs"
-- [ ] `npm test` passes with the new tests
-
-**Don't verify acceptance criteria manually** - that's what tests are for.
-
-**Example:** If acceptance criteria says "Schema exports posts table":
-
-```typescript
-import { posts } from "@/db/schema";
-
-describe("schema", () => {
-  it("exports posts table", () => {
-    expect(posts).toBeDefined();
-  });
-});
-```
+- [ ] Code with logic has corresponding tests
+- [ ] `npm test` passes
+- [ ] Visual verification done for UI changes
 
 ## Conventions
 
