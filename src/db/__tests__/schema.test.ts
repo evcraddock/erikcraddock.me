@@ -72,7 +72,7 @@ describe("database operations", () => {
     sqlite.close();
   });
 
-  it("can insert and query posts", async () => {
+  it("can insert and query posts", () => {
     const now = new Date();
 
     const result = db
@@ -97,7 +97,7 @@ describe("database operations", () => {
     expect(queried?.title).toBe("Test Post");
   });
 
-  it("can insert and query tags", async () => {
+  it("can insert and query tags", () => {
     const result = db
       .insert(tags)
       .values({
@@ -117,7 +117,7 @@ describe("database operations", () => {
     expect(queried?.name).toBe("TypeScript");
   });
 
-  it("can create post-tag relationships", async () => {
+  it("can create post-tag relationships", () => {
     // Insert another post and tag for this test
     const post = db
       .insert(posts)
