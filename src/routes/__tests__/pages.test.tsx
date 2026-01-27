@@ -46,6 +46,13 @@ beforeAll(async () => {
       tag_id INTEGER NOT NULL,
       PRIMARY KEY (post_id, tag_id)
     );
+
+    CREATE TABLE sources (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      name TEXT NOT NULL,
+      url TEXT NOT NULL,
+      feed_url TEXT
+    );
   `);
 
   testDb = drizzle(testSqlite, { schema });
@@ -70,6 +77,9 @@ beforeAll(async () => {
     INSERT INTO post_tags (post_id, tag_id) VALUES (1, 2);
     INSERT INTO post_tags (post_id, tag_id) VALUES (2, 1);
     INSERT INTO post_tags (post_id, tag_id) VALUES (3, 2);
+
+    INSERT INTO sources (id, name, url, feed_url) VALUES (1, 'Test Blog', 'https://example.com', 'https://example.com/feed.xml');
+    INSERT INTO sources (id, name, url, feed_url) VALUES (2, 'Another Site', 'https://another.example.com', NULL);
   `);
 });
 
@@ -118,6 +128,87 @@ describe("pages routes", () => {
       expect(html).toContain("dark:bg-gray-900");
       expect(html).toContain("dark:text-gray-100");
       expect(html).toContain("dark:border-gray-700");
+    });
+
+    it("includes navigation links to About and Sources", async () => {
+      const app = getApp();
+      const res = await app.request("/");
+      const html = await res.text();
+
+      expect(html).toContain('href="/about"');
+      expect(html).toContain('href="/sources"');
+    });
+  });
+
+  describe("GET /about", () => {
+    it("returns 200 and displays about page", async () => {
+      const app = getApp();
+      const res = await app.request("/about");
+
+      expect(res.status).toBe(200);
+
+      const html = await res.text();
+      expect(html).toContain("About");
+      expect(html).toContain("Erik Craddock");
+    });
+
+    it("includes ActivityPub follow information", async () => {
+      const app = getApp();
+      const res = await app.request("/about");
+      const html = await res.text();
+
+      expect(html).toContain("@erik@erikcraddock.me");
+      expect(html).toContain("Fediverse");
+    });
+
+    it("includes dark mode classes", async () => {
+      const app = getApp();
+      const res = await app.request("/about");
+      const html = await res.text();
+
+      expect(html).toContain("dark:bg-gray-900");
+      expect(html).toContain("dark:text-gray-100");
+    });
+  });
+
+  describe("GET /sources", () => {
+    it("returns 200 and displays sources page", async () => {
+      const app = getApp();
+      const res = await app.request("/sources");
+
+      expect(res.status).toBe(200);
+
+      const html = await res.text();
+      expect(html).toContain("Sources");
+    });
+
+    it("lists sources from database", async () => {
+      const app = getApp();
+      const res = await app.request("/sources");
+      const html = await res.text();
+
+      expect(html).toContain("Test Blog");
+      expect(html).toContain("https://example.com");
+      expect(html).toContain("Another Site");
+    });
+
+    it("shows RSS link for sources with feed_url", async () => {
+      const app = getApp();
+      const res = await app.request("/sources");
+      const html = await res.text();
+
+      expect(html).toContain("RSS");
+      expect(html).toContain("https://example.com/feed.xml");
+    });
+
+    it("includes dark mode classes", async () => {
+      const app = getApp();
+      const res = await app.request("/sources");
+      const html = await res.text();
+
+      expect(html).toContain("dark:bg-gray-900");
+      expect(html).toContain("dark:text-gray-100");
+      expect(html).toContain("dark:text-blue-400");
     });
   });
 

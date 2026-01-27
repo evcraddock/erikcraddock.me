@@ -1,7 +1,7 @@
 import { Hono } from "hono";
 import { raw } from "hono/html";
 import { desc, eq, isNotNull, and } from "drizzle-orm";
-import { db as defaultDb, posts, tags, postTags } from "../db";
+import { db as defaultDb, posts, tags, postTags, sources } from "../db";
 import { Layout } from "../templates/layout";
 import { NotFound } from "../templates/not-found";
 import { truncate } from "../utils/text";
@@ -72,6 +72,85 @@ export function createPagesRoutes(db: Database): Hono {
     return c.html(
       <Layout title="Home | erikcraddock.me">
         <PostList posts={allPosts} />
+      </Layout>
+    );
+  });
+
+  // About page
+  pages.get("/about", (c) => {
+    return c.html(
+      <Layout title="About | erikcraddock.me">
+        <h1 class="text-3xl font-bold text-gray-900 dark:text-gray-100 mb-8">About</h1>
+
+        <div class="prose prose-gray dark:prose-invert max-w-none">
+          <p>
+            Hi, I'm Erik Craddock. This is my personal blog where I write about software
+            development, technology, and whatever else interests me.
+          </p>
+
+          <p>
+            This site is built with modern web technologies and supports ActivityPub, which means
+            you can follow it from Mastodon and other federated platforms.
+          </p>
+
+          <h2>Follow Me</h2>
+          <p>
+            You can follow this blog on the Fediverse at <code>@erik@erikcraddock.me</code>. New
+            posts will appear in your home feed just like any other account you follow.
+          </p>
+
+          <h2>Contact</h2>
+          <p>Feel free to reach out via the Fediverse or check out my projects on GitHub.</p>
+        </div>
+      </Layout>
+    );
+  });
+
+  // Sources / Blogroll page
+  pages.get("/sources", (c) => {
+    const allSources = db.select().from(sources).orderBy(sources.name).all();
+
+    return c.html(
+      <Layout title="Sources | erikcraddock.me">
+        <h1 class="text-3xl font-bold text-gray-900 dark:text-gray-100 mb-4">Sources</h1>
+
+        <p class="text-gray-600 dark:text-gray-400 mb-8">
+          Blogs and websites I read and recommend. These are the sources that inspire my thinking
+          and writing.
+        </p>
+
+        {allSources.length === 0 ? (
+          <p class="text-gray-600 dark:text-gray-400">No sources yet.</p>
+        ) : (
+          <ul class="space-y-4">
+            {allSources.map((source) => (
+              <li key={source.id} class="border-b border-gray-200 dark:border-gray-700 pb-4">
+                <a
+                  href={source.url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  class="text-lg font-medium text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300"
+                >
+                  {source.name}
+                </a>
+                {source.feed_url ? (
+                  <span class="ml-2 text-sm text-gray-400 dark:text-gray-500">
+                    (
+                    <a
+                      href={source.feed_url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      class="hover:text-gray-600 dark:hover:text-gray-300"
+                    >
+                      RSS
+                    </a>
+                    )
+                  </span>
+                ) : null}
+              </li>
+            ))}
+          </ul>
+        )}
       </Layout>
     );
   });

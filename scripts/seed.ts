@@ -1,4 +1,4 @@
-import { db, posts, tags, postTags } from "../src/db";
+import { db, posts, tags, postTags, sources } from "../src/db";
 
 async function seed() {
   console.log("🌱 Seeding database...");
@@ -6,10 +6,21 @@ async function seed() {
   // Check if already seeded
   const existingPosts = db.select().from(posts).all();
   if (existingPosts.length > 0) {
-    console.log("Database already has posts, skipping seed.");
-    return;
+    console.log("Database already has posts, skipping post seed.");
+  } else {
+    await seedPosts();
   }
 
+  // Seed sources if empty
+  const existingSources = db.select().from(sources).all();
+  if (existingSources.length > 0) {
+    console.log("Database already has sources, skipping source seed.");
+  } else {
+    await seedSources();
+  }
+}
+
+async function seedPosts() {
   const now = new Date();
 
   // Create tags
@@ -36,11 +47,22 @@ async function seed() {
 
 When someone follows @erik@erikcraddock.me, they'll see my posts show up in their home feed, just like following any other account.
 
+> The best way to predict the future is to invent it.
+>
+> — Alan Kay
+
 The tech stack includes:
 - **Hono** for the web framework
 - **Fedify** for ActivityPub
 - **Drizzle + SQLite** for the database
 - **Tailwind** for styling
+
+Here is some \`inline code\` and a code block:
+
+\`\`\`javascript
+const greeting = "Hello, world!";
+console.log(greeting);
+\`\`\`
 
 More posts coming soon as I build this out!`,
       excerpt: "Introducing my new federated blog that can be followed from Mastodon.",
@@ -92,6 +114,44 @@ The small upfront cost of adding types pays off enormously as the project grows.
   }
 
   console.log(`✅ Seeded ${postData.length} posts and ${tagData.length} tags`);
+}
+
+async function seedSources() {
+  console.log("Creating sources...");
+
+  const sourceData = [
+    {
+      name: "Simon Willison's Weblog",
+      url: "https://simonwillison.net/",
+      feed_url: "https://simonwillison.net/atom/everything/",
+    },
+    {
+      name: "Julia Evans",
+      url: "https://jvns.ca/",
+      feed_url: "https://jvns.ca/atom.xml",
+    },
+    {
+      name: "Xe Iaso",
+      url: "https://xeiaso.net/",
+      feed_url: "https://xeiaso.net/blog.rss",
+    },
+    {
+      name: "Drew DeVault's Blog",
+      url: "https://drewdevault.com/",
+      feed_url: "https://drewdevault.com/blog/index.xml",
+    },
+    {
+      name: "Daring Fireball",
+      url: "https://daringfireball.net/",
+      feed_url: "https://daringfireball.net/feeds/main",
+    },
+  ];
+
+  for (const source of sourceData) {
+    db.insert(sources).values(source).run();
+  }
+
+  console.log(`✅ Seeded ${sourceData.length} sources`);
 }
 
 seed().catch(console.error);
