@@ -1,6 +1,6 @@
 import { Hono } from "hono";
 import { raw } from "hono/html";
-import { desc, eq, isNotNull } from "drizzle-orm";
+import { desc, eq, isNotNull, and } from "drizzle-orm";
 import { db as defaultDb, posts, tags, postTags } from "../db";
 import { Layout } from "../templates/layout";
 import { NotFound } from "../templates/not-found";
@@ -10,6 +10,49 @@ import { renderMarkdown } from "../utils/markdown";
 // Database type for dependency injection
 type Database = typeof defaultDb;
 
+// Post type for the card component
+type Post = typeof posts.$inferSelect;
+
+/** Reusable post card component */
+function PostCard({ post }: { post: Post }) {
+  return (
+    <article class="border-b border-gray-200 dark:border-gray-700 pb-6">
+      <a href={`/posts/${post.id}`} class="block group">
+        {post.title ? (
+          <h2 class="text-xl font-semibold text-gray-900 dark:text-gray-100 group-hover:text-blue-600 dark:group-hover:text-blue-400 mb-2">
+            {post.title}
+          </h2>
+        ) : null}
+        <p class="text-gray-600 dark:text-gray-400 mb-2">
+          {post.excerpt || truncate(post.content, 200)}
+        </p>
+        <time class="text-sm text-gray-400 dark:text-gray-500">
+          {post.published_at
+            ? new Date(post.published_at).toLocaleDateString("en-US", {
+                year: "numeric",
+                month: "long",
+                day: "numeric",
+              })
+            : "Draft"}
+        </time>
+      </a>
+    </article>
+  );
+}
+
+/** Reusable post list component */
+function PostList({ posts: postList, emptyMessage }: { posts: Post[]; emptyMessage?: string }) {
+  return (
+    <div class="space-y-8">
+      {postList.length === 0 ? (
+        <p class="text-gray-600 dark:text-gray-400">{emptyMessage || "No posts yet."}</p>
+      ) : (
+        postList.map((post) => <PostCard key={post.id} post={post} />)
+      )}
+    </div>
+  );
+}
+
 /**
  * Creates page routes with the given database instance.
  * Allows dependency injection for testing.
@@ -17,6 +60,7 @@ type Database = typeof defaultDb;
 export function createPagesRoutes(db: Database): Hono {
   const pages = new Hono();
 
+  // Home page
   pages.get("/", (c) => {
     const allPosts = db
       .select()
@@ -27,35 +71,7 @@ export function createPagesRoutes(db: Database): Hono {
 
     return c.html(
       <Layout title="Home | erikcraddock.me">
-        <div class="space-y-8">
-          {allPosts.length === 0 ? (
-            <p class="text-gray-600 dark:text-gray-400">No posts yet.</p>
-          ) : (
-            allPosts.map((post) => (
-              <article key={post.id} class="border-b border-gray-200 dark:border-gray-700 pb-6">
-                <a href={`/posts/${post.id}`} class="block group">
-                  {post.title ? (
-                    <h2 class="text-xl font-semibold text-gray-900 dark:text-gray-100 group-hover:text-blue-600 dark:group-hover:text-blue-400 mb-2">
-                      {post.title}
-                    </h2>
-                  ) : null}
-                  <p class="text-gray-600 dark:text-gray-400 mb-2">
-                    {post.excerpt || truncate(post.content, 200)}
-                  </p>
-                  <time class="text-sm text-gray-400 dark:text-gray-500">
-                    {post.published_at
-                      ? new Date(post.published_at).toLocaleDateString("en-US", {
-                          year: "numeric",
-                          month: "long",
-                          day: "numeric",
-                        })
-                      : "Draft"}
-                  </time>
-                </a>
-              </article>
-            ))
-          )}
-        </div>
+        <PostList posts={allPosts} />
       </Layout>
     );
   });
@@ -144,6 +160,61 @@ export function createPagesRoutes(db: Database): Hono {
           {/* Post content */}
           <div class="prose prose-gray max-w-none">{raw(renderMarkdown(post.content))}</div>
         </article>
+      </Layout>
+    );
+  });
+
+  // Posts by tag page
+  pages.get("/tags/:slug", (c) => {
+    const slug = c.req.param("slug");
+
+    // Query the tag by slug
+    const tag = db.select().from(tags).where(eq(tags.slug, slug)).get();
+
+    if (!tag) {
+      return c.html(
+        <NotFound title="Tag Not Found" message="The tag you're looking for doesn't exist." />,
+        404
+      );
+    }
+
+    // Query published posts with this tag
+    const taggedPosts = db
+      .select({
+        id: posts.id,
+        type: posts.type,
+        title: posts.title,
+        content: posts.content,
+        excerpt: posts.excerpt,
+        url: posts.url,
+        source_id: posts.source_id,
+        published_at: posts.published_at,
+        created_at: posts.created_at,
+        updated_at: posts.updated_at,
+      })
+      .from(posts)
+      .innerJoin(postTags, eq(posts.id, postTags.post_id))
+      .where(and(eq(postTags.tag_id, tag.id), isNotNull(posts.published_at)))
+      .orderBy(desc(posts.published_at))
+      .all();
+
+    return c.html(
+      <Layout title={`${tag.name} | erikcraddock.me`}>
+        {/* Back link */}
+        <a
+          href="/"
+          class="text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300 text-sm mb-6 inline-block"
+        >
+          ← Back to home
+        </a>
+
+        {/* Tag heading */}
+        <h1 class="text-3xl font-bold text-gray-900 dark:text-gray-100 mb-8">
+          Posts tagged "{tag.name}"
+        </h1>
+
+        {/* Post list */}
+        <PostList posts={taggedPosts} emptyMessage={`No posts tagged "${tag.name}" yet.`} />
       </Layout>
     );
   });

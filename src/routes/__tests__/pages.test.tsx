@@ -59,11 +59,17 @@ beforeAll(async () => {
     INSERT INTO posts (id, type, title, content, created_at, updated_at)
     VALUES (2, 'article', 'Draft Post', 'This is a draft.', ${now}, ${now});
 
+    INSERT INTO posts (id, type, title, content, published_at, created_at, updated_at)
+    VALUES (3, 'article', 'Another Post', 'Another post content.', ${now}, ${now}, ${now});
+
     INSERT INTO tags (id, name, slug) VALUES (1, 'Testing', 'testing');
     INSERT INTO tags (id, name, slug) VALUES (2, 'TypeScript', 'typescript');
+    INSERT INTO tags (id, name, slug) VALUES (3, 'Empty Tag', 'empty-tag');
 
     INSERT INTO post_tags (post_id, tag_id) VALUES (1, 1);
     INSERT INTO post_tags (post_id, tag_id) VALUES (1, 2);
+    INSERT INTO post_tags (post_id, tag_id) VALUES (2, 1);
+    INSERT INTO post_tags (post_id, tag_id) VALUES (3, 2);
   `);
 });
 
@@ -194,6 +200,83 @@ describe("pages routes", () => {
 
       const html = await res.text();
       expect(html).toContain("Post Not Found");
+    });
+  });
+
+  describe("GET /tags/:slug", () => {
+    it("returns 200 and displays tag name as heading", async () => {
+      const app = getApp();
+      const res = await app.request("/tags/testing");
+
+      expect(res.status).toBe(200);
+
+      const html = await res.text();
+      // Quotes are HTML-escaped as &quot;
+      expect(html).toContain("Posts tagged");
+      expect(html).toContain("Testing");
+    });
+
+    it("displays only published posts with that tag", async () => {
+      const app = getApp();
+      const res = await app.request("/tags/testing");
+      const html = await res.text();
+
+      // Post 1 is published and has "testing" tag
+      expect(html).toContain("Test Post");
+      // Post 2 is a draft with "testing" tag - should NOT appear
+      expect(html).not.toContain("Draft Post");
+    });
+
+    it("shows posts filtered by tag", async () => {
+      const app = getApp();
+      const res = await app.request("/tags/typescript");
+      const html = await res.text();
+
+      // Posts 1 and 3 have "typescript" tag
+      expect(html).toContain("Test Post");
+      expect(html).toContain("Another Post");
+    });
+
+    it("includes back link to home", async () => {
+      const app = getApp();
+      const res = await app.request("/tags/testing");
+      const html = await res.text();
+
+      expect(html).toContain('href="/"');
+      expect(html).toContain("Back to home");
+    });
+
+    it("includes dark mode classes", async () => {
+      const app = getApp();
+      const res = await app.request("/tags/testing");
+      const html = await res.text();
+
+      expect(html).toContain("dark:bg-gray-900");
+      expect(html).toContain("dark:text-gray-100");
+      expect(html).toContain("dark:border-gray-700");
+    });
+
+    it("shows empty message for tag with no published posts", async () => {
+      const app = getApp();
+      const res = await app.request("/tags/empty-tag");
+
+      expect(res.status).toBe(200);
+
+      const html = await res.text();
+      // Quotes are HTML-escaped as &quot;
+      expect(html).toContain("No posts tagged");
+      expect(html).toContain("Empty Tag");
+      expect(html).toContain("yet.");
+    });
+
+    it("returns 404 for non-existent tag", async () => {
+      const app = getApp();
+      const res = await app.request("/tags/nonexistent");
+
+      expect(res.status).toBe(404);
+
+      const html = await res.text();
+      expect(html).toContain("Tag Not Found");
     });
   });
 });
