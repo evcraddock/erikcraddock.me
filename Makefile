@@ -12,9 +12,10 @@ dev: ## Start the dev environment
 
 dev-stop: ## Stop the dev environment
 	overmind quit || true
+	@rm -f .overmind.sock
 
 dev-status: ## Check if dev environment is running
-	@if pgrep -f "overmind start" > /dev/null 2>&1; then echo "running"; else echo "stopped"; fi
+	@if [ -S .overmind.sock ]; then echo "running"; else echo "stopped"; fi
 
 dev-logs: ## Connect to dev environment logs
 	overmind connect

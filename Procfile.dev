@@ -1,1 +1,2 @@
 app: bun run --hot src/index.tsx
+css: npm run css:watch
