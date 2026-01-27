@@ -25,6 +25,12 @@ export function Layout({ title, children }: LayoutProps) {
         <title>{title}</title>
         <script>{raw(themeScript)}</script>
         <link rel="stylesheet" href="/css/main.css" />
+        <link
+          rel="alternate"
+          type="application/rss+xml"
+          title="erikcraddock.me RSS Feed"
+          href="/feed.xml"
+        />
       </head>
       <body class="min-h-screen flex flex-col bg-gray-50 text-gray-900 dark:bg-gray-900 dark:text-gray-100">
         <header class="bg-white shadow-sm dark:bg-gray-800 dark:shadow-gray-900/50">

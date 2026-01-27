@@ -1,6 +1,7 @@
 import { Hono } from "hono";
 import { serveStatic } from "hono/bun";
 import { pages } from "./routes/pages";
+import { feed } from "./routes/feed";
 import { logger } from "./utils/logger";
 
 const app = new Hono();
@@ -27,6 +28,7 @@ app.use("/css/*", serveStatic({ root: "./public" }));
 
 // Mount routes
 app.route("/", pages);
+app.route("/", feed);
 
 // ActivityPub actor endpoint (placeholder)
 app.get("/.well-known/webfinger", (c) => {
