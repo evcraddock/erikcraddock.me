@@ -7,10 +7,18 @@ import { generateToken, hashToken } from "./crypto";
 const TOKEN_EXPIRY_MINUTES = 15;
 
 /**
- * Check if an email is in the authors allow list
+ * Check if an email is in the authors allow list or is the admin email
  */
 export async function isAuthorizedEmail(email: string): Promise<boolean> {
   const normalizedEmail = email.toLowerCase().trim();
+
+  // Check ADMIN_EMAIL env var first
+  const adminEmail = process.env.ADMIN_EMAIL?.toLowerCase().trim();
+  if (adminEmail && normalizedEmail === adminEmail) {
+    return true;
+  }
+
+  // Check authors table
   const author = db.select().from(authors).where(eq(authors.email, normalizedEmail)).get();
 
   return !!author;
@@ -59,10 +67,10 @@ export async function createMagicLink(email: string): Promise<boolean> {
   const protocol = process.env.NODE_ENV === "production" ? "https" : "http";
   const magicLinkUrl = `${protocol}://${domain}/login/verify?token=${token}`;
 
-  const isProduction = process.env.NODE_ENV === "production";
+  const devMode = process.env.SMTP_DEV_MODE === "true";
 
-  if (isProduction) {
-    // Production: send email via configured SMTP
+  if (!devMode) {
+    // Send email via configured SMTP
     const emailSent = await sendEmail({
       to: normalizedEmail,
       subject: "Your login link",
@@ -79,7 +87,7 @@ export async function createMagicLink(email: string): Promise<boolean> {
       logger.error("auth", "Failed to send magic link email", { email: normalizedEmail });
     }
   } else {
-    // Development: log the link to console
+    // Dev mode: log the link to console instead of sending email
     logger.info("auth", "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
     logger.info("auth", `Magic link for ${normalizedEmail}:`);
     logger.info("auth", magicLinkUrl);
