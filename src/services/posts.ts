@@ -199,6 +199,77 @@ export function createPost(input: CreatePostInput) {
   };
 }
 
+export interface UpdatePostInput {
+  title?: string | null;
+  content?: string;
+  excerpt?: string | null;
+  url?: string | null;
+  tags?: string[]; // Tag slugs
+}
+
+/**
+ * Update an existing post
+ */
+export function updatePost(id: number, input: UpdatePostInput) {
+  const existing = db.select().from(posts).where(eq(posts.id, id)).get();
+
+  if (!existing) {
+    return null;
+  }
+
+  const { title, content, excerpt, url, tags: tagSlugs } = input;
+
+  // Build update object with only provided fields
+  const updates: Record<string, unknown> = {
+    updated_at: new Date(),
+  };
+
+  if (title !== undefined) updates.title = title;
+  if (content !== undefined) updates.content = content;
+  if (excerpt !== undefined) updates.excerpt = excerpt;
+  if (url !== undefined) updates.url = url;
+
+  // Update post
+  db.update(posts).set(updates).where(eq(posts.id, id)).run();
+
+  // Update tags if provided
+  if (tagSlugs !== undefined) {
+    // Remove existing tag associations
+    db.delete(postTags).where(eq(postTags.post_id, id)).run();
+
+    // Add new tags
+    for (const slug of tagSlugs) {
+      const normalizedSlug = slugify(slug);
+      if (normalizedSlug) {
+        const tagId = getOrCreateTag(normalizedSlug);
+        db.insert(postTags).values({ post_id: id, tag_id: tagId }).run();
+      }
+    }
+  }
+
+  // Return updated post
+  return getPost(id);
+}
+
+/**
+ * Delete a post
+ */
+export function deletePost(id: number): boolean {
+  const existing = db.select().from(posts).where(eq(posts.id, id)).get();
+
+  if (!existing) {
+    return false;
+  }
+
+  // Delete tag associations (cascade should handle this, but be explicit)
+  db.delete(postTags).where(eq(postTags.post_id, id)).run();
+
+  // Delete the post
+  db.delete(posts).where(eq(posts.id, id)).run();
+
+  return true;
+}
+
 /**
  * Get a single post by ID
  */

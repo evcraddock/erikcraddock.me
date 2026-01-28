@@ -1,6 +1,6 @@
 import { Hono } from "hono";
 import { requireApiKey } from "@/auth/api-key";
-import { listPosts, getPost, createPost, PostType } from "@/services/posts";
+import { listPosts, getPost, createPost, updatePost, deletePost, PostType } from "@/services/posts";
 
 export const api = new Hono();
 
@@ -108,4 +108,56 @@ api.post("/posts", async (c) => {
   });
 
   return c.json({ data: post }, 201);
+});
+
+/**
+ * PUT /api/posts/:id - Update post
+ */
+api.put("/posts/:id", async (c) => {
+  const id = parseInt(c.req.param("id"), 10);
+
+  if (isNaN(id)) {
+    return c.json({ error: "Invalid post ID" }, 400);
+  }
+
+  const body = await c.req.json();
+  const { title, content, excerpt, url, tags } = body;
+
+  // Validate tags if provided
+  if (tags !== undefined && !Array.isArray(tags)) {
+    return c.json({ error: "Tags must be an array" }, 400);
+  }
+
+  const post = updatePost(id, {
+    title: title !== undefined ? (title?.trim() || null) : undefined,
+    content: content?.trim(),
+    excerpt: excerpt !== undefined ? (excerpt?.trim() || null) : undefined,
+    url: url !== undefined ? (url?.trim() || null) : undefined,
+    tags,
+  });
+
+  if (!post) {
+    return c.json({ error: "Post not found" }, 404);
+  }
+
+  return c.json({ data: post });
+});
+
+/**
+ * DELETE /api/posts/:id - Delete post
+ */
+api.delete("/posts/:id", (c) => {
+  const id = parseInt(c.req.param("id"), 10);
+
+  if (isNaN(id)) {
+    return c.json({ error: "Invalid post ID" }, 400);
+  }
+
+  const deleted = deletePost(id);
+
+  if (!deleted) {
+    return c.json({ error: "Post not found" }, 404);
+  }
+
+  return c.body(null, 204);
 });
