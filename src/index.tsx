@@ -5,6 +5,7 @@ import { feed } from "./routes/feed";
 import { auth } from "./routes/auth";
 import { admin } from "./routes/admin";
 import { api } from "./routes/api";
+import { mediaRoute } from "./routes/media";
 import { logger } from "./utils/logger";
 
 const app = new Hono();
@@ -35,6 +36,7 @@ app.route("/", feed);
 app.route("/", auth);
 app.route("/admin", admin);
 app.route("/api", api);
+app.route("/media", mediaRoute);
 
 // ActivityPub actor endpoint (placeholder)
 app.get("/.well-known/webfinger", (c) => {
