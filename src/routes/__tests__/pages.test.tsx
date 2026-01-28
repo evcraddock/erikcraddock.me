@@ -79,6 +79,12 @@ beforeAll(async () => {
     INSERT INTO posts (id, type, title, content, published_at, created_at, updated_at)
     VALUES (3, 'article', 'Another Post', 'Another post content.', ${now}, ${now}, ${now});
 
+    INSERT INTO posts (id, type, title, content, published_at, created_at, updated_at)
+    VALUES (4, 'note', NULL, 'Short note content 🚀', ${now}, ${now}, ${now});
+
+    INSERT INTO posts (id, type, title, content, published_at, created_at, updated_at)
+    VALUES (5, 'note', NULL, '${"x".repeat(300)}', ${now}, ${now}, ${now});
+
     INSERT INTO tags (id, name, slug) VALUES (1, 'Testing', 'testing');
     INSERT INTO tags (id, name, slug) VALUES (2, 'TypeScript', 'typescript');
     INSERT INTO tags (id, name, slug) VALUES (3, 'Empty Tag', 'empty-tag');
@@ -451,6 +457,79 @@ describe("pages routes", () => {
 
       const html = await res.text();
       expect(html).toContain("Tag Not Found");
+    });
+  });
+
+  describe("Note posts", () => {
+    describe("GET / (home page)", () => {
+      it("displays short notes with full content", async () => {
+        const app = getApp();
+        const res = await app.request("/");
+        const html = await res.text();
+
+        // Short note should show full content
+        expect(html).toContain("Short note content 🚀");
+      });
+
+      it("displays notes with left border styling", async () => {
+        const app = getApp();
+        const res = await app.request("/");
+        const html = await res.text();
+
+        // Notes should have left border class
+        expect(html).toContain("border-l-2");
+        expect(html).toContain("border-l-gray-300");
+      });
+
+      it("truncates long notes with ellipsis", async () => {
+        const app = getApp();
+        const res = await app.request("/");
+        const html = await res.text();
+
+        // Long note (300 chars of 'x') should be truncated
+        // Should not contain all 300 x's, but should have truncated version
+        expect(html).not.toContain("x".repeat(300));
+        expect(html).toContain("…"); // Ellipsis for truncated content
+      });
+    });
+
+    describe("GET /posts/:id (single note page)", () => {
+      it("displays note with left border styling", async () => {
+        const app = getApp();
+        const res = await app.request("/posts/4");
+        const html = await res.text();
+
+        expect(res.status).toBe(200);
+        expect(html).toContain("border-l-4");
+        expect(html).toContain("border-l-gray-300");
+      });
+
+      it("displays full note content", async () => {
+        const app = getApp();
+        const res = await app.request("/posts/4");
+        const html = await res.text();
+
+        expect(html).toContain("Short note content 🚀");
+      });
+
+      it("uses 'Note' as title fallback in page title", async () => {
+        const app = getApp();
+        const res = await app.request("/posts/4");
+        const html = await res.text();
+
+        // The <title> should contain "Note" since notes don't have titles
+        expect(html).toContain("<title>Note | erikcraddock.me</title>");
+      });
+
+      it("does not display title heading for notes", async () => {
+        const app = getApp();
+        const res = await app.request("/posts/4");
+        const html = await res.text();
+
+        // Should not have an h1 with "Short note content" (that's content, not title)
+        // Notes have no title, so there shouldn't be a title heading
+        expect(html).not.toContain("<h1");
+      });
     });
   });
 });
