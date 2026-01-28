@@ -37,9 +37,20 @@ app.get("/.well-known/webfinger", (c) => {
   return c.json({ message: "WebFinger endpoint - to be implemented" });
 });
 
-const port = Number(process.env.PORT) || 3000;
+const port = Number(process.env.PORT) || 5000;
 
 logger.info("server", `Starting on http://localhost:${port}`);
+
+// In dev, log helpful info
+if (process.env.NODE_ENV !== "production") {
+  const adminEmail = process.env.ADMIN_EMAIL;
+  if (adminEmail) {
+    logger.info("server", `Admin email: ${adminEmail}`);
+    logger.info("server", `Login at: http://localhost:${port}/login`);
+  } else {
+    logger.warn("server", "ADMIN_EMAIL not set - run seed script after setting it in .env");
+  }
+}
 
 export default {
   port,
