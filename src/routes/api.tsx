@@ -10,6 +10,7 @@ import {
   unpublishPost,
   PostType,
 } from "@/services/posts";
+import { createMedia, deleteMedia, isAllowedMimeType } from "@/services/media";
 
 export const api = new Hono();
 
@@ -207,4 +208,65 @@ api.post("/posts/:id/unpublish", (c) => {
   }
 
   return c.json({ data: post });
+});
+
+/**
+ * POST /api/media - Upload media file
+ * Accepts multipart/form-data with:
+ *   - file: the image file (required)
+ *   - alt: alt text (optional)
+ *   - key: custom S3 key (optional)
+ */
+api.post("/media", async (c) => {
+  const body = await c.req.parseBody();
+  const file = body.file;
+
+  if (!file || !(file instanceof File)) {
+    return c.json({ error: "File is required" }, 400);
+  }
+
+  if (!isAllowedMimeType(file.type)) {
+    return c.json({ error: "Invalid file type. Allowed: jpg, png, gif, webp" }, 400);
+  }
+
+  const buffer = Buffer.from(await file.arrayBuffer());
+  const altText = typeof body.alt === "string" ? body.alt.trim() : undefined;
+  const customKey = typeof body.key === "string" ? body.key.trim() : undefined;
+
+  try {
+    const record = await createMedia({
+      file: buffer,
+      filename: file.name,
+      mimeType: file.type,
+      altText: altText || undefined,
+      customKey: customKey || undefined,
+    });
+
+    return c.json({ data: record }, 201);
+  } catch (error) {
+    return c.json({ error: String(error) }, 500);
+  }
+});
+
+/**
+ * DELETE /api/media/:id - Delete media file
+ */
+api.delete("/media/:id", async (c) => {
+  const id = parseInt(c.req.param("id"), 10);
+
+  if (isNaN(id)) {
+    return c.json({ error: "Invalid media ID" }, 400);
+  }
+
+  try {
+    const deleted = await deleteMedia(id);
+
+    if (!deleted) {
+      return c.json({ error: "Media not found" }, 404);
+    }
+
+    return c.body(null, 204);
+  } catch (error) {
+    return c.json({ error: String(error) }, 500);
+  }
 });

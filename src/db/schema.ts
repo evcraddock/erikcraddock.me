@@ -112,15 +112,12 @@ export const sessions = sqliteTable("sessions", {
   created_at: integer("created_at", { mode: "timestamp" }).notNull(),
 });
 
-// Media attachments for posts
+// Media files stored in S3
 export const media = sqliteTable("media", {
   id: integer("id").primaryKey({ autoIncrement: true }),
-  post_id: integer("post_id")
-    .notNull()
-    .references(() => posts.id, { onDelete: "cascade" }),
   filename: text("filename").notNull(),
   mime_type: text("mime_type").notNull(),
-  s3_key: text("s3_key").notNull(),
+  s3_key: text("s3_key").notNull().unique(),
   alt_text: text("alt_text"),
   created_at: integer("created_at", { mode: "timestamp" }).notNull(),
 });
