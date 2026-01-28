@@ -15,6 +15,7 @@ const domain = process.env.DOMAIN || "localhost:5000";
  * - KV store for Fedify's internal state (using in-memory for now, can switch to SQLite)
  * - Actor dispatcher for /users/{identifier}
  * - Key pairs dispatcher for HTTP signatures
+ * - Inbox, outbox, and followers collection dispatchers
  */
 export function createFedifyFederation() {
   logger.info("federation", `Creating federation for domain: ${domain}`);
@@ -36,14 +37,15 @@ export function createFedifyFederation() {
 
       const actorUri = ctx.getActorUri(identifier);
 
-      // Note: inbox, outbox, following, followers will be added in subsequent tasks
-      // For now, we just set up the basic actor with key pair
       return new Person({
         id: actorUri,
         preferredUsername: identifier,
         name: "Erik Craddock",
         summary: "Personal blog - articles, links, and notes",
         url: new URL("/", ctx.url),
+        inbox: ctx.getInboxUri(identifier),
+        outbox: ctx.getOutboxUri(identifier),
+        followers: ctx.getFollowersUri(identifier),
         publicKey: new CryptographicKey({
           id: new URL(`${actorUri}#main-key`),
           owner: actorUri,
@@ -60,6 +62,30 @@ export function createFedifyFederation() {
       const keyPair = await getOrCreateKeyPair();
       return [keyPair];
     });
+
+  // Set up inbox dispatcher - handles incoming activities
+  // Implementation will be added in Task #1319
+  federation.setInboxDispatcher("/users/{identifier}/inbox", async (_ctx, _identifier) => {
+    // Placeholder - returns empty collection
+    // Actual Follow/Undo handling will be implemented in Task #1319
+    return { items: [] };
+  });
+
+  // Set up outbox dispatcher - lists activities sent by this actor
+  // Implementation will be added in Task #1320
+  federation.setOutboxDispatcher("/users/{identifier}/outbox", async (_ctx, _identifier) => {
+    // Placeholder - returns empty collection
+    // Actual activity listing will be implemented in Task #1320
+    return { items: [] };
+  });
+
+  // Set up followers collection dispatcher - lists followers
+  // Implementation will be added in Task #1318
+  federation.setFollowersDispatcher("/users/{identifier}/followers", async (_ctx, _identifier) => {
+    // Placeholder - returns empty collection
+    // Actual follower listing will be implemented in Task #1318
+    return { items: [] };
+  });
 
   logger.info("federation", "Federation configured");
   return federation;
