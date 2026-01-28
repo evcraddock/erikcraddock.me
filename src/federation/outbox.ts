@@ -1,6 +1,6 @@
 import { Create, Note, Article } from "@fedify/fedify";
 import { Temporal } from "@js-temporal/polyfill";
-import { desc, isNotNull } from "drizzle-orm";
+import { desc, isNotNull, count } from "drizzle-orm";
 import { db, posts } from "@/db";
 import { logger } from "@/utils/logger";
 
@@ -45,12 +45,8 @@ export function getPublishedPosts(limit: number = 20, offset: number = 0): Publi
  * Get total count of published posts.
  */
 export function getPublishedPostCount(): number {
-  const result = db
-    .select({ id: posts.id })
-    .from(posts)
-    .where(isNotNull(posts.published_at))
-    .all();
-  return result.length;
+  const result = db.select({ count: count() }).from(posts).where(isNotNull(posts.published_at)).get();
+  return result?.count ?? 0;
 }
 
 /**
@@ -65,10 +61,10 @@ function dateToInstant(date: Date): Temporal.Instant {
  */
 export function postToObject(post: PublishedPost, actorUri: URL): Note | Article {
   const postUri = new URL(`/posts/${post.id}`, `${protocol}://${domain}`);
-  
+
   // Use Article for posts with titles, Note for everything else (notes, links)
   const ObjectClass = post.title ? Article : Note;
-  
+
   return new ObjectClass({
     id: postUri,
     attribution: actorUri,
@@ -86,9 +82,9 @@ export function postToObject(post: PublishedPost, actorUri: URL): Note | Article
 export function postToCreateActivity(post: PublishedPost, actorUri: URL): Create {
   const activityUri = new URL(`/posts/${post.id}#create`, `${protocol}://${domain}`);
   const object = postToObject(post, actorUri);
-  
+
   logger.debug("federation", `Converting post ${post.id} to Create activity`);
-  
+
   return new Create({
     id: activityUri,
     actor: actorUri,
@@ -101,7 +97,11 @@ export function postToCreateActivity(post: PublishedPost, actorUri: URL): Create
  * Get Create activities for the outbox.
  * Returns activities for all published posts, ordered by published_at descending.
  */
-export function getOutboxActivities(actorUri: URL, limit: number = 20, offset: number = 0): Create[] {
+export function getOutboxActivities(
+  actorUri: URL,
+  limit: number = 20,
+  offset: number = 0
+): Create[] {
   const publishedPosts = getPublishedPosts(limit, offset);
   return publishedPosts.map((post) => postToCreateActivity(post, actorUri));
 }

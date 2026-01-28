@@ -53,11 +53,7 @@ export function addFollower(follower: NewFollower): Follower | null {
  * Returns true if a follower was removed, false if not found.
  */
 export function removeFollower(actorUri: string): boolean {
-  const result = db
-    .delete(followers)
-    .where(eq(followers.actor_uri, actorUri))
-    .returning()
-    .get();
+  const result = db.delete(followers).where(eq(followers.actor_uri, actorUri)).returning().get();
 
   if (result) {
     logger.info("federation", `Follower removed: ${actorUri}`);
@@ -72,11 +68,7 @@ export function removeFollower(actorUri: string): boolean {
  * Get a follower by their actor URI.
  */
 export function getFollower(actorUri: string): Follower | undefined {
-  return db
-    .select()
-    .from(followers)
-    .where(eq(followers.actor_uri, actorUri))
-    .get();
+  return db.select().from(followers).where(eq(followers.actor_uri, actorUri)).get();
 }
 
 /**

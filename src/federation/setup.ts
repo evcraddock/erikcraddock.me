@@ -163,26 +163,21 @@ export function createFedifyFederation() {
     });
 
   // Set up followers collection dispatcher - returns list of followers
-  federation.setFollowersDispatcher(
-    "/users/{identifier}/followers",
-    async (_ctx, identifier) => {
-      if (identifier !== "erik") {
-        return null;
-      }
-
-      const followerList = getAllFollowers();
-      // Return Recipient objects with required id and inboxId
-      return {
-        items: followerList.map((f) => ({
-          id: new URL(f.actor_uri),
-          inboxId: new URL(f.inbox_uri),
-          endpoints: f.shared_inbox_uri
-            ? { sharedInbox: new URL(f.shared_inbox_uri) }
-            : undefined,
-        })),
-      };
+  federation.setFollowersDispatcher("/users/{identifier}/followers", async (_ctx, identifier) => {
+    if (identifier !== "erik") {
+      return null;
     }
-  );
+
+    const followerList = getAllFollowers();
+    // Return Recipient objects with required id and inboxId
+    return {
+      items: followerList.map((f) => ({
+        id: new URL(f.actor_uri),
+        inboxId: new URL(f.inbox_uri),
+        endpoints: f.shared_inbox_uri ? { sharedInbox: new URL(f.shared_inbox_uri) } : undefined,
+      })),
+    };
+  });
 
   logger.info("federation", "Federation configured");
   return federation;
