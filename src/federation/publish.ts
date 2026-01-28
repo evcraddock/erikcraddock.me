@@ -147,16 +147,16 @@ export async function federatePost(postId: number): Promise<boolean> {
   // Create the activity
   const activity = postToCreateActivity(post as PostWithBanner, actorUri);
 
-  logger.info("federation", `Sending Create activity for post ${postId} to ${followers.length} followers`);
+  logger.info(
+    "federation",
+    `Sending Create activity for post ${postId} to ${followers.length} followers`
+  );
 
   try {
     // Send to all followers using Fedify's built-in delivery
-    await ctx.sendActivity(
-      { identifier: "erik" },
-      "followers",
-      activity,
-      { preferSharedInbox: true }
-    );
+    await ctx.sendActivity({ identifier: "erik" }, "followers", activity, {
+      preferSharedInbox: true,
+    });
 
     logger.info("federation", `Successfully queued Create activity for post ${postId}`);
     return true;
