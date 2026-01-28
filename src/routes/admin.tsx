@@ -2,6 +2,12 @@ import { Hono } from "hono";
 import { Layout } from "@/templates/layout";
 import { requireAuth, requireAdmin } from "@/auth/middleware";
 import { listApiKeys, createApiKey, revokeApiKey, getAuthorByEmail } from "@/auth/api-key";
+import {
+  listPasskeys,
+  generatePasskeyRegistrationOptions,
+  verifyAndStorePasskey,
+  deletePasskey,
+} from "@/auth/passkey";
 
 export const admin = new Hono();
 
@@ -28,6 +34,11 @@ function AdminNav({ isAdmin }: { isAdmin: boolean }) {
         <li>
           <a href="/admin/keys" class="text-blue-600 dark:text-blue-400 hover:underline">
             API Keys
+          </a>
+        </li>
+        <li>
+          <a href="/admin/passkeys" class="text-blue-600 dark:text-blue-400 hover:underline">
+            Passkeys
           </a>
         </li>
         {isAdmin && (
@@ -284,6 +295,197 @@ admin.post("/keys/:id/revoke", async (c) => {
   }
 
   return c.redirect("/admin/keys");
+});
+
+/**
+ * GET /admin/passkeys - Passkey management
+ */
+admin.get("/passkeys", (c) => {
+  const auth = c.get("auth");
+  const author = getAuthorByEmail(auth.email);
+
+  if (!author) {
+    return c.redirect("/login");
+  }
+
+  const userPasskeys = listPasskeys(author.id);
+  const error = c.req.query("error");
+  const success = c.req.query("success");
+
+  return c.html(
+    <Layout title="Passkeys | Admin">
+      <div class="max-w-4xl mx-auto">
+        <AdminHeader title="Passkeys" isAdmin={auth.isAdmin} />
+
+        {error && (
+          <div class="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-4 mb-6">
+            <p class="text-red-700 dark:text-red-300">{error}</p>
+          </div>
+        )}
+
+        {success && (
+          <div class="bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg p-4 mb-6">
+            <p class="text-green-700 dark:text-green-300">{success}</p>
+          </div>
+        )}
+
+        {/* Register new passkey */}
+        <div class="bg-white dark:bg-gray-800 rounded-lg shadow p-6 mb-6">
+          <h2 class="text-lg font-semibold mb-4">Register New Passkey</h2>
+          <p class="text-gray-600 dark:text-gray-300 mb-4">
+            Passkeys let you log in securely using your device's biometrics (fingerprint, face) or
+            PIN.
+          </p>
+          <button
+            type="button"
+            id="register-passkey"
+            class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+          >
+            Register Passkey
+          </button>
+        </div>
+
+        {/* Existing passkeys */}
+        <div class="bg-white dark:bg-gray-800 rounded-lg shadow">
+          <div class="px-6 py-4 border-b border-gray-200 dark:border-gray-700">
+            <h2 class="text-lg font-semibold">Your Passkeys</h2>
+          </div>
+
+          {userPasskeys.length === 0 ? (
+            <div class="p-6 text-gray-500 dark:text-gray-400">
+              No passkeys registered yet. Register one above for faster login.
+            </div>
+          ) : (
+            <ul class="divide-y divide-gray-200 dark:divide-gray-700">
+              {userPasskeys.map((pk) => (
+                <li class="p-4 flex items-center justify-between">
+                  <div>
+                    <p class="font-medium text-gray-900 dark:text-white">
+                      {pk.name || "Unnamed passkey"}
+                    </p>
+                    <p class="text-sm text-gray-500 dark:text-gray-400">
+                      Created: {formatDate(pk.created_at)}
+                      {pk.last_used_at && ` • Last used: ${formatDate(pk.last_used_at)}`}
+                    </p>
+                  </div>
+                  <form method="post" action={`/admin/passkeys/${pk.id}/delete`}>
+                    <button
+                      type="submit"
+                      class="px-3 py-1 text-sm text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 rounded"
+                      onclick="return confirm('Delete this passkey? You cannot undo this.')"
+                    >
+                      Delete
+                    </button>
+                  </form>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+
+        {/* Client-side passkey registration script */}
+        <script src="https://unpkg.com/@simplewebauthn/browser@13/dist/bundle/index.umd.min.js"></script>
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `
+            document.getElementById('register-passkey').addEventListener('click', async () => {
+              const name = prompt('Name this passkey (e.g., MacBook, iPhone):');
+              if (!name) return;
+
+              try {
+                // Get registration options
+                const optionsRes = await fetch('/admin/passkeys/register/options', {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                });
+                const options = await optionsRes.json();
+
+                // Start WebAuthn registration
+                const credential = await SimpleWebAuthnBrowser.startRegistration({ optionsJSON: options });
+
+                // Verify with server
+                const verifyRes = await fetch('/admin/passkeys/register', {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({ name, credential }),
+                });
+                const result = await verifyRes.json();
+
+                if (result.success) {
+                  window.location.href = '/admin/passkeys?success=Passkey registered successfully';
+                } else {
+                  alert(result.error || 'Registration failed');
+                }
+              } catch (err) {
+                console.error(err);
+                alert('Registration failed: ' + err.message);
+              }
+            });
+          `,
+          }}
+        />
+      </div>
+    </Layout>
+  );
+});
+
+/**
+ * POST /admin/passkeys/register/options - Get registration options
+ */
+admin.post("/passkeys/register/options", async (c) => {
+  const auth = c.get("auth");
+  const author = getAuthorByEmail(auth.email);
+
+  if (!author) {
+    return c.json({ error: "Unauthorized" }, 401);
+  }
+
+  const options = await generatePasskeyRegistrationOptions(author.id, auth.email);
+  return c.json(options);
+});
+
+/**
+ * POST /admin/passkeys/register - Verify and store passkey
+ */
+admin.post("/passkeys/register", async (c) => {
+  const auth = c.get("auth");
+  const author = getAuthorByEmail(auth.email);
+
+  if (!author) {
+    return c.json({ error: "Unauthorized" }, 401);
+  }
+
+  const body = await c.req.json();
+  const { name, credential } = body;
+
+  const result = await verifyAndStorePasskey(author.id, auth.email, name, credential);
+  return c.json(result);
+});
+
+/**
+ * POST /admin/passkeys/:id/delete - Delete passkey
+ */
+admin.post("/passkeys/:id/delete", async (c) => {
+  const auth = c.get("auth");
+  const author = getAuthorByEmail(auth.email);
+
+  if (!author) {
+    return c.redirect("/login");
+  }
+
+  const passkeyId = parseInt(c.req.param("id"), 10);
+
+  if (isNaN(passkeyId)) {
+    return c.redirect("/admin/passkeys?error=Invalid passkey ID");
+  }
+
+  const success = deletePasskey(passkeyId, author.id);
+
+  if (!success) {
+    return c.redirect("/admin/passkeys?error=Could not delete passkey");
+  }
+
+  return c.redirect("/admin/passkeys?success=Passkey deleted");
 });
 
 /**
