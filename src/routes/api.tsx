@@ -13,6 +13,7 @@ import {
 } from "@/services/posts";
 import { createMedia, deleteMedia, isAllowedMimeType } from "@/services/media";
 import { listSources, getSource, createSource } from "@/services/sources";
+import { federatePost } from "@/federation/publish";
 
 export const api = new Hono();
 
@@ -216,8 +217,9 @@ api.delete("/posts/:id", (c) => {
 
 /**
  * POST /api/posts/:id/publish - Publish a post
+ * Also sends Create activity to all followers via ActivityPub.
  */
-api.post("/posts/:id/publish", (c) => {
+api.post("/posts/:id/publish", async (c) => {
   const id = parseInt(c.req.param("id"), 10);
 
   if (isNaN(id)) {
@@ -229,6 +231,12 @@ api.post("/posts/:id/publish", (c) => {
   if (!post) {
     return c.json({ error: "Post not found" }, 404);
   }
+
+  // Send Create activity to followers (fire and forget - don't block response)
+  // Fedify handles retries if delivery fails
+  federatePost(id).catch(() => {
+    // Error already logged in federatePost
+  });
 
   return c.json({ data: post });
 });
