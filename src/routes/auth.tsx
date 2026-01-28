@@ -1,5 +1,5 @@
 import { Hono } from "hono";
-import { setCookie, deleteCookie } from "hono/cookie";
+import { setCookie, getCookie, deleteCookie } from "hono/cookie";
 import { Layout } from "@/templates/layout";
 import { createMagicLink, verifyMagicLink } from "@/auth/magic-link";
 import { createSession, deleteSession, getSessionCookieOptions } from "@/auth/session";
@@ -131,7 +131,7 @@ auth.get("/login/verify", async (c) => {
  * POST /logout - Clear session and redirect to home
  */
 auth.post("/logout", async (c) => {
-  const sessionId = c.req.header("Cookie")?.match(/session=([^;]+)/)?.[1];
+  const sessionId = getCookie(c, "session");
 
   if (sessionId) {
     await deleteSession(sessionId);
@@ -149,7 +149,7 @@ auth.post("/logout", async (c) => {
  * GET /logout - Also support GET for simple links
  */
 auth.get("/logout", async (c) => {
-  const sessionId = c.req.header("Cookie")?.match(/session=([^;]+)/)?.[1];
+  const sessionId = getCookie(c, "session");
 
   if (sessionId) {
     await deleteSession(sessionId);
