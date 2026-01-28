@@ -9,6 +9,7 @@ export const posts = sqliteTable("posts", {
   excerpt: text("excerpt"),
   url: text("url"), // for link type posts
   source_id: integer("source_id").references(() => sources.id),
+  banner_image_id: integer("banner_image_id").references(() => media.id, { onDelete: "set null" }),
   published_at: integer("published_at", { mode: "timestamp" }),
   created_at: integer("created_at", { mode: "timestamp" }).notNull(),
   updated_at: integer("updated_at", { mode: "timestamp" }).notNull(),

@@ -22,6 +22,15 @@ beforeAll(async () => {
 
   // Create tables
   testSqlite.exec(`
+    CREATE TABLE media (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      filename TEXT NOT NULL,
+      mime_type TEXT NOT NULL,
+      s3_key TEXT NOT NULL UNIQUE,
+      alt_text TEXT,
+      created_at INTEGER NOT NULL
+    );
+
     CREATE TABLE posts (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       type TEXT NOT NULL,
@@ -30,6 +39,7 @@ beforeAll(async () => {
       excerpt TEXT,
       url TEXT,
       source_id INTEGER,
+      banner_image_id INTEGER REFERENCES media(id) ON DELETE SET NULL,
       published_at INTEGER,
       created_at INTEGER NOT NULL,
       updated_at INTEGER NOT NULL
@@ -291,6 +301,79 @@ describe("pages routes", () => {
 
       const html = await res.text();
       expect(html).toContain("Post Not Found");
+    });
+
+    it("displays banner image when set", async () => {
+      // Add media record
+      testSqlite.exec(
+        "INSERT INTO media (filename, mime_type, s3_key, created_at) VALUES ('page-banner.jpg', 'image/jpeg', 'page-banner.jpg', 1000)"
+      );
+      const mediaRow = testSqlite
+        .prepare("SELECT id FROM media WHERE s3_key = 'page-banner.jpg'")
+        .get() as { id: number };
+
+      // Add post with banner
+      const now = Date.now();
+      testSqlite.exec(
+        `INSERT INTO posts (type, title, content, banner_image_id, published_at, created_at, updated_at) VALUES ('article', 'Banner Post', 'Content here', ${mediaRow.id}, ${now}, ${now}, ${now})`
+      );
+      const postRow = testSqlite
+        .prepare("SELECT id FROM posts WHERE title = 'Banner Post'")
+        .get() as { id: number };
+
+      const app = getApp();
+      const res = await app.request(`/posts/${postRow.id}`);
+
+      expect(res.status).toBe(200);
+
+      const html = await res.text();
+      expect(html).toContain('src="/media/page-banner.jpg"');
+      expect(html).toContain('alt="Banner Post"');
+    });
+
+    it("includes og:image meta tag when banner is set", async () => {
+      // Add media record
+      testSqlite.exec(
+        "INSERT INTO media (filename, mime_type, s3_key, created_at) VALUES ('og-banner.jpg', 'image/jpeg', 'og-banner.jpg', 1000)"
+      );
+      const mediaRow = testSqlite
+        .prepare("SELECT id FROM media WHERE s3_key = 'og-banner.jpg'")
+        .get() as { id: number };
+
+      // Add post with banner
+      const now = Date.now();
+      testSqlite.exec(
+        `INSERT INTO posts (type, title, content, banner_image_id, published_at, created_at, updated_at) VALUES ('article', 'OG Banner Post', 'Content here', ${mediaRow.id}, ${now}, ${now}, ${now})`
+      );
+      const postRow = testSqlite
+        .prepare("SELECT id FROM posts WHERE title = 'OG Banner Post'")
+        .get() as { id: number };
+
+      const app = getApp();
+      const res = await app.request(`/posts/${postRow.id}`);
+
+      expect(res.status).toBe(200);
+
+      const html = await res.text();
+      expect(html).toContain('property="og:image"');
+      expect(html).toContain("/media/og-banner.jpg");
+    });
+
+    it("does not display banner image when not set", async () => {
+      const app = getApp();
+
+      // Use existing post without banner (from test setup)
+      const postRow = testSqlite
+        .prepare("SELECT id FROM posts WHERE title = 'Test Post'")
+        .get() as { id: number };
+
+      const res = await app.request(`/posts/${postRow.id}`);
+
+      expect(res.status).toBe(200);
+
+      const html = await res.text();
+      // Should not have a banner image element before the title
+      expect(html).not.toContain('class="w-full h-64 object-cover');
     });
   });
 

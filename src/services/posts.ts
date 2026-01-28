@@ -1,5 +1,6 @@
 import { eq, desc, and, isNotNull } from "drizzle-orm";
-import { db, posts, tags, postTags } from "@/db";
+import { db, posts, tags, postTags, media } from "@/db";
+import { mediaUrl } from "./media";
 
 export type PostType = "article" | "link" | "note";
 
@@ -107,6 +108,7 @@ export interface CreatePostInput {
   excerpt?: string | null;
   url?: string | null;
   tags?: string[]; // Tag slugs
+  banner_image_id?: number | null;
 }
 
 /**
@@ -146,7 +148,15 @@ function getOrCreateTag(slug: string): number {
  * Create a new post
  */
 export function createPost(input: CreatePostInput) {
-  const { type, title, content, excerpt, url, tags: tagSlugs } = input;
+  const { type, title, content, excerpt, url, tags: tagSlugs, banner_image_id } = input;
+
+  // Validate banner_image_id if provided
+  if (banner_image_id !== undefined && banner_image_id !== null) {
+    const bannerMedia = db.select().from(media).where(eq(media.id, banner_image_id)).get();
+    if (!bannerMedia) {
+      throw new Error(`Banner image not found: ${banner_image_id}`);
+    }
+  }
 
   // Auto-generate excerpt if not provided
   const finalExcerpt = excerpt ?? content.slice(0, 200) + (content.length > 200 ? "..." : "");
@@ -162,6 +172,7 @@ export function createPost(input: CreatePostInput) {
       content,
       excerpt: finalExcerpt,
       url: url ?? null,
+      banner_image_id: banner_image_id ?? null,
       created_at: now,
       updated_at: now,
     })
@@ -186,8 +197,18 @@ export function createPost(input: CreatePostInput) {
     }
   }
 
+  // Get banner URL if banner_image_id is set
+  let banner_url: string | null = null;
+  if (post.banner_image_id) {
+    const bannerMedia = db.select().from(media).where(eq(media.id, post.banner_image_id)).get();
+    if (bannerMedia) {
+      banner_url = mediaUrl(bannerMedia.s3_key);
+    }
+  }
+
   return {
     ...post,
+    banner_url,
     published_at: post.published_at?.toISOString() ?? null,
     created_at: post.created_at.toISOString(),
     updated_at: post.updated_at.toISOString(),
@@ -201,6 +222,7 @@ export interface UpdatePostInput {
   excerpt?: string | null;
   url?: string | null;
   tags?: string[]; // Tag slugs
+  banner_image_id?: number | null;
 }
 
 /**
@@ -213,7 +235,15 @@ export function updatePost(id: number, input: UpdatePostInput) {
     return null;
   }
 
-  const { title, content, excerpt, url, tags: tagSlugs } = input;
+  const { title, content, excerpt, url, tags: tagSlugs, banner_image_id } = input;
+
+  // Validate banner_image_id if provided
+  if (banner_image_id !== undefined && banner_image_id !== null) {
+    const bannerMedia = db.select().from(media).where(eq(media.id, banner_image_id)).get();
+    if (!bannerMedia) {
+      throw new Error(`Banner image not found: ${banner_image_id}`);
+    }
+  }
 
   // Build update object with only provided fields
   const updates: Record<string, unknown> = {
@@ -224,6 +254,7 @@ export function updatePost(id: number, input: UpdatePostInput) {
   if (content !== undefined) updates.content = content;
   if (excerpt !== undefined) updates.excerpt = excerpt;
   if (url !== undefined) updates.url = url;
+  if (banner_image_id !== undefined) updates.banner_image_id = banner_image_id;
 
   // Update post
   db.update(posts).set(updates).where(eq(posts.id, id)).run();
@@ -328,8 +359,18 @@ export function getPost(id: number) {
     .where(eq(postTags.post_id, post.id))
     .all();
 
+  // Get banner URL if banner_image_id is set
+  let banner_url: string | null = null;
+  if (post.banner_image_id) {
+    const bannerMedia = db.select().from(media).where(eq(media.id, post.banner_image_id)).get();
+    if (bannerMedia) {
+      banner_url = mediaUrl(bannerMedia.s3_key);
+    }
+  }
+
   return {
     ...post,
+    banner_url,
     published_at: post.published_at?.toISOString() ?? null,
     created_at: post.created_at.toISOString(),
     updated_at: post.updated_at.toISOString(),

@@ -22,6 +22,15 @@ beforeAll(async () => {
 
   // Create tables
   testSqlite.exec(`
+    CREATE TABLE media (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      filename TEXT NOT NULL,
+      mime_type TEXT NOT NULL,
+      s3_key TEXT NOT NULL UNIQUE,
+      alt_text TEXT,
+      created_at INTEGER NOT NULL
+    );
+
     CREATE TABLE posts (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       type TEXT NOT NULL,
@@ -30,6 +39,7 @@ beforeAll(async () => {
       excerpt TEXT,
       url TEXT,
       source_id INTEGER,
+      banner_image_id INTEGER REFERENCES media(id) ON DELETE SET NULL,
       published_at INTEGER,
       created_at INTEGER NOT NULL,
       updated_at INTEGER NOT NULL
@@ -180,6 +190,51 @@ describe("feed routes", () => {
       const firstPostIndex = xml.indexOf("First Post");
 
       expect(secondPostIndex).toBeLessThan(firstPostIndex);
+    });
+
+    it("includes enclosure for posts with banner image", async () => {
+      // Add media record
+      testSqlite.exec(
+        "INSERT INTO media (filename, mime_type, s3_key, created_at) VALUES ('feed-banner.jpg', 'image/jpeg', 'feed-banner.jpg', 1000)"
+      );
+      const mediaRow = testSqlite
+        .prepare("SELECT id FROM media WHERE s3_key = 'feed-banner.jpg'")
+        .get() as { id: number };
+
+      // Add post with banner
+      const now = Date.now();
+      testSqlite.exec(
+        `INSERT INTO posts (type, title, content, banner_image_id, published_at, created_at, updated_at) VALUES ('article', 'Post with Banner', 'Content', ${mediaRow.id}, ${now}, ${now}, ${now})`
+      );
+
+      const app = getApp();
+      const res = await app.request("/feed.xml");
+      const xml = await res.text();
+
+      expect(xml).toContain("<enclosure");
+      expect(xml).toContain('url="https://erikcraddock.me/media/feed-banner.jpg"');
+      expect(xml).toContain('type="image/jpeg"');
+    });
+
+    it("does not include enclosure for posts without banner image", async () => {
+      // The existing test posts don't have banner images
+      const app = getApp();
+      const res = await app.request("/feed.xml");
+      const xml = await res.text();
+
+      // Get the item blocks
+      const itemRegex = /<item>[\s\S]*?<\/item>/g;
+      const items = xml.match(itemRegex) || [];
+
+      // Find items that contain "First Post" or "Second Post" and check they don't have enclosures
+      const existingPosts = items.filter(
+        (item) =>
+          item.includes("First Post") || item.includes("Second Post") || item.includes("Third Post")
+      );
+
+      for (const item of existingPosts) {
+        expect(item).not.toContain("<enclosure");
+      }
     });
   });
 });

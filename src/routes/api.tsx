@@ -83,7 +83,7 @@ api.post("/posts", async (c) => {
   const body = await c.req.json();
 
   // Validate type
-  const { type, title, content, excerpt, url, tags } = body;
+  const { type, title, content, excerpt, url, tags, banner_image_id } = body;
 
   if (!type || !["article", "link", "note"].includes(type)) {
     return c.json({ error: "Invalid or missing type. Must be article, link, or note" }, 400);
@@ -109,16 +109,30 @@ api.post("/posts", async (c) => {
     return c.json({ error: "Tags must be an array" }, 400);
   }
 
-  const post = createPost({
-    type,
-    title: title?.trim() || null,
-    content: content.trim(),
-    excerpt: excerpt?.trim() || null,
-    url: url?.trim() || null,
-    tags: tags || [],
-  });
+  // Validate banner_image_id if provided
+  if (
+    banner_image_id !== undefined &&
+    banner_image_id !== null &&
+    typeof banner_image_id !== "number"
+  ) {
+    return c.json({ error: "banner_image_id must be a number" }, 400);
+  }
 
-  return c.json({ data: post }, 201);
+  try {
+    const post = createPost({
+      type,
+      title: title?.trim() || null,
+      content: content.trim(),
+      excerpt: excerpt?.trim() || null,
+      url: url?.trim() || null,
+      tags: tags || [],
+      banner_image_id: banner_image_id ?? null,
+    });
+
+    return c.json({ data: post }, 201);
+  } catch (error) {
+    return c.json({ error: String(error) }, 400);
+  }
 });
 
 /**
@@ -132,26 +146,40 @@ api.put("/posts/:id", async (c) => {
   }
 
   const body = await c.req.json();
-  const { title, content, excerpt, url, tags } = body;
+  const { title, content, excerpt, url, tags, banner_image_id } = body;
 
   // Validate tags if provided
   if (tags !== undefined && !Array.isArray(tags)) {
     return c.json({ error: "Tags must be an array" }, 400);
   }
 
-  const post = updatePost(id, {
-    title: title !== undefined ? title?.trim() || null : undefined,
-    content: content?.trim(),
-    excerpt: excerpt !== undefined ? excerpt?.trim() || null : undefined,
-    url: url !== undefined ? url?.trim() || null : undefined,
-    tags,
-  });
-
-  if (!post) {
-    return c.json({ error: "Post not found" }, 404);
+  // Validate banner_image_id if provided
+  if (
+    banner_image_id !== undefined &&
+    banner_image_id !== null &&
+    typeof banner_image_id !== "number"
+  ) {
+    return c.json({ error: "banner_image_id must be a number" }, 400);
   }
 
-  return c.json({ data: post });
+  try {
+    const post = updatePost(id, {
+      title: title !== undefined ? title?.trim() || null : undefined,
+      content: content?.trim(),
+      excerpt: excerpt !== undefined ? excerpt?.trim() || null : undefined,
+      url: url !== undefined ? url?.trim() || null : undefined,
+      tags,
+      banner_image_id,
+    });
+
+    if (!post) {
+      return c.json({ error: "Post not found" }, 404);
+    }
+
+    return c.json({ data: post });
+  } catch (error) {
+    return c.json({ error: String(error) }, 400);
+  }
 });
 
 /**

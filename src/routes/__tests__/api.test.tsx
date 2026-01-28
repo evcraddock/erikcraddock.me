@@ -37,6 +37,15 @@ beforeAll(async () => {
       revoked_at INTEGER
     );
 
+    CREATE TABLE media (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      filename TEXT NOT NULL,
+      mime_type TEXT NOT NULL,
+      s3_key TEXT NOT NULL UNIQUE,
+      alt_text TEXT,
+      created_at INTEGER NOT NULL
+    );
+
     CREATE TABLE posts (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       type TEXT NOT NULL,
@@ -45,6 +54,7 @@ beforeAll(async () => {
       excerpt TEXT,
       url TEXT,
       source_id INTEGER,
+      banner_image_id INTEGER REFERENCES media(id) ON DELETE SET NULL,
       published_at INTEGER,
       created_at INTEGER NOT NULL,
       updated_at INTEGER NOT NULL
@@ -663,6 +673,81 @@ describe("POST /api/posts", () => {
 
     expect(res.status).toBe(401);
   });
+
+  it("creates post with valid banner_image_id", async () => {
+    const { api } = await import("../api");
+
+    // Insert a media record
+    testSqlite.exec(
+      "INSERT INTO media (filename, mime_type, s3_key, created_at) VALUES ('banner.jpg', 'image/jpeg', 'test-banner.jpg', 1000)"
+    );
+    const mediaRow = testSqlite
+      .prepare("SELECT id FROM media WHERE s3_key = 'test-banner.jpg'")
+      .get() as { id: number };
+
+    const res = await api.request("/posts", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${testApiKey}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        type: "article",
+        title: "Post with Banner",
+        content: "Content here",
+        banner_image_id: mediaRow.id,
+      }),
+    });
+
+    expect(res.status).toBe(201);
+    const json = await res.json();
+    expect(json.data.banner_image_id).toBe(mediaRow.id);
+    expect(json.data.banner_url).toBe("/media/test-banner.jpg");
+  });
+
+  it("returns 400 for non-existent banner_image_id", async () => {
+    const { api } = await import("../api");
+
+    const res = await api.request("/posts", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${testApiKey}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        type: "article",
+        title: "Post with Bad Banner",
+        content: "Content here",
+        banner_image_id: 99999,
+      }),
+    });
+
+    expect(res.status).toBe(400);
+    const json = await res.json();
+    expect(json.error).toContain("Banner image not found");
+  });
+
+  it("returns 400 for invalid banner_image_id type", async () => {
+    const { api } = await import("../api");
+
+    const res = await api.request("/posts", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${testApiKey}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        type: "article",
+        title: "Post with Invalid Banner",
+        content: "Content here",
+        banner_image_id: "not-a-number",
+      }),
+    });
+
+    expect(res.status).toBe(400);
+    const json = await res.json();
+    expect(json.error).toContain("banner_image_id must be a number");
+  });
 });
 
 describe("PUT /api/posts/:id", () => {
@@ -764,6 +849,100 @@ describe("PUT /api/posts/:id", () => {
     });
 
     expect(res.status).toBe(401);
+  });
+
+  it("updates post with banner_image_id", async () => {
+    const { api } = await import("../api");
+
+    // Create a post
+    const now = Date.now();
+    testSqlite.exec(
+      `INSERT INTO posts (type, title, content, created_at, updated_at) VALUES ('article', 'Test', 'Content', ${now}, ${now})`
+    );
+    const postRow = testSqlite.prepare("SELECT id FROM posts WHERE title = 'Test'").get() as {
+      id: number;
+    };
+
+    // Insert a media record
+    testSqlite.exec(
+      "INSERT INTO media (filename, mime_type, s3_key, created_at) VALUES ('update-banner.jpg', 'image/jpeg', 'update-banner.jpg', 1000)"
+    );
+    const mediaRow = testSqlite
+      .prepare("SELECT id FROM media WHERE s3_key = 'update-banner.jpg'")
+      .get() as { id: number };
+
+    const res = await api.request(`/posts/${postRow.id}`, {
+      method: "PUT",
+      headers: {
+        Authorization: `Bearer ${testApiKey}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ banner_image_id: mediaRow.id }),
+    });
+
+    expect(res.status).toBe(200);
+    const json = await res.json();
+    expect(json.data.banner_image_id).toBe(mediaRow.id);
+    expect(json.data.banner_url).toBe("/media/update-banner.jpg");
+  });
+
+  it("clears banner_image_id with null", async () => {
+    const { api } = await import("../api");
+
+    // Create media and post with banner
+    testSqlite.exec(
+      "INSERT INTO media (filename, mime_type, s3_key, created_at) VALUES ('clear-banner.jpg', 'image/jpeg', 'clear-banner.jpg', 1000)"
+    );
+    const mediaRow = testSqlite
+      .prepare("SELECT id FROM media WHERE s3_key = 'clear-banner.jpg'")
+      .get() as { id: number };
+
+    const now = Date.now();
+    testSqlite.exec(
+      `INSERT INTO posts (type, title, content, banner_image_id, created_at, updated_at) VALUES ('article', 'With Banner', 'Content', ${mediaRow.id}, ${now}, ${now})`
+    );
+    const postRow = testSqlite
+      .prepare("SELECT id FROM posts WHERE title = 'With Banner'")
+      .get() as { id: number };
+
+    const res = await api.request(`/posts/${postRow.id}`, {
+      method: "PUT",
+      headers: {
+        Authorization: `Bearer ${testApiKey}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ banner_image_id: null }),
+    });
+
+    expect(res.status).toBe(200);
+    const json = await res.json();
+    expect(json.data.banner_image_id).toBeNull();
+    expect(json.data.banner_url).toBeNull();
+  });
+
+  it("returns 400 for non-existent banner_image_id on update", async () => {
+    const { api } = await import("../api");
+
+    const now = Date.now();
+    testSqlite.exec(
+      `INSERT INTO posts (type, title, content, created_at, updated_at) VALUES ('article', 'Update Test', 'Content', ${now}, ${now})`
+    );
+    const postRow = testSqlite
+      .prepare("SELECT id FROM posts WHERE title = 'Update Test'")
+      .get() as { id: number };
+
+    const res = await api.request(`/posts/${postRow.id}`, {
+      method: "PUT",
+      headers: {
+        Authorization: `Bearer ${testApiKey}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ banner_image_id: 99999 }),
+    });
+
+    expect(res.status).toBe(400);
+    const json = await res.json();
+    expect(json.error).toContain("Banner image not found");
   });
 });
 
