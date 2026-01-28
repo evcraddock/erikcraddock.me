@@ -2,6 +2,8 @@ import { Hono } from "hono";
 import { serveStatic } from "hono/bun";
 import { pages } from "./routes/pages";
 import { feed } from "./routes/feed";
+import { auth } from "./routes/auth";
+import { admin } from "./routes/admin";
 import { logger } from "./utils/logger";
 
 const app = new Hono();
@@ -29,15 +31,28 @@ app.use("/css/*", serveStatic({ root: "./public" }));
 // Mount routes
 app.route("/", pages);
 app.route("/", feed);
+app.route("/", auth);
+app.route("/admin", admin);
 
 // ActivityPub actor endpoint (placeholder)
 app.get("/.well-known/webfinger", (c) => {
   return c.json({ message: "WebFinger endpoint - to be implemented" });
 });
 
-const port = Number(process.env.PORT) || 3000;
+const port = Number(process.env.PORT) || 5000;
 
 logger.info("server", `Starting on http://localhost:${port}`);
+
+// In dev, log helpful info
+if (process.env.NODE_ENV !== "production") {
+  const adminEmail = process.env.ADMIN_EMAIL;
+  if (adminEmail) {
+    logger.info("server", `Admin email: ${adminEmail}`);
+    logger.info("server", `Login at: http://localhost:${port}/login`);
+  } else {
+    logger.warn("server", "ADMIN_EMAIL not set - run seed script after setting it in .env");
+  }
+}
 
 export default {
   port,
