@@ -191,5 +191,50 @@ describe("feed routes", () => {
 
       expect(secondPostIndex).toBeLessThan(firstPostIndex);
     });
+
+    it("includes enclosure for posts with banner image", async () => {
+      // Add media record
+      testSqlite.exec(
+        "INSERT INTO media (filename, mime_type, s3_key, created_at) VALUES ('feed-banner.jpg', 'image/jpeg', 'feed-banner.jpg', 1000)"
+      );
+      const mediaRow = testSqlite
+        .prepare("SELECT id FROM media WHERE s3_key = 'feed-banner.jpg'")
+        .get() as { id: number };
+
+      // Add post with banner
+      const now = Date.now();
+      testSqlite.exec(
+        `INSERT INTO posts (type, title, content, banner_image_id, published_at, created_at, updated_at) VALUES ('article', 'Post with Banner', 'Content', ${mediaRow.id}, ${now}, ${now}, ${now})`
+      );
+
+      const app = getApp();
+      const res = await app.request("/feed.xml");
+      const xml = await res.text();
+
+      expect(xml).toContain("<enclosure");
+      expect(xml).toContain('url="https://erikcraddock.me/media/feed-banner.jpg"');
+      expect(xml).toContain('type="image/jpeg"');
+    });
+
+    it("does not include enclosure for posts without banner image", async () => {
+      // The existing test posts don't have banner images
+      const app = getApp();
+      const res = await app.request("/feed.xml");
+      const xml = await res.text();
+
+      // Get the item blocks
+      const itemRegex = /<item>[\s\S]*?<\/item>/g;
+      const items = xml.match(itemRegex) || [];
+
+      // Find items that contain "First Post" or "Second Post" and check they don't have enclosures
+      const existingPosts = items.filter(
+        (item) =>
+          item.includes("First Post") || item.includes("Second Post") || item.includes("Third Post")
+      );
+
+      for (const item of existingPosts) {
+        expect(item).not.toContain("<enclosure");
+      }
+    });
   });
 });
