@@ -1,11 +1,12 @@
 import { Hono } from "hono";
 import { raw } from "hono/html";
 import { desc, eq, isNotNull, and } from "drizzle-orm";
-import { db as defaultDb, posts, tags, postTags, sources } from "../db";
+import { db as defaultDb, posts, tags, postTags, sources, media } from "../db";
 import { Layout } from "../templates/layout";
 import { NotFound } from "../templates/not-found";
 import { truncate } from "../utils/text";
 import { renderMarkdown } from "../utils/markdown";
+import { mediaUrl } from "../services/media";
 
 // Database type for dependency injection
 type Database = typeof defaultDb;
@@ -189,10 +190,24 @@ export function createPagesRoutes(db: Database): Hono {
       .where(eq(postTags.post_id, id))
       .all();
 
+    // Get banner image URL if set
+    let bannerUrl: string | null = null;
+    if (post.banner_image_id) {
+      const bannerMedia = db.select().from(media).where(eq(media.id, post.banner_image_id)).get();
+      if (bannerMedia) {
+        bannerUrl = mediaUrl(bannerMedia.s3_key);
+      }
+    }
+
     const title = post.title || "Post";
+    const description = post.excerpt || truncate(post.content, 160);
 
     return c.html(
-      <Layout title={`${title} | erikcraddock.me`}>
+      <Layout
+        title={`${title} | erikcraddock.me`}
+        ogImage={bannerUrl ?? undefined}
+        description={description}
+      >
         <article class="max-w-none">
           {/* Back link */}
           <a
@@ -201,6 +216,15 @@ export function createPagesRoutes(db: Database): Hono {
           >
             ← Back to home
           </a>
+
+          {/* Banner image */}
+          {bannerUrl && (
+            <img
+              src={bannerUrl}
+              alt={post.title || "Post banner"}
+              class="w-full h-64 object-cover rounded-lg mb-6"
+            />
+          )}
 
           {/* Post header */}
           {post.title ? (
@@ -267,6 +291,7 @@ export function createPagesRoutes(db: Database): Hono {
         excerpt: posts.excerpt,
         url: posts.url,
         source_id: posts.source_id,
+        banner_image_id: posts.banner_image_id,
         published_at: posts.published_at,
         created_at: posts.created_at,
         updated_at: posts.updated_at,

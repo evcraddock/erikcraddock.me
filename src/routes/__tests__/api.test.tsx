@@ -37,6 +37,15 @@ beforeAll(async () => {
       revoked_at INTEGER
     );
 
+    CREATE TABLE media (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      filename TEXT NOT NULL,
+      mime_type TEXT NOT NULL,
+      s3_key TEXT NOT NULL UNIQUE,
+      alt_text TEXT,
+      created_at INTEGER NOT NULL
+    );
+
     CREATE TABLE posts (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       type TEXT NOT NULL,
@@ -45,6 +54,7 @@ beforeAll(async () => {
       excerpt TEXT,
       url TEXT,
       source_id INTEGER,
+      banner_image_id INTEGER REFERENCES media(id) ON DELETE SET NULL,
       published_at INTEGER,
       created_at INTEGER NOT NULL,
       updated_at INTEGER NOT NULL

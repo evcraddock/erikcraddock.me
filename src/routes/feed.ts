@@ -1,7 +1,8 @@
 import { Hono } from "hono";
-import { desc, isNotNull } from "drizzle-orm";
-import { db as defaultDb, posts } from "../db";
+import { desc, isNotNull, eq } from "drizzle-orm";
+import { db as defaultDb, posts, media } from "../db";
 import { truncate } from "../utils/text";
+import { mediaUrl } from "../services/media";
 
 // Database type for dependency injection
 type Database = typeof defaultDb;
@@ -55,12 +56,26 @@ export function createFeedRoutes(db: Database): Hono {
         const description = post.excerpt || truncate(post.content, 300);
         const pubDate = post.published_at ? formatRssDate(new Date(post.published_at)) : "";
 
+        // Get banner image for enclosure
+        let enclosure = "";
+        if (post.banner_image_id) {
+          const bannerMedia = db
+            .select()
+            .from(media)
+            .where(eq(media.id, post.banner_image_id))
+            .get();
+          if (bannerMedia) {
+            const bannerFullUrl = `${SITE_URL}${mediaUrl(bannerMedia.s3_key)}`;
+            enclosure = `\n      <enclosure url="${escapeXml(bannerFullUrl)}" type="${escapeXml(bannerMedia.mime_type)}" length="0"/>`;
+          }
+        }
+
         return `    <item>
       <title>${escapeXml(title)}</title>
       <link>${escapeXml(link)}</link>
       <description>${escapeXml(description)}</description>
       <pubDate>${pubDate}</pubDate>
-      <guid isPermaLink="true">${escapeXml(link)}</guid>
+      <guid isPermaLink="true">${escapeXml(link)}</guid>${enclosure}
     </item>`;
       })
       .join("\n");

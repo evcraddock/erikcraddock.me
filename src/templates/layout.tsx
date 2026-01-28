@@ -4,6 +4,8 @@ import { raw } from "hono/html";
 interface LayoutProps {
   title: string;
   children: Child;
+  ogImage?: string;
+  description?: string;
 }
 
 // Inline script to prevent flash of wrong theme
@@ -16,13 +18,36 @@ const themeScript = `
 })();
 `;
 
-export function Layout({ title, children }: LayoutProps) {
+export function Layout({ title, children, ogImage, description }: LayoutProps) {
+  const siteUrl = process.env.SITE_URL || "https://erikcraddock.me";
+
   return (
     <html lang="en">
       <head>
         <meta charset="UTF-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1.0" />
         <title>{title}</title>
+        {description && <meta name="description" content={description} />}
+        {/* Open Graph tags */}
+        <meta property="og:title" content={title} />
+        {description && <meta property="og:description" content={description} />}
+        {ogImage && (
+          <meta
+            property="og:image"
+            content={ogImage.startsWith("http") ? ogImage : `${siteUrl}${ogImage}`}
+          />
+        )}
+        <meta property="og:type" content="article" />
+        {/* Twitter Card tags */}
+        <meta name="twitter:card" content={ogImage ? "summary_large_image" : "summary"} />
+        <meta name="twitter:title" content={title} />
+        {description && <meta name="twitter:description" content={description} />}
+        {ogImage && (
+          <meta
+            name="twitter:image"
+            content={ogImage.startsWith("http") ? ogImage : `${siteUrl}${ogImage}`}
+          />
+        )}
         <script>{raw(themeScript)}</script>
         <link rel="stylesheet" href="/css/main.css" />
         <link
