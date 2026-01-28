@@ -53,8 +53,9 @@ export function listPosts(options: ListPostsOptions = {}): PostListItem[] {
     }
   }
 
-  // Get posts
-  let query = db
+  // Get posts - don't apply limit at DB level if filtering by tag
+  // (we need to filter first, then apply limit)
+  const baseQuery = db
     .select({
       id: posts.id,
       type: posts.type,
@@ -64,13 +65,18 @@ export function listPosts(options: ListPostsOptions = {}): PostListItem[] {
     })
     .from(posts)
     .where(and(...conditions))
-    .orderBy(desc(posts.published_at))
-    .limit(limit);
+    .orderBy(desc(posts.published_at));
 
-  const postResults = query.all();
+  // Only apply DB-level limit if not filtering by tag
+  const postResults = postIds ? baseQuery.all() : baseQuery.limit(limit).all();
 
-  // Filter by tag if needed (in-memory since SQLite doesn't support IN with dynamic arrays well in Drizzle)
-  const filteredPosts = postIds ? postResults.filter((p) => postIds!.includes(p.id)) : postResults;
+  // Filter by tag if needed, then apply limit
+  let filteredPosts = postIds ? postResults.filter((p) => postIds!.includes(p.id)) : postResults;
+
+  // Apply limit after tag filtering
+  if (postIds && filteredPosts.length > limit) {
+    filteredPosts = filteredPosts.slice(0, limit);
+  }
 
   // Get tags for each post
   const postsWithTags: PostListItem[] = filteredPosts.map((post) => {

@@ -243,6 +243,40 @@ describe("GET /api/posts", () => {
     expect(json.data).toEqual([]);
   });
 
+  it("applies limit after tag filtering", async () => {
+    const now = Date.now();
+    // Create 5 posts, only 3 tagged
+    const tag = testSqlite
+      .prepare("INSERT INTO tags (name, slug) VALUES (?, ?) RETURNING id")
+      .get("TestTag", "testtag") as { id: number };
+
+    for (let i = 0; i < 5; i++) {
+      const post = testSqlite
+        .prepare(
+          "INSERT INTO posts (type, title, content, published_at, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?) RETURNING id"
+        )
+        .get("article", `Post ${i}`, "Content", now - i * 1000, now, now) as { id: number };
+
+      // Tag first 3 posts
+      if (i < 3) {
+        testSqlite.prepare("INSERT INTO post_tags (post_id, tag_id) VALUES (?, ?)").run(post.id, tag.id);
+      }
+    }
+
+    const { api } = await import("../api");
+
+    // Request with limit=2 and tag filter
+    // Should return 2 posts (not 0-2 due to incorrect limit placement)
+    const res = await api.request("/posts?tag=testtag&limit=2", {
+      headers: { Authorization: `Bearer ${testApiKey}` },
+    });
+
+    const json = await res.json();
+    expect(json.data).toHaveLength(2);
+    // All returned posts should have the tag
+    expect(json.data.every((p: { tags: string[] }) => p.tags.includes("TestTag"))).toBe(true);
+  });
+
   it("respects limit param", async () => {
     const now = Date.now();
     for (let i = 0; i < 5; i++) {
