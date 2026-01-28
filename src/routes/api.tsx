@@ -1,6 +1,6 @@
 import { Hono } from "hono";
 import { requireApiKey } from "@/auth/api-key";
-import { listPosts, PostType } from "@/services/posts";
+import { listPosts, getPost, PostType } from "@/services/posts";
 
 export const api = new Hono();
 
@@ -44,4 +44,23 @@ api.get("/posts", (c) => {
   const posts = listPosts({ type, tag, limit });
 
   return c.json({ data: posts });
+});
+
+/**
+ * GET /api/posts/:id - Get single post
+ */
+api.get("/posts/:id", (c) => {
+  const id = parseInt(c.req.param("id"), 10);
+
+  if (isNaN(id)) {
+    return c.json({ error: "Invalid post ID" }, 400);
+  }
+
+  const post = getPost(id);
+
+  if (!post) {
+    return c.json({ error: "Post not found" }, 404);
+  }
+
+  return c.json({ data: post });
 });
