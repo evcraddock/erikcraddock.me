@@ -300,7 +300,9 @@ export function createPagesRoutes(db: Database): Hono {
         ogImage={bannerUrl ?? undefined}
         description={description}
       >
-        <article class={`max-w-none ${isNote ? "pl-4 border-l-4 border-l-gray-300 dark:border-l-gray-600" : ""}`}>
+        <article
+          class={`max-w-none ${isNote ? "pl-4 border-l-4 border-l-gray-300 dark:border-l-gray-600" : ""}`}
+        >
           {/* Back link */}
           <a
             href="/"

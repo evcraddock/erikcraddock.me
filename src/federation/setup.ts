@@ -9,6 +9,7 @@ import {
 } from "@fedify/fedify";
 import { getOrCreateKeyPair } from "./keys";
 import { addFollower, removeFollower, getAllFollowers } from "./followers";
+import { getOutboxActivities, getPublishedPostCount } from "./outbox";
 import { logger } from "@/utils/logger";
 
 // Context type for federation - we use void since we don't need request-specific data
@@ -123,34 +124,60 @@ export function createFedifyFederation() {
     });
 
   // Set up outbox dispatcher - lists activities sent by this actor
-  // Implementation will be added in Task #1320
-  federation.setOutboxDispatcher("/users/{identifier}/outbox", async (_ctx, _identifier) => {
-    // Placeholder - returns empty collection
-    // Actual activity listing will be implemented in Task #1320
-    return { items: [] };
-  });
+  // Returns Create activities for all published posts (including imported/backdated ones)
+  const OUTBOX_PAGE_SIZE = 20;
 
-  // Set up followers collection dispatcher - returns list of followers
-  federation.setFollowersDispatcher(
-    "/users/{identifier}/followers",
-    async (_ctx, identifier) => {
+  federation
+    .setOutboxDispatcher("/users/{identifier}/outbox", async (ctx, identifier, cursor) => {
       if (identifier !== "erik") {
         return null;
       }
 
-      const followerList = getAllFollowers();
-      // Return Recipient objects with required id and inboxId
+      const actorUri = ctx.getActorUri(identifier);
+      const offset = cursor ? parseInt(cursor, 10) : 0;
+      const activities = getOutboxActivities(actorUri, OUTBOX_PAGE_SIZE, offset);
+      const totalCount = getPublishedPostCount();
+
+      // Calculate next cursor if there are more items
+      const nextOffset = offset + activities.length;
+      const hasMore = nextOffset < totalCount;
+
       return {
-        items: followerList.map((f) => ({
-          id: new URL(f.actor_uri),
-          inboxId: new URL(f.inbox_uri),
-          endpoints: f.shared_inbox_uri
-            ? { sharedInbox: new URL(f.shared_inbox_uri) }
-            : undefined,
-        })),
+        items: activities,
+        nextCursor: hasMore ? nextOffset.toString() : null,
+        prevCursor: offset > 0 ? Math.max(0, offset - OUTBOX_PAGE_SIZE).toString() : null,
       };
+    })
+    .setCounter(async (_ctx, identifier) => {
+      if (identifier !== "erik") {
+        return null;
+      }
+      return getPublishedPostCount();
+    })
+    .setFirstCursor(async (_ctx, identifier) => {
+      if (identifier !== "erik") {
+        return null;
+      }
+      // First page starts at offset 0
+      return "0";
+    });
+
+  // Set up followers collection dispatcher - returns list of followers
+  federation.setFollowersDispatcher("/users/{identifier}/followers", async (_ctx, identifier) => {
+    if (identifier !== "erik") {
+      return null;
     }
-  );
+
+    const followerList = getAllFollowers();
+    // Return Recipient objects with required id and inboxId
+    return {
+      items: followerList.map((f) => ({
+        id: new URL(f.actor_uri),
+        inboxId: new URL(f.inbox_uri),
+        endpoints: f.shared_inbox_uri ? { sharedInbox: new URL(f.shared_inbox_uri) } : undefined,
+      })),
+    };
+  });
 
   logger.info("federation", "Federation configured");
   return federation;

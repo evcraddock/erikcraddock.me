@@ -14,7 +14,10 @@ const app = new Hono();
 
 // Fedify middleware - handles ActivityPub requests
 // Must be before other routes so it can intercept AP requests via content negotiation
-app.use("*", fedifyMiddleware(federation, () => undefined));
+app.use(
+  "*",
+  fedifyMiddleware(federation, () => undefined)
+);
 
 // Request logging middleware
 app.use("*", async (c, next) => {
