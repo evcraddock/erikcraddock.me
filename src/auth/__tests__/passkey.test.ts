@@ -16,6 +16,35 @@ vi.mock("../../db", async () => {
   };
 });
 
+// Mock @simplewebauthn/server
+vi.mock("@simplewebauthn/server", () => ({
+  generateRegistrationOptions: vi.fn().mockResolvedValue({
+    challenge: "test-challenge-registration",
+    rp: { name: "test", id: "localhost" },
+    user: { id: "user-id", name: "test@example.com", displayName: "test@example.com" },
+  }),
+  verifyRegistrationResponse: vi.fn().mockResolvedValue({
+    verified: true,
+    registrationInfo: {
+      credential: {
+        id: "new-credential-id",
+        publicKey: new Uint8Array([1, 2, 3, 4]),
+        counter: 0,
+      },
+    },
+  }),
+  generateAuthenticationOptions: vi.fn().mockResolvedValue({
+    challenge: "test-challenge-auth",
+    rpId: "localhost",
+  }),
+  verifyAuthenticationResponse: vi.fn().mockResolvedValue({
+    verified: true,
+    authenticationInfo: {
+      newCounter: 1,
+    },
+  }),
+}));
+
 beforeAll(async () => {
   testSqlite = new Database(":memory:");
 
@@ -147,6 +176,114 @@ describe("Passkey Service", () => {
       const result = deletePasskey(pk.id, testAuthorId);
 
       expect(result).toBe(false);
+    });
+  });
+
+  describe("generatePasskeyRegistrationOptions", () => {
+    it("returns registration options", async () => {
+      const { generatePasskeyRegistrationOptions } = await import("../passkey");
+      const options = await generatePasskeyRegistrationOptions(testAuthorId, "test@example.com");
+
+      expect(options).toBeDefined();
+      expect(options.challenge).toBeDefined();
+    });
+  });
+
+  describe("verifyAndStorePasskey", () => {
+    it("stores passkey on successful verification", async () => {
+      const { generatePasskeyRegistrationOptions, verifyAndStorePasskey } = await import("../passkey");
+      await generatePasskeyRegistrationOptions(testAuthorId, "test@example.com");
+
+      const mockResponse = {
+        id: "new-credential-id",
+        rawId: "new-credential-id",
+        response: {
+          clientDataJSON: "eyJ0eXBlIjoid2ViYXV0aG4uY3JlYXRlIn0",
+          attestationObject: "o2NmbXRmcGFja2Vk",
+        },
+        type: "public-key" as const,
+        clientExtensionResults: {},
+      };
+
+      const result = await verifyAndStorePasskey(
+        testAuthorId,
+        "test@example.com",
+        "Test Passkey",
+        mockResponse
+      );
+
+      expect(result.success).toBe(true);
+      expect(result.passkey).toBeDefined();
+    });
+
+    it("returns error when no challenge found", async () => {
+      const { verifyAndStorePasskey } = await import("../passkey");
+
+      const result = await verifyAndStorePasskey(
+        testAuthorId,
+        "unknown@example.com",
+        "Test",
+        {} as any
+      );
+
+      expect(result.success).toBe(false);
+      expect(result.error).toContain("expired");
+    });
+  });
+
+  describe("generatePasskeyAuthOptions", () => {
+    it("returns auth options", async () => {
+      const { generatePasskeyAuthOptions } = await import("../passkey");
+      const options = await generatePasskeyAuthOptions();
+
+      expect(options).toBeDefined();
+      expect(options.challenge).toBeDefined();
+    });
+  });
+
+  describe("verifyPasskeyAuth", () => {
+    it("returns error when passkey not found", async () => {
+      const { generatePasskeyAuthOptions, verifyPasskeyAuth } = await import("../passkey");
+      await generatePasskeyAuthOptions();
+
+      const result = await verifyPasskeyAuth({
+        id: "nonexistent-cred",
+        rawId: "nonexistent-cred",
+        response: {} as any,
+        type: "public-key",
+        clientExtensionResults: {},
+      });
+
+      expect(result.success).toBe(false);
+      expect(result.error).toContain("not found");
+    });
+
+    it("returns email on successful auth", async () => {
+      testSqlite
+        .prepare(
+          "INSERT INTO passkeys (author_id, credential_id, public_key, name, created_at) VALUES (?, ?, ?, ?, ?)"
+        )
+        .run(testAuthorId, "verify-cred", Buffer.from([1, 2, 3, 4]).toString("base64"), "Verify Test", Date.now());
+
+      const { generatePasskeyAuthOptions, verifyPasskeyAuth } = await import("../passkey");
+      await generatePasskeyAuthOptions();
+
+      const mockResponse = {
+        id: "verify-cred",
+        rawId: "verify-cred",
+        response: {
+          clientDataJSON: "eyJ0eXBlIjoid2ViYXV0aG4uZ2V0In0",
+          authenticatorData: "SZYN5YgOjGh0NBcPZHZgW4_krrmihjLHmVzzuoMdl2MBAAAABQ",
+          signature: "MEUCIQDKg",
+        },
+        type: "public-key" as const,
+        clientExtensionResults: {},
+      };
+
+      const result = await verifyPasskeyAuth(mockResponse);
+
+      expect(result.success).toBe(true);
+      expect(result.email).toBe("test@example.com");
     });
   });
 });
