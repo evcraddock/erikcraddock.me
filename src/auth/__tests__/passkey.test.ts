@@ -1,6 +1,10 @@
 import { describe, it, expect, beforeAll, afterAll, beforeEach, vi } from "vitest";
 import { drizzle } from "drizzle-orm/better-sqlite3";
 import Database from "better-sqlite3";
+import type {
+  RegistrationResponseJSON,
+  AuthenticatorAssertionResponseJSON,
+} from "@simplewebauthn/server";
 import * as schema from "../../db/schema";
 
 // Create test database before mocking
@@ -191,7 +195,8 @@ describe("Passkey Service", () => {
 
   describe("verifyAndStorePasskey", () => {
     it("stores passkey on successful verification", async () => {
-      const { generatePasskeyRegistrationOptions, verifyAndStorePasskey } = await import("../passkey");
+      const { generatePasskeyRegistrationOptions, verifyAndStorePasskey } =
+        await import("../passkey");
       await generatePasskeyRegistrationOptions(testAuthorId, "test@example.com");
 
       const mockResponse = {
@@ -223,7 +228,7 @@ describe("Passkey Service", () => {
         testAuthorId,
         "unknown@example.com",
         "Test",
-        {} as any
+        {} as RegistrationResponseJSON
       );
 
       expect(result.success).toBe(false);
@@ -249,7 +254,7 @@ describe("Passkey Service", () => {
       const result = await verifyPasskeyAuth({
         id: "nonexistent-cred",
         rawId: "nonexistent-cred",
-        response: {} as any,
+        response: {} as AuthenticatorAssertionResponseJSON,
         type: "public-key",
         clientExtensionResults: {},
       });
@@ -263,7 +268,13 @@ describe("Passkey Service", () => {
         .prepare(
           "INSERT INTO passkeys (author_id, credential_id, public_key, name, created_at) VALUES (?, ?, ?, ?, ?)"
         )
-        .run(testAuthorId, "verify-cred", Buffer.from([1, 2, 3, 4]).toString("base64"), "Verify Test", Date.now());
+        .run(
+          testAuthorId,
+          "verify-cred",
+          Buffer.from([1, 2, 3, 4]).toString("base64"),
+          "Verify Test",
+          Date.now()
+        );
 
       const { generatePasskeyAuthOptions, verifyPasskeyAuth } = await import("../passkey");
       await generatePasskeyAuthOptions();
