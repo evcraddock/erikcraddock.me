@@ -1,4 +1,4 @@
-import { eq } from "drizzle-orm";
+import { eq, count } from "drizzle-orm";
 import { db, followers } from "@/db";
 import { logger } from "@/utils/logger";
 
@@ -90,6 +90,6 @@ export function getAllFollowers(): Follower[] {
  * Get the count of followers.
  */
 export function getFollowerCount(): number {
-  const result = db.select().from(followers).all();
-  return result.length;
+  const result = db.select({ count: count() }).from(followers).get();
+  return result?.count ?? 0;
 }
