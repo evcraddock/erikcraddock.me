@@ -29,16 +29,16 @@ If any prerequisite fails, mark ALL tests in this file as FAIL and move on.
 1. Navigate to http://localhost:5000/login in browser
 2. Fill email field with admin email:
    ```javascript
-   (function() {
+   (function () {
      var input = document.querySelector("input[type=email]");
      var setter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, "value").set;
      setter.call(input, "ADMIN_EMAIL_HERE");
      input.dispatchEvent(new Event("input", { bubbles: true }));
-   })()
+   })();
    ```
 3. Click submit button:
    ```javascript
-   document.querySelector("button[type=submit]").click()
+   document.querySelector("button[type=submit]").click();
    ```
 4. **PASS**: Page shows "Check your email" success message
 5. **FAIL**: Error message, form validation error, or any other issue

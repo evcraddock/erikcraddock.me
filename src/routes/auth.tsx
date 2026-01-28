@@ -1,6 +1,8 @@
 import { Hono } from "hono";
+import { setCookie, deleteCookie } from "hono/cookie";
 import { Layout } from "@/templates/layout";
-import { createMagicLink } from "@/auth/magic-link";
+import { createMagicLink, verifyMagicLink } from "@/auth/magic-link";
+import { createSession, deleteSession, getSessionCookieOptions } from "@/auth/session";
 import { logger } from "@/utils/logger";
 
 export const auth = new Hono();
@@ -87,4 +89,75 @@ auth.post("/login", async (c) => {
   await createMagicLink(email);
 
   return c.redirect("/login?success=1");
+});
+
+/**
+ * GET /login/verify - Verify magic link and create session
+ */
+auth.get("/login/verify", async (c) => {
+  const token = c.req.query("token");
+
+  if (!token) {
+    logger.debug("auth", "No token provided");
+    return c.redirect("/login?error=invalid");
+  }
+
+  // Verify the magic link
+  const email = await verifyMagicLink(token);
+
+  if (!email) {
+    logger.debug("auth", "Invalid or expired token");
+    return c.redirect("/login?error=invalid");
+  }
+
+  // Create session
+  const sessionId = await createSession(email);
+
+  if (!sessionId) {
+    logger.error("auth", "Failed to create session", { email });
+    return c.redirect("/login?error=invalid");
+  }
+
+  // Set session cookie
+  const isProduction = process.env.NODE_ENV === "production";
+  setCookie(c, "session", sessionId, getSessionCookieOptions(isProduction));
+
+  logger.info("auth", "User logged in", { email });
+
+  return c.redirect("/admin");
+});
+
+/**
+ * POST /logout - Clear session and redirect to home
+ */
+auth.post("/logout", async (c) => {
+  const sessionId = c.req.header("Cookie")?.match(/session=([^;]+)/)?.[1];
+
+  if (sessionId) {
+    await deleteSession(sessionId);
+  }
+
+  // Clear the cookie
+  deleteCookie(c, "session", { path: "/" });
+
+  logger.info("auth", "User logged out");
+
+  return c.redirect("/");
+});
+
+/**
+ * GET /logout - Also support GET for simple links
+ */
+auth.get("/logout", async (c) => {
+  const sessionId = c.req.header("Cookie")?.match(/session=([^;]+)/)?.[1];
+
+  if (sessionId) {
+    await deleteSession(sessionId);
+  }
+
+  deleteCookie(c, "session", { path: "/" });
+
+  logger.info("auth", "User logged out");
+
+  return c.redirect("/");
 });

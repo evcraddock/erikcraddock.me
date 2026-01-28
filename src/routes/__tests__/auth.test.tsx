@@ -49,6 +49,12 @@ beforeAll(async () => {
     );
   `);
 
+  // Seed an author for session tests
+  testSqlite.exec(`
+    INSERT INTO authors (email, created_at) 
+    VALUES ('session-test@example.com', ${Math.floor(Date.now() / 1000)})
+  `);
+
   testDb = drizzle(testSqlite, { schema });
 });
 
@@ -57,9 +63,10 @@ afterAll(() => {
 });
 
 beforeEach(() => {
-  // Clear tables before each test
+  // Clear tables before each test (keep session-test author)
   testSqlite.exec("DELETE FROM magic_links");
-  testSqlite.exec("DELETE FROM authors");
+  testSqlite.exec("DELETE FROM sessions");
+  testSqlite.exec("DELETE FROM authors WHERE email != 'session-test@example.com'");
 });
 
 describe("GET /login", () => {
@@ -256,5 +263,83 @@ describe("verifyMagicLink", () => {
     // Second verification should fail (already used)
     const email2 = await verifyMagicLink(token);
     expect(email2).toBeNull();
+  });
+});
+
+describe("GET /login/verify", () => {
+  const nowSeconds = () => Math.floor(Date.now() / 1000);
+
+  it("redirects to /login?error=invalid when no token provided", async () => {
+    const { auth } = await import("../auth");
+
+    const res = await auth.request("/login/verify");
+
+    expect(res.status).toBe(302);
+    expect(res.headers.get("Location")).toBe("/login?error=invalid");
+  });
+
+  it("redirects to /login?error=invalid for invalid token", async () => {
+    const { auth } = await import("../auth");
+
+    const res = await auth.request("/login/verify?token=invalid-token");
+
+    expect(res.status).toBe(302);
+    expect(res.headers.get("Location")).toBe("/login?error=invalid");
+  });
+
+  it("creates session and redirects to /admin for valid token", async () => {
+    const { hashToken } = await import("../../auth/crypto");
+    const { auth } = await import("../auth");
+
+    const token = "valid-login-token";
+    const tokenHash = await hashToken(token);
+    const expiresAt = nowSeconds() + 15 * 60;
+
+    testSqlite.exec(`
+      INSERT INTO magic_links (email, token_hash, expires_at) 
+      VALUES ('session-test@example.com', '${tokenHash}', ${expiresAt})
+    `);
+
+    const res = await auth.request(`/login/verify?token=${token}`);
+
+    expect(res.status).toBe(302);
+    expect(res.headers.get("Location")).toBe("/admin");
+
+    // Check session cookie was set
+    const setCookieHeader = res.headers.get("Set-Cookie");
+    expect(setCookieHeader).toContain("session=");
+    expect(setCookieHeader).toContain("HttpOnly");
+
+    // Check session was created in database
+    const sessions = testSqlite.prepare("SELECT * FROM sessions").all();
+    expect(sessions).toHaveLength(1);
+  });
+});
+
+describe("POST /logout", () => {
+  it("clears session cookie and redirects to home", async () => {
+    const { auth } = await import("../auth");
+
+    const res = await auth.request("/logout", {
+      method: "POST",
+    });
+
+    expect(res.status).toBe(302);
+    expect(res.headers.get("Location")).toBe("/");
+
+    // Check session cookie was cleared
+    const setCookieHeader = res.headers.get("Set-Cookie");
+    expect(setCookieHeader).toContain("session=");
+  });
+});
+
+describe("GET /logout", () => {
+  it("clears session cookie and redirects to home", async () => {
+    const { auth } = await import("../auth");
+
+    const res = await auth.request("/logout");
+
+    expect(res.status).toBe(302);
+    expect(res.headers.get("Location")).toBe("/");
   });
 });
