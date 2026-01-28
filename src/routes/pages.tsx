@@ -66,21 +66,18 @@ function PostCard({ post }: { post: PostWithSource }) {
 
           {/* Source attribution for link posts */}
           {isLink && post.source && (
-            <>
-              <span>•</span>
-              <span>
-                via{" "}
-                <a
-                  href={post.source.url}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  class="text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300"
-                  onClick={(e) => e.stopPropagation()}
-                >
-                  {post.source.name}
-                </a>
-              </span>
-            </>
+            <span class="ml-2">
+              • via{" "}
+              <a
+                href={post.source.url}
+                target="_blank"
+                rel="noopener noreferrer"
+                class="text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300"
+                onClick={(e) => e.stopPropagation()}
+              >
+                {post.source.name}
+              </a>
+            </span>
           )}
         </div>
       </a>
@@ -293,31 +290,6 @@ export function createPagesRoutes(db: Database): Hono {
             ← Back to home
           </a>
 
-          {/* External link for link posts */}
-          {isLink && post.url && (
-            <a
-              href={post.url}
-              target="_blank"
-              rel="noopener noreferrer"
-              class="inline-flex items-center gap-2 px-4 py-2 bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 rounded-lg mb-6 hover:bg-blue-100 dark:hover:bg-blue-900/50"
-            >
-              <span>View original: {new URL(post.url).hostname}</span>
-              <svg
-                class="w-4 h-4 flex-shrink-0"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path
-                  stroke-linecap="round"
-                  stroke-linejoin="round"
-                  stroke-width="2"
-                  d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"
-                />
-              </svg>
-            </a>
-          )}
-
           {/* Banner image */}
           {bannerUrl && (
             <img
@@ -359,6 +331,18 @@ export function createPagesRoutes(db: Database): Hono {
                   {source.name}
                 </a>
               </span>
+            )}
+
+            {/* Link to original for link posts */}
+            {isLink && post.url && (
+              <a
+                href={post.url}
+                target="_blank"
+                rel="noopener noreferrer"
+                class="text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300"
+              >
+                → original
+              </a>
             )}
 
             {postTagsResult.length > 0 ? (
