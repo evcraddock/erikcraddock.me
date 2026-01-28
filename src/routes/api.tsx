@@ -1,6 +1,15 @@
 import { Hono } from "hono";
 import { requireApiKey } from "@/auth/api-key";
-import { listPosts, getPost, createPost, updatePost, deletePost, PostType } from "@/services/posts";
+import {
+  listPosts,
+  getPost,
+  createPost,
+  updatePost,
+  deletePost,
+  publishPost,
+  unpublishPost,
+  PostType,
+} from "@/services/posts";
 
 export const api = new Hono();
 
@@ -160,4 +169,42 @@ api.delete("/posts/:id", (c) => {
   }
 
   return c.body(null, 204);
+});
+
+/**
+ * POST /api/posts/:id/publish - Publish a post
+ */
+api.post("/posts/:id/publish", (c) => {
+  const id = parseInt(c.req.param("id"), 10);
+
+  if (isNaN(id)) {
+    return c.json({ error: "Invalid post ID" }, 400);
+  }
+
+  const post = publishPost(id);
+
+  if (!post) {
+    return c.json({ error: "Post not found" }, 404);
+  }
+
+  return c.json({ data: post });
+});
+
+/**
+ * POST /api/posts/:id/unpublish - Unpublish a post
+ */
+api.post("/posts/:id/unpublish", (c) => {
+  const id = parseInt(c.req.param("id"), 10);
+
+  if (isNaN(id)) {
+    return c.json({ error: "Invalid post ID" }, 400);
+  }
+
+  const post = unpublishPost(id);
+
+  if (!post) {
+    return c.json({ error: "Post not found" }, 404);
+  }
+
+  return c.json({ data: post });
 });

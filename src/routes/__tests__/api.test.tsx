@@ -849,3 +849,169 @@ describe("DELETE /api/posts/:id", () => {
     expect(res.status).toBe(401);
   });
 });
+
+describe("POST /api/posts/:id/publish", () => {
+  let testApiKey: string;
+
+  beforeEach(async () => {
+    testSqlite.exec("DELETE FROM post_tags");
+    testSqlite.exec("DELETE FROM tags");
+    testSqlite.exec("DELETE FROM posts");
+    testSqlite.exec("DELETE FROM api_keys");
+    testSqlite.exec("DELETE FROM authors");
+
+    const author = testSqlite
+      .prepare("INSERT INTO authors (email, display_name, created_at) VALUES (?, ?, ?) RETURNING id")
+      .get("test@example.com", "Test User", Date.now()) as { id: number };
+
+    const { hashToken } = await import("../../auth/crypto");
+    testApiKey = "ek_test1234567890abcdef1234567890abcdef1234567890abcdef1234567890ab";
+    const keyHash = await hashToken(testApiKey);
+
+    testSqlite
+      .prepare("INSERT INTO api_keys (author_id, key_hash, name, created_at) VALUES (?, ?, ?, ?)")
+      .run(author.id, keyHash, "Test Key", Date.now());
+  });
+
+  it("publishes an unpublished post", async () => {
+    const now = Date.now();
+    const post = testSqlite
+      .prepare(
+        "INSERT INTO posts (type, title, content, created_at, updated_at) VALUES (?, ?, ?, ?, ?) RETURNING id"
+      )
+      .get("article", "Draft Post", "Content", now, now) as { id: number };
+
+    const { api } = await import("../api");
+
+    const res = await api.request(`/posts/${post.id}/publish`, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${testApiKey}` },
+    });
+
+    expect(res.status).toBe(200);
+    const json = await res.json();
+    expect(json.data.published_at).not.toBeNull();
+  });
+
+  it("is idempotent for already-published posts", async () => {
+    const now = Date.now();
+    const post = testSqlite
+      .prepare(
+        "INSERT INTO posts (type, title, content, published_at, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?) RETURNING id"
+      )
+      .get("article", "Published Post", "Content", now, now, now) as { id: number };
+
+    const { api } = await import("../api");
+
+    const res = await api.request(`/posts/${post.id}/publish`, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${testApiKey}` },
+    });
+
+    expect(res.status).toBe(200);
+    const json = await res.json();
+    expect(json.data.published_at).not.toBeNull();
+  });
+
+  it("returns 404 for non-existent post", async () => {
+    const { api } = await import("../api");
+
+    const res = await api.request("/posts/99999/publish", {
+      method: "POST",
+      headers: { Authorization: `Bearer ${testApiKey}` },
+    });
+
+    expect(res.status).toBe(404);
+  });
+
+  it("returns 400 for invalid ID", async () => {
+    const { api } = await import("../api");
+
+    const res = await api.request("/posts/abc/publish", {
+      method: "POST",
+      headers: { Authorization: `Bearer ${testApiKey}` },
+    });
+
+    expect(res.status).toBe(400);
+    const json = await res.json();
+    expect(json.error).toBe("Invalid post ID");
+  });
+
+  it("returns 401 without API key", async () => {
+    const { api } = await import("../api");
+
+    const res = await api.request("/posts/1/publish", {
+      method: "POST",
+    });
+
+    expect(res.status).toBe(401);
+  });
+});
+
+describe("POST /api/posts/:id/unpublish", () => {
+  let testApiKey: string;
+
+  beforeEach(async () => {
+    testSqlite.exec("DELETE FROM post_tags");
+    testSqlite.exec("DELETE FROM tags");
+    testSqlite.exec("DELETE FROM posts");
+    testSqlite.exec("DELETE FROM api_keys");
+    testSqlite.exec("DELETE FROM authors");
+
+    const author = testSqlite
+      .prepare("INSERT INTO authors (email, display_name, created_at) VALUES (?, ?, ?) RETURNING id")
+      .get("test@example.com", "Test User", Date.now()) as { id: number };
+
+    const { hashToken } = await import("../../auth/crypto");
+    testApiKey = "ek_test1234567890abcdef1234567890abcdef1234567890abcdef1234567890ab";
+    const keyHash = await hashToken(testApiKey);
+
+    testSqlite
+      .prepare("INSERT INTO api_keys (author_id, key_hash, name, created_at) VALUES (?, ?, ?, ?)")
+      .run(author.id, keyHash, "Test Key", Date.now());
+  });
+
+  it("unpublishes a published post", async () => {
+    const now = Date.now();
+    const post = testSqlite
+      .prepare(
+        "INSERT INTO posts (type, title, content, published_at, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?) RETURNING id"
+      )
+      .get("article", "Published Post", "Content", now, now, now) as { id: number };
+
+    const { api } = await import("../api");
+
+    const res = await api.request(`/posts/${post.id}/unpublish`, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${testApiKey}` },
+    });
+
+    expect(res.status).toBe(200);
+    const json = await res.json();
+    expect(json.data.published_at).toBeNull();
+  });
+
+  it("returns 404 for non-existent post", async () => {
+    const { api } = await import("../api");
+
+    const res = await api.request("/posts/99999/unpublish", {
+      method: "POST",
+      headers: { Authorization: `Bearer ${testApiKey}` },
+    });
+
+    expect(res.status).toBe(404);
+  });
+
+  it("returns 400 for invalid ID", async () => {
+    const { api } = await import("../api");
+
+    const res = await api.request("/posts/abc/unpublish", {
+      method: "POST",
+      headers: { Authorization: `Bearer ${testApiKey}` },
+    });
+
+    expect(res.status).toBe(400);
+    const json = await res.json();
+    expect(json.error).toBe("Invalid post ID");
+  });
+});
