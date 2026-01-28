@@ -656,3 +656,196 @@ describe("POST /api/posts", () => {
     expect(res.status).toBe(401);
   });
 });
+
+describe("PUT /api/posts/:id", () => {
+  let testApiKey: string;
+
+  beforeEach(async () => {
+    testSqlite.exec("DELETE FROM post_tags");
+    testSqlite.exec("DELETE FROM tags");
+    testSqlite.exec("DELETE FROM posts");
+    testSqlite.exec("DELETE FROM api_keys");
+    testSqlite.exec("DELETE FROM authors");
+
+    const author = testSqlite
+      .prepare("INSERT INTO authors (email, display_name, created_at) VALUES (?, ?, ?) RETURNING id")
+      .get("test@example.com", "Test User", Date.now()) as { id: number };
+
+    const { hashToken } = await import("../../auth/crypto");
+    testApiKey = "ek_test1234567890abcdef1234567890abcdef1234567890abcdef1234567890ab";
+    const keyHash = await hashToken(testApiKey);
+
+    testSqlite
+      .prepare("INSERT INTO api_keys (author_id, key_hash, name, created_at) VALUES (?, ?, ?, ?)")
+      .run(author.id, keyHash, "Test Key", Date.now());
+  });
+
+  it("updates post title", async () => {
+    const now = Date.now();
+    const post = testSqlite
+      .prepare(
+        "INSERT INTO posts (type, title, content, created_at, updated_at) VALUES (?, ?, ?, ?, ?) RETURNING id"
+      )
+      .get("article", "Old Title", "Content", now, now) as { id: number };
+
+    const { api } = await import("../api");
+
+    const res = await api.request(`/posts/${post.id}`, {
+      method: "PUT",
+      headers: {
+        Authorization: `Bearer ${testApiKey}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ title: "New Title" }),
+    });
+
+    expect(res.status).toBe(200);
+    const json = await res.json();
+    expect(json.data.title).toBe("New Title");
+    expect(json.data.content).toBe("Content"); // Unchanged
+  });
+
+  it("updates post tags", async () => {
+    const now = Date.now();
+    const post = testSqlite
+      .prepare(
+        "INSERT INTO posts (type, title, content, created_at, updated_at) VALUES (?, ?, ?, ?, ?) RETURNING id"
+      )
+      .get("article", "Title", "Content", now, now) as { id: number };
+
+    const { api } = await import("../api");
+
+    const res = await api.request(`/posts/${post.id}`, {
+      method: "PUT",
+      headers: {
+        Authorization: `Bearer ${testApiKey}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ tags: ["new-tag"] }),
+    });
+
+    expect(res.status).toBe(200);
+    const json = await res.json();
+    expect(json.data.tags).toContain("New Tag");
+  });
+
+  it("returns 404 for non-existent post", async () => {
+    const { api } = await import("../api");
+
+    const res = await api.request("/posts/99999", {
+      method: "PUT",
+      headers: {
+        Authorization: `Bearer ${testApiKey}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ title: "New Title" }),
+    });
+
+    expect(res.status).toBe(404);
+  });
+
+  it("returns 401 without API key", async () => {
+    const { api } = await import("../api");
+
+    const res = await api.request("/posts/1", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ title: "New Title" }),
+    });
+
+    expect(res.status).toBe(401);
+  });
+});
+
+describe("DELETE /api/posts/:id", () => {
+  let testApiKey: string;
+
+  beforeEach(async () => {
+    testSqlite.exec("DELETE FROM post_tags");
+    testSqlite.exec("DELETE FROM tags");
+    testSqlite.exec("DELETE FROM posts");
+    testSqlite.exec("DELETE FROM api_keys");
+    testSqlite.exec("DELETE FROM authors");
+
+    const author = testSqlite
+      .prepare("INSERT INTO authors (email, display_name, created_at) VALUES (?, ?, ?) RETURNING id")
+      .get("test@example.com", "Test User", Date.now()) as { id: number };
+
+    const { hashToken } = await import("../../auth/crypto");
+    testApiKey = "ek_test1234567890abcdef1234567890abcdef1234567890abcdef1234567890ab";
+    const keyHash = await hashToken(testApiKey);
+
+    testSqlite
+      .prepare("INSERT INTO api_keys (author_id, key_hash, name, created_at) VALUES (?, ?, ?, ?)")
+      .run(author.id, keyHash, "Test Key", Date.now());
+  });
+
+  it("deletes post", async () => {
+    const now = Date.now();
+    const post = testSqlite
+      .prepare(
+        "INSERT INTO posts (type, title, content, created_at, updated_at) VALUES (?, ?, ?, ?, ?) RETURNING id"
+      )
+      .get("article", "Title", "Content", now, now) as { id: number };
+
+    const { api } = await import("../api");
+
+    const res = await api.request(`/posts/${post.id}`, {
+      method: "DELETE",
+      headers: { Authorization: `Bearer ${testApiKey}` },
+    });
+
+    expect(res.status).toBe(204);
+
+    // Verify deleted
+    const deleted = testSqlite.prepare("SELECT * FROM posts WHERE id = ?").get(post.id);
+    expect(deleted).toBeUndefined();
+  });
+
+  it("deletes tag associations", async () => {
+    const now = Date.now();
+    const post = testSqlite
+      .prepare(
+        "INSERT INTO posts (type, title, content, created_at, updated_at) VALUES (?, ?, ?, ?, ?) RETURNING id"
+      )
+      .get("article", "Title", "Content", now, now) as { id: number };
+
+    const tag = testSqlite
+      .prepare("INSERT INTO tags (name, slug) VALUES (?, ?) RETURNING id")
+      .get("Test", "test") as { id: number };
+
+    testSqlite.prepare("INSERT INTO post_tags (post_id, tag_id) VALUES (?, ?)").run(post.id, tag.id);
+
+    const { api } = await import("../api");
+
+    await api.request(`/posts/${post.id}`, {
+      method: "DELETE",
+      headers: { Authorization: `Bearer ${testApiKey}` },
+    });
+
+    // Verify tag association deleted
+    const assoc = testSqlite.prepare("SELECT * FROM post_tags WHERE post_id = ?").get(post.id);
+    expect(assoc).toBeUndefined();
+  });
+
+  it("returns 404 for non-existent post", async () => {
+    const { api } = await import("../api");
+
+    const res = await api.request("/posts/99999", {
+      method: "DELETE",
+      headers: { Authorization: `Bearer ${testApiKey}` },
+    });
+
+    expect(res.status).toBe(404);
+  });
+
+  it("returns 401 without API key", async () => {
+    const { api } = await import("../api");
+
+    const res = await api.request("/posts/1", {
+      method: "DELETE",
+    });
+
+    expect(res.status).toBe(401);
+  });
+});
