@@ -100,6 +100,105 @@ export function listPosts(options: ListPostsOptions = {}): PostListItem[] {
   return postsWithTags;
 }
 
+export interface CreatePostInput {
+  type: PostType;
+  title?: string | null;
+  content: string;
+  excerpt?: string | null;
+  url?: string | null;
+  tags?: string[]; // Tag slugs
+}
+
+/**
+ * Generate a slug from a string
+ */
+function slugify(str: string): string {
+  return str
+    .toLowerCase()
+    .trim()
+    .replace(/[^\w\s-]/g, "")
+    .replace(/[\s_-]+/g, "-")
+    .replace(/^-+|-+$/g, "");
+}
+
+/**
+ * Get or create a tag by slug
+ */
+function getOrCreateTag(slug: string): number {
+  const existing = db.select().from(tags).where(eq(tags.slug, slug)).get();
+
+  if (existing) {
+    return existing.id;
+  }
+
+  // Create new tag - convert slug to title case for name
+  const name = slug
+    .split("-")
+    .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+    .join(" ");
+
+  const created = db
+    .insert(tags)
+    .values({ name, slug })
+    .returning()
+    .get();
+
+  return created.id;
+}
+
+/**
+ * Create a new post
+ */
+export function createPost(input: CreatePostInput) {
+  const { type, title, content, excerpt, url, tags: tagSlugs } = input;
+
+  // Auto-generate excerpt if not provided
+  const finalExcerpt = excerpt ?? content.slice(0, 200) + (content.length > 200 ? "..." : "");
+
+  const now = new Date();
+
+  // Create the post
+  const post = db
+    .insert(posts)
+    .values({
+      type,
+      title: title ?? null,
+      content,
+      excerpt: finalExcerpt,
+      url: url ?? null,
+      created_at: now,
+      updated_at: now,
+    })
+    .returning()
+    .get();
+
+  // Handle tags
+  const tagNames: string[] = [];
+  if (tagSlugs && tagSlugs.length > 0) {
+    for (const slug of tagSlugs) {
+      const normalizedSlug = slugify(slug);
+      if (normalizedSlug) {
+        const tagId = getOrCreateTag(normalizedSlug);
+        db.insert(postTags).values({ post_id: post.id, tag_id: tagId }).run();
+
+        // Get the tag name for the response
+        const tag = db.select().from(tags).where(eq(tags.id, tagId)).get();
+        if (tag) {
+          tagNames.push(tag.name);
+        }
+      }
+    }
+  }
+
+  return {
+    ...post,
+    published_at: post.published_at?.toISOString() ?? null,
+    created_at: post.created_at.toISOString(),
+    updated_at: post.updated_at.toISOString(),
+    tags: tagNames,
+  };
+}
+
 /**
  * Get a single post by ID
  */
