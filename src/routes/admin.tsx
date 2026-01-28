@@ -2,6 +2,7 @@ import { Hono } from "hono";
 import { Layout } from "@/templates/layout";
 import { requireAuth, requireAdmin } from "@/auth/middleware";
 import { listApiKeys, createApiKey, revokeApiKey, getAuthorByEmail } from "@/auth/api-key";
+import { listAuthors, addAuthor, deleteAuthor } from "@/auth/authors";
 import {
   listPasskeys,
   generatePasskeyRegistrationOptions,
@@ -493,16 +494,132 @@ admin.post("/passkeys/:id/delete", async (c) => {
  */
 admin.get("/authors", requireAdmin, (c) => {
   const auth = c.get("auth");
+  const authorsList = listAuthors();
+  const error = c.req.query("error");
+  const success = c.req.query("success");
 
   return c.html(
     <Layout title="Authors | Admin">
       <div class="max-w-4xl mx-auto">
         <AdminHeader title="Authors" isAdmin={auth.isAdmin} />
 
-        <div class="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
-          <p class="text-gray-500 dark:text-gray-400">Author management coming soon...</p>
+        {error && (
+          <div class="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-4 mb-6">
+            <p class="text-red-700 dark:text-red-300">{error}</p>
+          </div>
+        )}
+
+        {success && (
+          <div class="bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg p-4 mb-6">
+            <p class="text-green-700 dark:text-green-300">{success}</p>
+          </div>
+        )}
+
+        {/* Add author form */}
+        <div class="bg-white dark:bg-gray-800 rounded-lg shadow p-6 mb-6">
+          <h2 class="text-lg font-semibold mb-4">Add Author</h2>
+          <form method="post" action="/admin/authors" class="flex gap-4">
+            <input
+              type="email"
+              name="email"
+              placeholder="Email address"
+              required
+              class="flex-1 px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+            />
+            <button
+              type="submit"
+              class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+            >
+              Add Author
+            </button>
+          </form>
+        </div>
+
+        {/* Authors list */}
+        <div class="bg-white dark:bg-gray-800 rounded-lg shadow">
+          <div class="px-6 py-4 border-b border-gray-200 dark:border-gray-700">
+            <h2 class="text-lg font-semibold">Allowed Authors</h2>
+          </div>
+
+          {authorsList.length === 0 ? (
+            <div class="p-6 text-gray-500 dark:text-gray-400">No authors yet. Add one above.</div>
+          ) : (
+            <ul class="divide-y divide-gray-200 dark:divide-gray-700">
+              {authorsList.map((author) => {
+                const isSelf = author.email.toLowerCase() === auth.email.toLowerCase();
+                return (
+                  <li class="p-4 flex items-center justify-between">
+                    <div>
+                      <p class="font-medium text-gray-900 dark:text-white">
+                        {author.email}
+                        {isSelf && (
+                          <span class="ml-2 px-2 py-0.5 text-xs bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-300 rounded">
+                            You
+                          </span>
+                        )}
+                      </p>
+                      <p class="text-sm text-gray-500 dark:text-gray-400">
+                        Added: {formatDate(author.created_at)}
+                      </p>
+                    </div>
+                    {!isSelf && (
+                      <form method="post" action={`/admin/authors/${author.id}/delete`}>
+                        <button
+                          type="submit"
+                          class="px-3 py-1 text-sm text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 rounded"
+                          onclick="return confirm('Remove this author? They will lose access.')"
+                        >
+                          Remove
+                        </button>
+                      </form>
+                    )}
+                  </li>
+                );
+              })}
+            </ul>
+          )}
         </div>
       </div>
     </Layout>
   );
+});
+
+/**
+ * POST /admin/authors - Add author (admin only)
+ */
+admin.post("/authors", requireAdmin, async (c) => {
+  const body = await c.req.parseBody();
+  const email = body.email as string;
+
+  if (!email || !email.trim()) {
+    return c.redirect("/admin/authors?error=Email is required");
+  }
+
+  const result = addAuthor(email);
+
+  if (!result) {
+    return c.redirect("/admin/authors?error=Invalid email or author already exists");
+  }
+
+  return c.redirect(`/admin/authors?success=${encodeURIComponent(`Added ${result.email}`)}`);
+});
+
+/**
+ * POST /admin/authors/:id/delete - Remove author (admin only)
+ */
+admin.post("/authors/:id/delete", requireAdmin, (c) => {
+  const auth = c.get("auth");
+  const authorId = parseInt(c.req.param("id"), 10);
+
+  if (isNaN(authorId)) {
+    return c.redirect("/admin/authors?error=Invalid author ID");
+  }
+
+  const success = deleteAuthor(authorId, auth.email);
+
+  if (!success) {
+    return c.redirect("/admin/authors?error=Could not remove author");
+  }
+
+  return c.redirect("/admin/authors?success=Author removed");
 });

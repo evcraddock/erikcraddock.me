@@ -191,7 +191,8 @@ describe("Passkey Service", () => {
 
   describe("verifyAndStorePasskey", () => {
     it("stores passkey on successful verification", async () => {
-      const { generatePasskeyRegistrationOptions, verifyAndStorePasskey } = await import("../passkey");
+      const { generatePasskeyRegistrationOptions, verifyAndStorePasskey } =
+        await import("../passkey");
       await generatePasskeyRegistrationOptions(testAuthorId, "test@example.com");
 
       const mockResponse = {
@@ -263,7 +264,13 @@ describe("Passkey Service", () => {
         .prepare(
           "INSERT INTO passkeys (author_id, credential_id, public_key, name, created_at) VALUES (?, ?, ?, ?, ?)"
         )
-        .run(testAuthorId, "verify-cred", Buffer.from([1, 2, 3, 4]).toString("base64"), "Verify Test", Date.now());
+        .run(
+          testAuthorId,
+          "verify-cred",
+          Buffer.from([1, 2, 3, 4]).toString("base64"),
+          "Verify Test",
+          Date.now()
+        );
 
       const { generatePasskeyAuthOptions, verifyPasskeyAuth } = await import("../passkey");
       await generatePasskeyAuthOptions();
