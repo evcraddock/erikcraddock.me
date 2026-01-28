@@ -1,14 +1,20 @@
 import { Hono } from "hono";
 import { serveStatic } from "hono/bun";
+import { federation as fedifyMiddleware } from "@fedify/hono";
 import { pages } from "./routes/pages";
 import { feed } from "./routes/feed";
 import { auth } from "./routes/auth";
 import { admin } from "./routes/admin";
 import { api } from "./routes/api";
 import { mediaRoute } from "./routes/media";
+import { federation } from "./federation/setup";
 import { logger } from "./utils/logger";
 
 const app = new Hono();
+
+// Fedify middleware - handles ActivityPub requests
+// Must be before other routes so it can intercept AP requests via content negotiation
+app.use("*", fedifyMiddleware(federation, () => undefined));
 
 // Request logging middleware
 app.use("*", async (c, next) => {
@@ -37,11 +43,6 @@ app.route("/", auth);
 app.route("/admin", admin);
 app.route("/api", api);
 app.route("/media", mediaRoute);
-
-// ActivityPub actor endpoint (placeholder)
-app.get("/.well-known/webfinger", (c) => {
-  return c.json({ message: "WebFinger endpoint - to be implemented" });
-});
 
 const port = Number(process.env.PORT) || 5000;
 
