@@ -252,6 +252,51 @@ export function updatePost(id: number, input: UpdatePostInput) {
 }
 
 /**
+ * Publish a post (set published_at if not already set)
+ */
+export function publishPost(id: number) {
+  const existing = db.select().from(posts).where(eq(posts.id, id)).get();
+
+  if (!existing) {
+    return null;
+  }
+
+  // Only set published_at if not already published
+  if (!existing.published_at) {
+    db.update(posts)
+      .set({
+        published_at: new Date(),
+        updated_at: new Date(),
+      })
+      .where(eq(posts.id, id))
+      .run();
+  }
+
+  return getPost(id);
+}
+
+/**
+ * Unpublish a post (clear published_at)
+ */
+export function unpublishPost(id: number) {
+  const existing = db.select().from(posts).where(eq(posts.id, id)).get();
+
+  if (!existing) {
+    return null;
+  }
+
+  db.update(posts)
+    .set({
+      published_at: null,
+      updated_at: new Date(),
+    })
+    .where(eq(posts.id, id))
+    .run();
+
+  return getPost(id);
+}
+
+/**
  * Delete a post
  */
 export function deletePost(id: number): boolean {
