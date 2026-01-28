@@ -158,3 +158,6 @@ check: ## Run linting and tests
 
 pre-pr: ## Run pre-PR checks
 	./scripts/pre-pr.sh
+
+garage-setup: ## Setup Garage (run once after first make dev)
+	@./scripts/setup-garage.sh

@@ -1,124 +1,90 @@
 #!/bin/bash
-# Setup Garage for local development
-# Run after `docker compose up -d garage`
+# Setup Garage for local development (run once after first `make dev`)
+#
+# Reads from .env:
+#   GARAGE_ADMIN_TOKEN - Admin API token (must match garage.toml)
+#   S3_BUCKET - Bucket name to create
+#
+# Creates the cluster layout, API key, and bucket.
+# Only needs to run once - data persists in Docker volumes.
 
 set -e
 
+# Load .env
+if [ -f .env ]; then
+  export $(grep -v '^#' .env | xargs)
+fi
+
 GARAGE_ADMIN="http://localhost:3903"
-BUCKET_NAME="erikcraddock-media"
-ACCESS_KEY="dev-access-key"
-SECRET_KEY="dev-secret-key"
+ADMIN_TOKEN="${GARAGE_ADMIN_TOKEN:-dev-admin-token}"
+BUCKET_NAME="${S3_BUCKET:-erikcraddock}"
+
+garage_api() {
+  curl -s -H "Authorization: Bearer $ADMIN_TOKEN" "$@"
+}
 
 echo "🚀 Setting up Garage..."
 
-# Wait for Garage to be ready
+# Wait for admin API
 echo "Waiting for Garage admin API..."
 for i in {1..30}; do
-  if curl -s "$GARAGE_ADMIN/health" > /dev/null 2>&1; then
-    echo "Garage is ready!"
+  if garage_api "$GARAGE_ADMIN/health" > /dev/null 2>&1; then
     break
   fi
-  if [ $i -eq 30 ]; then
-    echo "❌ Garage failed to start"
-    exit 1
-  fi
+  [ $i -eq 30 ] && { echo "❌ Garage admin API not responding"; exit 1; }
   sleep 1
 done
 
-# Get cluster status and node ID
-echo "Getting cluster status..."
-STATUS=$(curl -s "$GARAGE_ADMIN/v1/status" -H "Content-Type: application/json")
-NODE_ID=$(echo "$STATUS" | jq -r '.node')
+# Check/configure layout
+LAYOUT=$(garage_api "$GARAGE_ADMIN/v1/layout")
+VERSION=$(echo "$LAYOUT" | jq -r '.version // 0')
 
-if [ -z "$NODE_ID" ] || [ "$NODE_ID" = "null" ]; then
-  echo "❌ Failed to get node ID"
-  exit 1
+if [ "$VERSION" -gt 0 ]; then
+  echo "✓ Layout already configured"
+else
+  NODE_ID=$(garage_api "$GARAGE_ADMIN/v1/status" | jq -r '.node')
+  [ -z "$NODE_ID" ] || [ "$NODE_ID" = "null" ] && { echo "❌ Failed to get node ID"; exit 1; }
+  
+  garage_api -X POST "$GARAGE_ADMIN/v1/layout" \
+    -H "Content-Type: application/json" \
+    -d "[{\"id\":\"$NODE_ID\",\"zone\":\"dc1\",\"capacity\":1073741824}]" > /dev/null
+  garage_api -X POST "$GARAGE_ADMIN/v1/layout/apply" \
+    -H "Content-Type: application/json" \
+    -d '{"version":1}' > /dev/null
+  echo "✓ Layout configured"
 fi
 
-echo "Node ID: $NODE_ID"
+# Check/create API key
+KEYS=$(garage_api "$GARAGE_ADMIN/v1/key")
+KEY_ID=$(echo "$KEYS" | jq -r '.[] | select(.name == "dev-key") | .id')
 
-# Configure the node with zone and capacity
-echo "Configuring node layout..."
-curl -s -X POST "$GARAGE_ADMIN/v1/layout" \
-  -H "Content-Type: application/json" \
-  -d "[{
-    \"id\": \"$NODE_ID\",
-    \"zone\": \"dc1\",
-    \"capacity\": 1073741824,
-    \"tags\": [\"dev\"]
-  }]" > /dev/null
-
-# Get current layout version and apply
-LAYOUT=$(curl -s "$GARAGE_ADMIN/v1/layout")
-VERSION=$(echo "$LAYOUT" | jq -r '.version')
-NEXT_VERSION=$((VERSION + 1))
-
-echo "Applying layout (version $NEXT_VERSION)..."
-curl -s -X POST "$GARAGE_ADMIN/v1/layout/apply" \
-  -H "Content-Type: application/json" \
-  -d "{\"version\": $NEXT_VERSION}" > /dev/null
-
-# Create API key
-echo "Creating API key..."
-KEY_RESULT=$(curl -s -X POST "$GARAGE_ADMIN/v1/key" \
-  -H "Content-Type: application/json" \
-  -d "{
-    \"name\": \"dev-key\"
-  }")
-
-CREATED_ACCESS_KEY=$(echo "$KEY_RESULT" | jq -r '.accessKeyId')
-CREATED_SECRET_KEY=$(echo "$KEY_RESULT" | jq -r '.secretAccessKey')
-
-if [ -z "$CREATED_ACCESS_KEY" ] || [ "$CREATED_ACCESS_KEY" = "null" ]; then
-  echo "⚠️  Key may already exist, checking..."
-  # List keys and find dev-key
-  KEYS=$(curl -s "$GARAGE_ADMIN/v1/key")
-  EXISTING_KEY=$(echo "$KEYS" | jq -r '.[] | select(.name == "dev-key") | .id')
-  if [ -n "$EXISTING_KEY" ]; then
-    echo "Found existing key: $EXISTING_KEY"
-    KEY_INFO=$(curl -s "$GARAGE_ADMIN/v1/key?id=$EXISTING_KEY")
-    CREATED_ACCESS_KEY=$(echo "$KEY_INFO" | jq -r '.accessKeyId')
-    CREATED_SECRET_KEY=$(echo "$KEY_INFO" | jq -r '.secretAccessKey')
-  fi
+if [ -n "$KEY_ID" ] && [ "$KEY_ID" != "null" ]; then
+  KEY_INFO=$(garage_api "$GARAGE_ADMIN/v1/key?id=$KEY_ID")
+else
+  KEY_INFO=$(garage_api -X POST "$GARAGE_ADMIN/v1/key" -H "Content-Type: application/json" -d '{"name":"dev-key"}')
+  echo "✓ API key created"
 fi
 
-# Create bucket
-echo "Creating bucket: $BUCKET_NAME..."
-curl -s -X POST "$GARAGE_ADMIN/v1/bucket" \
-  -H "Content-Type: application/json" \
-  -d "{\"globalAlias\": \"$BUCKET_NAME\"}" > /dev/null 2>&1 || true
+ACCESS_KEY=$(echo "$KEY_INFO" | jq -r '.accessKeyId')
+SECRET_KEY=$(echo "$KEY_INFO" | jq -r '.secretAccessKey')
 
-# Get bucket ID
-BUCKETS=$(curl -s "$GARAGE_ADMIN/v1/bucket")
+# Check/create bucket
+BUCKETS=$(garage_api "$GARAGE_ADMIN/v1/bucket")
 BUCKET_ID=$(echo "$BUCKETS" | jq -r ".[] | select(.globalAliases[]? == \"$BUCKET_NAME\") | .id")
 
 if [ -z "$BUCKET_ID" ] || [ "$BUCKET_ID" = "null" ]; then
-  echo "❌ Failed to create or find bucket"
-  exit 1
+  BUCKET_ID=$(garage_api -X POST "$GARAGE_ADMIN/v1/bucket" \
+    -H "Content-Type: application/json" \
+    -d "{\"globalAlias\":\"$BUCKET_NAME\"}" | jq -r '.id')
+  echo "✓ Bucket created"
 fi
 
-echo "Bucket ID: $BUCKET_ID"
-
-# Grant key access to bucket
-echo "Granting bucket access..."
-curl -s -X POST "$GARAGE_ADMIN/v1/bucket/allow" \
+# Grant permissions
+garage_api -X POST "$GARAGE_ADMIN/v1/bucket/allow" \
   -H "Content-Type: application/json" \
-  -d "{
-    \"bucketId\": \"$BUCKET_ID\",
-    \"accessKeyId\": \"$CREATED_ACCESS_KEY\",
-    \"permissions\": {
-      \"read\": true,
-      \"write\": true,
-      \"owner\": true
-    }
-  }" > /dev/null
+  -d "{\"bucketId\":\"$BUCKET_ID\",\"accessKeyId\":\"$ACCESS_KEY\",\"permissions\":{\"read\":true,\"write\":true,\"owner\":true}}" > /dev/null
 
 echo ""
-echo "✅ Garage setup complete!"
-echo ""
-echo "Add these to your .env file:"
-echo "  S3_ENDPOINT=http://localhost:3900"
-echo "  S3_ACCESS_KEY=$CREATED_ACCESS_KEY"
-echo "  S3_SECRET_KEY=$CREATED_SECRET_KEY"
-echo "  S3_BUCKET=$BUCKET_NAME"
-echo "  S3_REGION=garage"
+echo "✅ Garage ready! Add to .env:"
+echo "  S3_ACCESS_KEY=$ACCESS_KEY"
+echo "  S3_SECRET_KEY=$SECRET_KEY"
