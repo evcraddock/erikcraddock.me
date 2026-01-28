@@ -56,8 +56,6 @@ If any prerequisite fails, mark ALL tests in this file as FAIL and move on.
 
 ### Verify Magic Link
 
-> **BLOCKED**: Requires /login/verify route (Task #1305)
-
 1. Copy magic link URL from server logs
 2. Navigate to the magic link URL in browser
 3. **PASS**: Redirected to /admin, session cookie set
@@ -72,8 +70,6 @@ If any prerequisite fails, mark ALL tests in this file as FAIL and move on.
 
 ### Expired Magic Link
 
-> **BLOCKED**: Requires /login/verify route (Task #1305)
-
 1. Request a magic link
 2. Wait 16 minutes (or manually set expires_at to past in DB)
 3. Navigate to magic link URL
@@ -82,20 +78,16 @@ If any prerequisite fails, mark ALL tests in this file as FAIL and move on.
 
 ### Already Used Magic Link
 
-> **BLOCKED**: Requires /login/verify route (Task #1305)
-
 1. Request a magic link
 2. Use the link to log in (should succeed)
 3. Log out
 4. Try the same magic link again
-5. **PASS**: Shows "link already used" error
+5. **PASS**: Shows "link already used" error, redirects to /login?error=invalid
 6. **FAIL**: Logs in again
 
 ---
 
 ## Session Persistence (Pass/Fail)
-
-> **BLOCKED**: Requires session creation (Task #1305) and protected routes (Task #1306)
 
 ### Session Survives Page Reload
 
@@ -107,7 +99,7 @@ If any prerequisite fails, mark ALL tests in this file as FAIL and move on.
 
 ### Unauthenticated Access to Protected Route
 
-1. Clear cookies / use incognito
+1. Clear cookies / use incognito (or test with curl)
 2. Navigate to http://localhost:5000/admin
 3. **PASS**: Redirected to /login
 4. **FAIL**: Shows admin page
@@ -116,12 +108,10 @@ If any prerequisite fails, mark ALL tests in this file as FAIL and move on.
 
 ## Logout (Pass/Fail)
 
-> **BLOCKED**: Requires /logout route (Task #1305 or #1306)
-
 ### Logout Clears Session
 
 1. Login via magic link
-2. Click logout or POST to /logout
+2. Click logout or navigate to /logout
 3. Navigate to http://localhost:5000/admin
 4. **PASS**: Redirected to /login
 5. **FAIL**: Still shows admin page
@@ -133,4 +123,3 @@ If any prerequisite fails, mark ALL tests in this file as FAIL and move on.
 - Dev mode logs magic links to console instead of sending emails
 - Port is 5000 in this project (not 3000)
 - Use `make dev-tail` to view server logs
-- Some tests blocked until subsequent tasks are completed
