@@ -1,6 +1,6 @@
 import { Hono } from "hono";
 import { requireApiKey } from "@/auth/api-key";
-import { listPosts, getPost, PostType } from "@/services/posts";
+import { listPosts, getPost, createPost, PostType } from "@/services/posts";
 
 export const api = new Hono();
 
@@ -63,4 +63,49 @@ api.get("/posts/:id", (c) => {
   }
 
   return c.json({ data: post });
+});
+
+/**
+ * POST /api/posts - Create new post
+ */
+api.post("/posts", async (c) => {
+  const body = await c.req.json();
+
+  // Validate type
+  const { type, title, content, excerpt, url, tags } = body;
+
+  if (!type || !["article", "link", "note"].includes(type)) {
+    return c.json({ error: "Invalid or missing type. Must be article, link, or note" }, 400);
+  }
+
+  // Validate content
+  if (!content || typeof content !== "string" || content.trim().length === 0) {
+    return c.json({ error: "Content is required" }, 400);
+  }
+
+  // Articles require title
+  if (type === "article" && (!title || typeof title !== "string" || title.trim().length === 0)) {
+    return c.json({ error: "Title is required for articles" }, 400);
+  }
+
+  // Links require url
+  if (type === "link" && (!url || typeof url !== "string" || url.trim().length === 0)) {
+    return c.json({ error: "URL is required for links" }, 400);
+  }
+
+  // Validate tags if provided
+  if (tags !== undefined && !Array.isArray(tags)) {
+    return c.json({ error: "Tags must be an array" }, 400);
+  }
+
+  const post = createPost({
+    type,
+    title: title?.trim() || null,
+    content: content.trim(),
+    excerpt: excerpt?.trim() || null,
+    url: url?.trim() || null,
+    tags: tags || [],
+  });
+
+  return c.json({ data: post }, 201);
 });

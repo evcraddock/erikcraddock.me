@@ -423,3 +423,236 @@ describe("GET /api/posts/:id", () => {
     expect(res.status).toBe(401);
   });
 });
+
+describe("POST /api/posts", () => {
+  let testApiKey: string;
+
+  beforeEach(async () => {
+    // Clean up
+    testSqlite.exec("DELETE FROM post_tags");
+    testSqlite.exec("DELETE FROM tags");
+    testSqlite.exec("DELETE FROM posts");
+    testSqlite.exec("DELETE FROM api_keys");
+    testSqlite.exec("DELETE FROM authors");
+
+    // Create test author
+    const author = testSqlite
+      .prepare("INSERT INTO authors (email, display_name, created_at) VALUES (?, ?, ?) RETURNING id")
+      .get("test@example.com", "Test User", Date.now()) as { id: number };
+
+    // Create API key
+    const { hashToken } = await import("../../auth/crypto");
+    testApiKey = "ek_test1234567890abcdef1234567890abcdef1234567890abcdef1234567890ab";
+    const keyHash = await hashToken(testApiKey);
+
+    testSqlite
+      .prepare("INSERT INTO api_keys (author_id, key_hash, name, created_at) VALUES (?, ?, ?, ?)")
+      .run(author.id, keyHash, "Test Key", Date.now());
+  });
+
+  it("creates an article post", async () => {
+    const { api } = await import("../api");
+
+    const res = await api.request("/posts", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${testApiKey}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        type: "article",
+        title: "My Article",
+        content: "This is the content",
+      }),
+    });
+
+    expect(res.status).toBe(201);
+    const json = await res.json();
+    expect(json.data.type).toBe("article");
+    expect(json.data.title).toBe("My Article");
+    expect(json.data.content).toBe("This is the content");
+    expect(json.data.id).toBeGreaterThan(0);
+  });
+
+  it("creates a note without title", async () => {
+    const { api } = await import("../api");
+
+    const res = await api.request("/posts", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${testApiKey}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        type: "note",
+        content: "Just a quick thought",
+      }),
+    });
+
+    expect(res.status).toBe(201);
+    const json = await res.json();
+    expect(json.data.type).toBe("note");
+    expect(json.data.title).toBeNull();
+  });
+
+  it("creates a link post with url", async () => {
+    const { api } = await import("../api");
+
+    const res = await api.request("/posts", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${testApiKey}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        type: "link",
+        title: "Cool Link",
+        content: "Check this out",
+        url: "https://example.com",
+      }),
+    });
+
+    expect(res.status).toBe(201);
+    const json = await res.json();
+    expect(json.data.type).toBe("link");
+    expect(json.data.url).toBe("https://example.com");
+  });
+
+  it("auto-generates excerpt if not provided", async () => {
+    const { api } = await import("../api");
+    const longContent = "A".repeat(250);
+
+    const res = await api.request("/posts", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${testApiKey}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        type: "note",
+        content: longContent,
+      }),
+    });
+
+    const json = await res.json();
+    expect(json.data.excerpt).toBe("A".repeat(200) + "...");
+  });
+
+  it("creates tags if they don't exist", async () => {
+    const { api } = await import("../api");
+
+    const res = await api.request("/posts", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${testApiKey}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        type: "article",
+        title: "Tagged Post",
+        content: "Content here",
+        tags: ["javascript", "web-dev"],
+      }),
+    });
+
+    expect(res.status).toBe(201);
+    const json = await res.json();
+    expect(json.data.tags).toContain("Javascript");
+    expect(json.data.tags).toContain("Web Dev");
+
+    // Verify tags were created in DB
+    const jsTag = testSqlite.prepare("SELECT * FROM tags WHERE slug = ?").get("javascript");
+    expect(jsTag).toBeDefined();
+  });
+
+  it("returns 400 for missing type", async () => {
+    const { api } = await import("../api");
+
+    const res = await api.request("/posts", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${testApiKey}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        content: "No type provided",
+      }),
+    });
+
+    expect(res.status).toBe(400);
+    const json = await res.json();
+    expect(json.error).toContain("type");
+  });
+
+  it("returns 400 for missing content", async () => {
+    const { api } = await import("../api");
+
+    const res = await api.request("/posts", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${testApiKey}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        type: "note",
+      }),
+    });
+
+    expect(res.status).toBe(400);
+    const json = await res.json();
+    expect(json.error).toContain("Content");
+  });
+
+  it("returns 400 for article without title", async () => {
+    const { api } = await import("../api");
+
+    const res = await api.request("/posts", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${testApiKey}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        type: "article",
+        content: "Content but no title",
+      }),
+    });
+
+    expect(res.status).toBe(400);
+    const json = await res.json();
+    expect(json.error).toContain("Title");
+  });
+
+  it("returns 400 for link without url", async () => {
+    const { api } = await import("../api");
+
+    const res = await api.request("/posts", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${testApiKey}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        type: "link",
+        title: "A Link",
+        content: "Content",
+      }),
+    });
+
+    expect(res.status).toBe(400);
+    const json = await res.json();
+    expect(json.error).toContain("URL");
+  });
+
+  it("returns 401 without API key", async () => {
+    const { api } = await import("../api");
+
+    const res = await api.request("/posts", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ type: "note", content: "test" }),
+    });
+
+    expect(res.status).toBe(401);
+  });
+});
