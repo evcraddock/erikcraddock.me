@@ -317,3 +317,109 @@ describe("GET /api/posts", () => {
     expect(res.status).toBe(401);
   });
 });
+
+describe("GET /api/posts/:id", () => {
+  let testApiKey: string;
+
+  beforeEach(async () => {
+    // Clean up
+    testSqlite.exec("DELETE FROM post_tags");
+    testSqlite.exec("DELETE FROM tags");
+    testSqlite.exec("DELETE FROM posts");
+    testSqlite.exec("DELETE FROM api_keys");
+    testSqlite.exec("DELETE FROM authors");
+
+    // Create test author
+    const author = testSqlite
+      .prepare("INSERT INTO authors (email, display_name, created_at) VALUES (?, ?, ?) RETURNING id")
+      .get("test@example.com", "Test User", Date.now()) as { id: number };
+
+    // Create API key
+    const { hashToken } = await import("../../auth/crypto");
+    testApiKey = "ek_test1234567890abcdef1234567890abcdef1234567890abcdef1234567890ab";
+    const keyHash = await hashToken(testApiKey);
+
+    testSqlite
+      .prepare("INSERT INTO api_keys (author_id, key_hash, name, created_at) VALUES (?, ?, ?, ?)")
+      .run(author.id, keyHash, "Test Key", Date.now());
+  });
+
+  it("returns single post with full content", async () => {
+    const now = Date.now();
+    const post = testSqlite
+      .prepare(
+        "INSERT INTO posts (type, title, content, excerpt, published_at, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?) RETURNING id"
+      )
+      .get("article", "Test Post", "Full content here", "Excerpt", now, now, now) as { id: number };
+
+    const { api } = await import("../api");
+
+    const res = await api.request(`/posts/${post.id}`, {
+      headers: { Authorization: `Bearer ${testApiKey}` },
+    });
+
+    expect(res.status).toBe(200);
+    const json = await res.json();
+    expect(json.data.id).toBe(post.id);
+    expect(json.data.title).toBe("Test Post");
+    expect(json.data.content).toBe("Full content here");
+    expect(json.data.excerpt).toBe("Excerpt");
+    expect(json.data.tags).toEqual([]);
+  });
+
+  it("includes tags in response", async () => {
+    const now = Date.now();
+    const post = testSqlite
+      .prepare(
+        "INSERT INTO posts (type, title, content, published_at, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?) RETURNING id"
+      )
+      .get("article", "Tagged Post", "Content", now, now, now) as { id: number };
+
+    const tag = testSqlite
+      .prepare("INSERT INTO tags (name, slug) VALUES (?, ?) RETURNING id")
+      .get("JavaScript", "javascript") as { id: number };
+
+    testSqlite.prepare("INSERT INTO post_tags (post_id, tag_id) VALUES (?, ?)").run(post.id, tag.id);
+
+    const { api } = await import("../api");
+
+    const res = await api.request(`/posts/${post.id}`, {
+      headers: { Authorization: `Bearer ${testApiKey}` },
+    });
+
+    const json = await res.json();
+    expect(json.data.tags).toContain("JavaScript");
+  });
+
+  it("returns 404 for non-existent post", async () => {
+    const { api } = await import("../api");
+
+    const res = await api.request("/posts/99999", {
+      headers: { Authorization: `Bearer ${testApiKey}` },
+    });
+
+    expect(res.status).toBe(404);
+    const json = await res.json();
+    expect(json.error).toBe("Post not found");
+  });
+
+  it("returns 400 for invalid ID", async () => {
+    const { api } = await import("../api");
+
+    const res = await api.request("/posts/abc", {
+      headers: { Authorization: `Bearer ${testApiKey}` },
+    });
+
+    expect(res.status).toBe(400);
+    const json = await res.json();
+    expect(json.error).toBe("Invalid post ID");
+  });
+
+  it("returns 401 without API key", async () => {
+    const { api } = await import("../api");
+
+    const res = await api.request("/posts/1");
+
+    expect(res.status).toBe(401);
+  });
+});
