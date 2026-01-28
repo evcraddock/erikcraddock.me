@@ -146,6 +146,40 @@ describe("Media Service", () => {
       expect(result.alt_text).toBe("A nice photo");
     });
 
+    it("overwrites existing record when custom key matches", async () => {
+      const { createMedia, getMediaByKey } = await import("../media");
+      const { uploadFile } = await import("../s3");
+
+      const first = await createMedia({
+        file: Buffer.from("first image"),
+        filename: "original.jpg",
+        mimeType: "image/jpeg",
+        customKey: "overwrite-test.jpg",
+      });
+
+      const second = await createMedia({
+        file: Buffer.from("second image"),
+        filename: "replacement.png",
+        mimeType: "image/png",
+        altText: "Updated alt",
+        customKey: "overwrite-test.jpg",
+      });
+
+      // Same ID, updated fields
+      expect(second.id).toBe(first.id);
+      expect(second.filename).toBe("replacement.png");
+      expect(second.mime_type).toBe("image/png");
+      expect(second.alt_text).toBe("Updated alt");
+
+      // S3 upload called twice
+      expect(uploadFile).toHaveBeenCalledTimes(2);
+
+      // Only one record in DB
+      const record = getMediaByKey("overwrite-test.jpg");
+      expect(record).not.toBeNull();
+      expect(record!.filename).toBe("replacement.png");
+    });
+
     it("rejects invalid mime type", async () => {
       const { createMedia } = await import("../media");
 
@@ -178,6 +212,25 @@ describe("Media Service", () => {
     it("returns null for non-existent id", async () => {
       const { getMedia } = await import("../media");
       expect(getMedia(999)).toBeNull();
+    });
+  });
+
+  describe("getMediaByKey", () => {
+    it("returns media record by S3 key", async () => {
+      testSqlite.exec(
+        "INSERT INTO media (filename, mime_type, s3_key, created_at) VALUES ('bykey.jpg', 'image/jpeg', 'lookup-key.jpg', 1000)"
+      );
+      const { getMediaByKey } = await import("../media");
+
+      const result = getMediaByKey("lookup-key.jpg");
+      expect(result).not.toBeNull();
+      expect(result!.filename).toBe("bykey.jpg");
+      expect(result!.mime_type).toBe("image/jpeg");
+    });
+
+    it("returns null for non-existent key", async () => {
+      const { getMediaByKey } = await import("../media");
+      expect(getMediaByKey("no-such-key.jpg")).toBeNull();
     });
   });
 

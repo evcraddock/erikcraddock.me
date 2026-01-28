@@ -50,19 +50,36 @@ export async function createMedia(options: {
 
   await uploadFile(s3Key, file, mimeType);
 
-  const record = db
-    .insert(media)
-    .values({
-      filename,
-      mime_type: mimeType,
-      s3_key: s3Key,
-      alt_text: altText || null,
-      created_at: new Date(),
-    })
-    .returning()
-    .get();
+  // Check if a record with this key already exists (overwrite case)
+  const existing = db.select().from(media).where(eq(media.s3_key, s3Key)).get();
 
-  logger.info("media", "Media created", { id: record.id, s3Key, filename });
+  let record;
+  if (existing) {
+    record = db
+      .update(media)
+      .set({
+        filename,
+        mime_type: mimeType,
+        alt_text: altText || null,
+      })
+      .where(eq(media.id, existing.id))
+      .returning()
+      .get();
+    logger.info("media", "Media overwritten", { id: record.id, s3Key, filename });
+  } else {
+    record = db
+      .insert(media)
+      .values({
+        filename,
+        mime_type: mimeType,
+        s3_key: s3Key,
+        alt_text: altText || null,
+        created_at: new Date(),
+      })
+      .returning()
+      .get();
+    logger.info("media", "Media created", { id: record.id, s3Key, filename });
+  }
 
   return { ...record, url: mediaUrl(record.s3_key) };
 }
@@ -72,6 +89,15 @@ export async function createMedia(options: {
  */
 export function getMedia(id: number): MediaRecord | null {
   const record = db.select().from(media).where(eq(media.id, id)).get();
+  if (!record) return null;
+  return { ...record, url: mediaUrl(record.s3_key) };
+}
+
+/**
+ * Get a media record by S3 key
+ */
+export function getMediaByKey(s3Key: string): MediaRecord | null {
+  const record = db.select().from(media).where(eq(media.s3_key, s3Key)).get();
   if (!record) return null;
   return { ...record, url: mediaUrl(record.s3_key) };
 }
