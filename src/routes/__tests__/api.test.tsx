@@ -924,6 +924,19 @@ describe("POST /api/posts/:id/publish", () => {
     expect(res.status).toBe(404);
   });
 
+  it("returns 400 for invalid ID", async () => {
+    const { api } = await import("../api");
+
+    const res = await api.request("/posts/abc/publish", {
+      method: "POST",
+      headers: { Authorization: `Bearer ${testApiKey}` },
+    });
+
+    expect(res.status).toBe(400);
+    const json = await res.json();
+    expect(json.error).toBe("Invalid post ID");
+  });
+
   it("returns 401 without API key", async () => {
     const { api } = await import("../api");
 
@@ -987,5 +1000,18 @@ describe("POST /api/posts/:id/unpublish", () => {
     });
 
     expect(res.status).toBe(404);
+  });
+
+  it("returns 400 for invalid ID", async () => {
+    const { api } = await import("../api");
+
+    const res = await api.request("/posts/abc/unpublish", {
+      method: "POST",
+      headers: { Authorization: `Bearer ${testApiKey}` },
+    });
+
+    expect(res.status).toBe(400);
+    const json = await res.json();
+    expect(json.error).toBe("Invalid post ID");
   });
 });
