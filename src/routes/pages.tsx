@@ -16,12 +16,21 @@ type Post = typeof posts.$inferSelect;
 type Source = typeof sources.$inferSelect;
 type PostWithSource = Post & { source?: Source | null };
 
+/** Max length for showing full note content inline */
+const NOTE_INLINE_MAX_LENGTH = 280;
+
 /** Reusable post card component */
 function PostCard({ post }: { post: PostWithSource }) {
   const isLink = post.type === "link";
+  const isNote = post.type === "note";
+
+  // Notes show full content if short enough
+  const noteContent = isNote && post.content.length <= NOTE_INLINE_MAX_LENGTH ? post.content : null;
 
   return (
-    <article class="border-b border-gray-200 dark:border-gray-700 pb-6">
+    <article
+      class={`border-b border-gray-200 dark:border-gray-700 ${isNote ? "pb-4" : "pb-6"} ${isNote ? "pl-4 border-l-2 border-l-gray-300 dark:border-l-gray-600" : ""}`}
+    >
       {/* Link posts: show external URL prominently */}
       {isLink && post.url && (
         <a
@@ -43,14 +52,23 @@ function PostCard({ post }: { post: PostWithSource }) {
       )}
 
       <a href={`/posts/${post.id}`} class="block group">
+        {/* Title for articles and links (notes don't have titles) */}
         {post.title ? (
           <h2 class="text-xl font-semibold text-gray-900 dark:text-gray-100 group-hover:text-blue-600 dark:group-hover:text-blue-400 mb-2">
             {post.title}
           </h2>
         ) : null}
-        <p class="text-gray-600 dark:text-gray-400 mb-2">
-          {post.excerpt || truncate(post.content, 200)}
-        </p>
+
+        {/* Content: notes show full content if short, others show excerpt */}
+        {isNote ? (
+          <p class="text-gray-700 dark:text-gray-300 mb-2 whitespace-pre-wrap">
+            {noteContent || truncate(post.content, 200) + "…"}
+          </p>
+        ) : (
+          <p class="text-gray-600 dark:text-gray-400 mb-2">
+            {post.excerpt || truncate(post.content, 200)}
+          </p>
+        )}
 
         {/* Meta: date and source attribution */}
         <div class="flex flex-wrap items-center gap-2 text-sm text-gray-400 dark:text-gray-500">
@@ -250,6 +268,7 @@ export function createPagesRoutes(db: Database): Hono {
     const post = result.post;
     const source = result.source;
     const isLink = post.type === "link";
+    const isNote = post.type === "note";
 
     // Query tags for this post
     const postTagsResult = db
@@ -272,7 +291,7 @@ export function createPagesRoutes(db: Database): Hono {
       }
     }
 
-    const title = post.title || "Post";
+    const title = post.title || (isNote ? "Note" : "Post");
     const description = post.excerpt || truncate(post.content, 160);
 
     return c.html(
@@ -281,7 +300,7 @@ export function createPagesRoutes(db: Database): Hono {
         ogImage={bannerUrl ?? undefined}
         description={description}
       >
-        <article class="max-w-none">
+        <article class={`max-w-none ${isNote ? "pl-4 border-l-4 border-l-gray-300 dark:border-l-gray-600" : ""}`}>
           {/* Back link */}
           <a
             href="/"
