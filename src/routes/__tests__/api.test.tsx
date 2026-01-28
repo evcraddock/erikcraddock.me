@@ -259,7 +259,9 @@ describe("GET /api/posts", () => {
 
       // Tag first 3 posts
       if (i < 3) {
-        testSqlite.prepare("INSERT INTO post_tags (post_id, tag_id) VALUES (?, ?)").run(post.id, tag.id);
+        testSqlite
+          .prepare("INSERT INTO post_tags (post_id, tag_id) VALUES (?, ?)")
+          .run(post.id, tag.id);
       }
     }
 
@@ -331,7 +333,9 @@ describe("GET /api/posts/:id", () => {
 
     // Create test author
     const author = testSqlite
-      .prepare("INSERT INTO authors (email, display_name, created_at) VALUES (?, ?, ?) RETURNING id")
+      .prepare(
+        "INSERT INTO authors (email, display_name, created_at) VALUES (?, ?, ?) RETURNING id"
+      )
       .get("test@example.com", "Test User", Date.now()) as { id: number };
 
     // Create API key
@@ -379,7 +383,9 @@ describe("GET /api/posts/:id", () => {
       .prepare("INSERT INTO tags (name, slug) VALUES (?, ?) RETURNING id")
       .get("JavaScript", "javascript") as { id: number };
 
-    testSqlite.prepare("INSERT INTO post_tags (post_id, tag_id) VALUES (?, ?)").run(post.id, tag.id);
+    testSqlite
+      .prepare("INSERT INTO post_tags (post_id, tag_id) VALUES (?, ?)")
+      .run(post.id, tag.id);
 
     const { api } = await import("../api");
 
@@ -437,7 +443,9 @@ describe("POST /api/posts", () => {
 
     // Create test author
     const author = testSqlite
-      .prepare("INSERT INTO authors (email, display_name, created_at) VALUES (?, ?, ?) RETURNING id")
+      .prepare(
+        "INSERT INTO authors (email, display_name, created_at) VALUES (?, ?, ?) RETURNING id"
+      )
       .get("test@example.com", "Test User", Date.now()) as { id: number };
 
     // Create API key
@@ -668,7 +676,9 @@ describe("PUT /api/posts/:id", () => {
     testSqlite.exec("DELETE FROM authors");
 
     const author = testSqlite
-      .prepare("INSERT INTO authors (email, display_name, created_at) VALUES (?, ?, ?) RETURNING id")
+      .prepare(
+        "INSERT INTO authors (email, display_name, created_at) VALUES (?, ?, ?) RETURNING id"
+      )
       .get("test@example.com", "Test User", Date.now()) as { id: number };
 
     const { hashToken } = await import("../../auth/crypto");
@@ -768,7 +778,9 @@ describe("DELETE /api/posts/:id", () => {
     testSqlite.exec("DELETE FROM authors");
 
     const author = testSqlite
-      .prepare("INSERT INTO authors (email, display_name, created_at) VALUES (?, ?, ?) RETURNING id")
+      .prepare(
+        "INSERT INTO authors (email, display_name, created_at) VALUES (?, ?, ?) RETURNING id"
+      )
       .get("test@example.com", "Test User", Date.now()) as { id: number };
 
     const { hashToken } = await import("../../auth/crypto");
@@ -814,7 +826,9 @@ describe("DELETE /api/posts/:id", () => {
       .prepare("INSERT INTO tags (name, slug) VALUES (?, ?) RETURNING id")
       .get("Test", "test") as { id: number };
 
-    testSqlite.prepare("INSERT INTO post_tags (post_id, tag_id) VALUES (?, ?)").run(post.id, tag.id);
+    testSqlite
+      .prepare("INSERT INTO post_tags (post_id, tag_id) VALUES (?, ?)")
+      .run(post.id, tag.id);
 
     const { api } = await import("../api");
 
@@ -861,7 +875,9 @@ describe("POST /api/posts/:id/publish", () => {
     testSqlite.exec("DELETE FROM authors");
 
     const author = testSqlite
-      .prepare("INSERT INTO authors (email, display_name, created_at) VALUES (?, ?, ?) RETURNING id")
+      .prepare(
+        "INSERT INTO authors (email, display_name, created_at) VALUES (?, ?, ?) RETURNING id"
+      )
       .get("test@example.com", "Test User", Date.now()) as { id: number };
 
     const { hashToken } = await import("../../auth/crypto");
@@ -959,7 +975,9 @@ describe("POST /api/posts/:id/unpublish", () => {
     testSqlite.exec("DELETE FROM authors");
 
     const author = testSqlite
-      .prepare("INSERT INTO authors (email, display_name, created_at) VALUES (?, ?, ?) RETURNING id")
+      .prepare(
+        "INSERT INTO authors (email, display_name, created_at) VALUES (?, ?, ?) RETURNING id"
+      )
       .get("test@example.com", "Test User", Date.now()) as { id: number };
 
     const { hashToken } = await import("../../auth/crypto");

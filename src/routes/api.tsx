@@ -138,10 +138,10 @@ api.put("/posts/:id", async (c) => {
   }
 
   const post = updatePost(id, {
-    title: title !== undefined ? (title?.trim() || null) : undefined,
+    title: title !== undefined ? title?.trim() || null : undefined,
     content: content?.trim(),
-    excerpt: excerpt !== undefined ? (excerpt?.trim() || null) : undefined,
-    url: url !== undefined ? (url?.trim() || null) : undefined,
+    excerpt: excerpt !== undefined ? excerpt?.trim() || null : undefined,
+    url: url !== undefined ? url?.trim() || null : undefined,
     tags,
   });
 
