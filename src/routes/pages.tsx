@@ -11,13 +11,37 @@ import { mediaUrl } from "../services/media";
 // Database type for dependency injection
 type Database = typeof defaultDb;
 
-// Post type for the card component
+// Post type for the card component (with optional source)
 type Post = typeof posts.$inferSelect;
+type Source = typeof sources.$inferSelect;
+type PostWithSource = Post & { source?: Source | null };
 
 /** Reusable post card component */
-function PostCard({ post }: { post: Post }) {
+function PostCard({ post }: { post: PostWithSource }) {
+  const isLink = post.type === "link";
+
   return (
     <article class="border-b border-gray-200 dark:border-gray-700 pb-6">
+      {/* Link posts: show external URL prominently */}
+      {isLink && post.url && (
+        <a
+          href={post.url}
+          target="_blank"
+          rel="noopener noreferrer"
+          class="text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300 text-sm mb-2 inline-flex items-center gap-1"
+        >
+          <span class="truncate max-w-md">{new URL(post.url).hostname}</span>
+          <svg class="w-3 h-3 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              stroke-width="2"
+              d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"
+            />
+          </svg>
+        </a>
+      )}
+
       <a href={`/posts/${post.id}`} class="block group">
         {post.title ? (
           <h2 class="text-xl font-semibold text-gray-900 dark:text-gray-100 group-hover:text-blue-600 dark:group-hover:text-blue-400 mb-2">
@@ -27,22 +51,51 @@ function PostCard({ post }: { post: Post }) {
         <p class="text-gray-600 dark:text-gray-400 mb-2">
           {post.excerpt || truncate(post.content, 200)}
         </p>
-        <time class="text-sm text-gray-400 dark:text-gray-500">
-          {post.published_at
-            ? new Date(post.published_at).toLocaleDateString("en-US", {
-                year: "numeric",
-                month: "long",
-                day: "numeric",
-              })
-            : "Draft"}
-        </time>
+
+        {/* Meta: date and source attribution */}
+        <div class="flex flex-wrap items-center gap-2 text-sm text-gray-400 dark:text-gray-500">
+          <time>
+            {post.published_at
+              ? new Date(post.published_at).toLocaleDateString("en-US", {
+                  year: "numeric",
+                  month: "long",
+                  day: "numeric",
+                })
+              : "Draft"}
+          </time>
+
+          {/* Source attribution for link posts */}
+          {isLink && post.source && (
+            <>
+              <span>•</span>
+              <span>
+                via{" "}
+                <a
+                  href={post.source.url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  class="text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300"
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  {post.source.name}
+                </a>
+              </span>
+            </>
+          )}
+        </div>
       </a>
     </article>
   );
 }
 
 /** Reusable post list component */
-function PostList({ posts: postList, emptyMessage }: { posts: Post[]; emptyMessage?: string }) {
+function PostList({
+  posts: postList,
+  emptyMessage,
+}: {
+  posts: PostWithSource[];
+  emptyMessage?: string;
+}) {
   return (
     <div class="space-y-8">
       {postList.length === 0 ? (
@@ -63,12 +116,23 @@ export function createPagesRoutes(db: Database): Hono {
 
   // Home page
   pages.get("/", (c) => {
-    const allPosts = db
-      .select()
+    // Fetch posts with source info via left join
+    const results = db
+      .select({
+        post: posts,
+        source: sources,
+      })
       .from(posts)
+      .leftJoin(sources, eq(posts.source_id, sources.id))
       .where(isNotNull(posts.published_at))
       .orderBy(desc(posts.published_at))
       .all();
+
+    // Transform to PostWithSource
+    const allPosts: PostWithSource[] = results.map((row) => ({
+      ...row.post,
+      source: row.source,
+    }));
 
     return c.html(
       <Layout title="Home | erikcraddock.me">
@@ -168,15 +232,27 @@ export function createPagesRoutes(db: Database): Hono {
       );
     }
 
-    // Query the post
-    const post = db.select().from(posts).where(eq(posts.id, id)).get();
+    // Query the post with source info
+    const result = db
+      .select({
+        post: posts,
+        source: sources,
+      })
+      .from(posts)
+      .leftJoin(sources, eq(posts.source_id, sources.id))
+      .where(eq(posts.id, id))
+      .get();
 
-    if (!post) {
+    if (!result) {
       return c.html(
         <NotFound title="Post Not Found" message="The post you're looking for doesn't exist." />,
         404
       );
     }
+
+    const post = result.post;
+    const source = result.source;
+    const isLink = post.type === "link";
 
     // Query tags for this post
     const postTagsResult = db
@@ -217,6 +293,31 @@ export function createPagesRoutes(db: Database): Hono {
             ← Back to home
           </a>
 
+          {/* External link for link posts */}
+          {isLink && post.url && (
+            <a
+              href={post.url}
+              target="_blank"
+              rel="noopener noreferrer"
+              class="inline-flex items-center gap-2 px-4 py-2 bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 rounded-lg mb-6 hover:bg-blue-100 dark:hover:bg-blue-900/50"
+            >
+              <span>View original: {new URL(post.url).hostname}</span>
+              <svg
+                class="w-4 h-4 flex-shrink-0"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  stroke-width="2"
+                  d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"
+                />
+              </svg>
+            </a>
+          )}
+
           {/* Banner image */}
           {bannerUrl && (
             <img
@@ -231,7 +332,7 @@ export function createPagesRoutes(db: Database): Hono {
             <h1 class="text-3xl font-bold text-gray-900 dark:text-gray-100 mb-4">{post.title}</h1>
           ) : null}
 
-          {/* Meta: date and tags */}
+          {/* Meta: date, source, and tags */}
           <div class="flex flex-wrap items-center gap-4 text-sm text-gray-500 dark:text-gray-400 mb-8">
             {post.published_at ? (
               <time>
@@ -243,6 +344,21 @@ export function createPagesRoutes(db: Database): Hono {
               </time>
             ) : (
               <span class="text-yellow-600 dark:text-yellow-500">Draft</span>
+            )}
+
+            {/* Source attribution for link posts */}
+            {isLink && source && (
+              <span>
+                via{" "}
+                <a
+                  href={source.url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  class="text-gray-600 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200"
+                >
+                  {source.name}
+                </a>
+              </span>
             )}
 
             {postTagsResult.length > 0 ? (
@@ -281,26 +397,24 @@ export function createPagesRoutes(db: Database): Hono {
       );
     }
 
-    // Query published posts with this tag
-    const taggedPosts = db
+    // Query published posts with this tag (including source info)
+    const results = db
       .select({
-        id: posts.id,
-        type: posts.type,
-        title: posts.title,
-        content: posts.content,
-        excerpt: posts.excerpt,
-        url: posts.url,
-        source_id: posts.source_id,
-        banner_image_id: posts.banner_image_id,
-        published_at: posts.published_at,
-        created_at: posts.created_at,
-        updated_at: posts.updated_at,
+        post: posts,
+        source: sources,
       })
       .from(posts)
       .innerJoin(postTags, eq(posts.id, postTags.post_id))
+      .leftJoin(sources, eq(posts.source_id, sources.id))
       .where(and(eq(postTags.tag_id, tag.id), isNotNull(posts.published_at)))
       .orderBy(desc(posts.published_at))
       .all();
+
+    // Transform to PostWithSource
+    const taggedPosts: PostWithSource[] = results.map((row) => ({
+      ...row.post,
+      source: row.source,
+    }));
 
     return c.html(
       <Layout title={`${tag.name} | erikcraddock.me`}>
