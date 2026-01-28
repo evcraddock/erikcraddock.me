@@ -120,9 +120,12 @@ make dev-logs      # Ctrl+C to stop
 ## PR Workflow
 
 1. Create feature branch: `feat/<task-id>-<description>`
-2. Run `./scripts/pre-pr.sh` before opening PR
-3. **Check logs for errors** before opening PR (see below)
-4. After PR is created, use the `request-review` skill to spawn a separate agent to review the PR
+2. Commit changes (pre-commit hook runs: format + lint staged files)
+3. Push changes (pre-push hook runs: full lint, typecheck, tests)
+4. **Check logs for errors** before opening PR (see below)
+5. Create PR with `gh pr create`
+6. **Wait for CI to pass** before requesting review (see below)
+7. Use the `request-review` skill to spawn a separate agent to review the PR
 
 ### Check Logs Before PR
 
@@ -139,6 +142,30 @@ If errors are present:
 - If an error is expected/acceptable, document why in the PR description
 
 This catches runtime issues that tests might miss (startup errors, middleware failures, etc.).
+
+### Wait for CI Before Requesting Review
+
+After creating a PR, CI runs automatically. **Do not request a review until CI passes.**
+
+Check CI status:
+
+```bash
+gh pr view <number> --json statusCheckRollup --jq '.statusCheckRollup[0] | "\(.status) - \(.conclusion // "pending")"'
+```
+
+If CI is still running, wait and check again:
+
+```bash
+sleep 30 && gh pr view <number> --json statusCheckRollup
+```
+
+If CI fails:
+
+- Check the failure: `gh run view <run-id> --log-failed`
+- Fix the issue, commit, and push
+- Wait for CI to pass before requesting review
+
+**Why:** Requesting review on a failing PR wastes the reviewer's time. CI runs the same checks as pre-push, but catches environment differences and ensures reviewers see green checks.
 
 ## Testing Requirements
 

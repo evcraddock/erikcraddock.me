@@ -41,7 +41,11 @@ export function getPublishedPosts(limit: number = 20, offset: number = 0): Publi
  * Get total count of published posts.
  */
 export function getPublishedPostCount(): number {
-  const result = db.select({ count: count() }).from(posts).where(isNotNull(posts.published_at)).get();
+  const result = db
+    .select({ count: count() })
+    .from(posts)
+    .where(isNotNull(posts.published_at))
+    .get();
   return result?.count ?? 0;
 }
 

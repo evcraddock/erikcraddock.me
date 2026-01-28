@@ -1,5 +1,7 @@
 # erikcraddock.me
 
+[![CI](https://github.com/evcraddock/erikcraddock.me/actions/workflows/ci.yml/badge.svg)](https://github.com/evcraddock/erikcraddock.me/actions/workflows/ci.yml)
+
 Personal website and blog that can be followed from Mastodon via ActivityPub.
 
 ## Tech Stack

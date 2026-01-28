@@ -36,21 +36,18 @@ Commit format:
 Task: #<task-id>
 ```
 
-### 4. Verify Quality
+Quality checks run automatically:
 
-Before opening a PR:
+- **Pre-commit**: Formats and lints staged files
+- **Pre-push**: Runs full lint, typecheck, and tests
 
-```bash
-./scripts/pre-pr.sh
-```
+You cannot push code that fails these checks.
 
-Do not open a PR if this fails.
-
-### 5. Open PR
+### 4. Open PR
 
 Push and create PR with clear description linking to the task.
 
-### 6. Review and Merge
+### 5. Review and Merge
 
 - CI must pass
 - Address review feedback
