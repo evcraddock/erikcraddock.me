@@ -203,3 +203,37 @@ Tests should catch bugs and prevent regressions. Testing that "a schema export e
 - Use path aliases for imports (@/...)
 - Handle null explicitly with ?? and ?.
 - Write tests with Vitest
+
+## Releasing
+
+Use the `web-release` skill to create releases. It will:
+
+1. Analyze commits since last release
+2. Determine version bump (major/minor/patch) based on conventional commits
+3. Create annotated git tag (`web-v*`)
+4. Push tag to trigger deployment
+
+**Trigger phrases:** "release", "deploy", "web release", "new version"
+
+### What happens on release
+
+Pushing a `web-v*` tag triggers the deploy workflow:
+
+1. Builds Docker image for amd64 and arm64
+2. Pushes to `evcraddock/erikcraddock-web` on Docker Hub
+3. Tags with semver, timestamp, and `latest`
+
+### Docker Image
+
+```bash
+# Pull latest
+docker pull evcraddock/erikcraddock-web:latest
+
+# Run (requires database volume and env vars)
+docker run -d \
+  -p 3000:3000 \
+  -v /path/to/data:/app/data \
+  -e ADMIN_EMAIL=you@example.com \
+  -e DOMAIN=erikcraddock.me \
+  evcraddock/erikcraddock-web:latest
+```
