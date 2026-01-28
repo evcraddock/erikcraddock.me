@@ -1,15 +1,10 @@
 import { Create, Note, Article, Image } from "@fedify/fedify";
-import { Temporal } from "@js-temporal/polyfill";
 import { eq } from "drizzle-orm";
 import { db, posts, media } from "@/db";
 import { federation } from "./setup";
 import { getAllFollowers } from "./followers";
 import { logger } from "@/utils/logger";
-
-// Domain from environment
-const domain = process.env.DOMAIN || "localhost:5000";
-const protocol = domain.includes("localhost") ? "http" : "https";
-const baseUrl = `${protocol}://${domain}`;
+import { dateToInstant, baseUrl } from "./utils";
 
 /**
  * Post with banner image info for federation.
@@ -27,23 +22,16 @@ interface PostWithBanner {
 /**
  * Banner image info.
  */
-interface BannerImage {
+export interface BannerImage {
   s3_key: string;
   mime_type: string;
   alt_text: string | null;
 }
 
 /**
- * Convert a Date to Temporal.Instant for Fedify.
- */
-function dateToInstant(date: Date): Temporal.Instant {
-  return Temporal.Instant.fromEpochMilliseconds(date.getTime());
-}
-
-/**
  * Get banner image info for a post.
  */
-function getBannerImage(bannerImageId: number): BannerImage | null {
+export function getBannerImage(bannerImageId: number): BannerImage | null {
   const banner = db.select().from(media).where(eq(media.id, bannerImageId)).get();
   if (!banner) return null;
 
@@ -57,7 +45,7 @@ function getBannerImage(bannerImageId: number): BannerImage | null {
 /**
  * Create an ActivityPub Image attachment for a banner.
  */
-function createImageAttachment(banner: BannerImage): Image {
+export function createImageAttachment(banner: BannerImage): Image {
   const imageUrl = new URL(`/media/${banner.s3_key}`, baseUrl);
 
   return new Image({
@@ -70,7 +58,7 @@ function createImageAttachment(banner: BannerImage): Image {
 /**
  * Convert a post to an ActivityPub object (Note or Article) with optional attachment.
  */
-function postToObject(post: PostWithBanner, actorUri: URL): Note | Article {
+export function postToObjectWithAttachment(post: PostWithBanner, actorUri: URL): Note | Article {
   const postUri = new URL(`/posts/${post.id}`, baseUrl);
 
   // Use Article for posts with titles, Note for everything else
@@ -102,7 +90,7 @@ function postToObject(post: PostWithBanner, actorUri: URL): Note | Article {
  */
 function postToCreateActivity(post: PostWithBanner, actorUri: URL): Create {
   const activityUri = new URL(`/posts/${post.id}#create`, baseUrl);
-  const object = postToObject(post, actorUri);
+  const object = postToObjectWithAttachment(post, actorUri);
 
   return new Create({
     id: activityUri,

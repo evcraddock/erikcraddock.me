@@ -1,12 +1,8 @@
 import { Create, Note, Article } from "@fedify/fedify";
-import { Temporal } from "@js-temporal/polyfill";
 import { desc, isNotNull, count } from "drizzle-orm";
 import { db, posts } from "@/db";
 import { logger } from "@/utils/logger";
-
-// Domain from environment
-const domain = process.env.DOMAIN || "localhost:5000";
-const protocol = domain.includes("localhost") ? "http" : "https";
+import { dateToInstant, baseUrl } from "./utils";
 
 export interface PublishedPost {
   id: number;
@@ -50,17 +46,10 @@ export function getPublishedPostCount(): number {
 }
 
 /**
- * Convert a Date to Temporal.Instant for Fedify.
- */
-function dateToInstant(date: Date): Temporal.Instant {
-  return Temporal.Instant.fromEpochMilliseconds(date.getTime());
-}
-
-/**
  * Convert a post to an ActivityPub object (Note or Article).
  */
 export function postToObject(post: PublishedPost, actorUri: URL): Note | Article {
-  const postUri = new URL(`/posts/${post.id}`, `${protocol}://${domain}`);
+  const postUri = new URL(`/posts/${post.id}`, baseUrl);
 
   // Use Article for posts with titles, Note for everything else (notes, links)
   const ObjectClass = post.title ? Article : Note;
@@ -80,7 +69,7 @@ export function postToObject(post: PublishedPost, actorUri: URL): Note | Article
  * Convert a post to a Create activity.
  */
 export function postToCreateActivity(post: PublishedPost, actorUri: URL): Create {
-  const activityUri = new URL(`/posts/${post.id}#create`, `${protocol}://${domain}`);
+  const activityUri = new URL(`/posts/${post.id}#create`, baseUrl);
   const object = postToObject(post, actorUri);
 
   logger.debug("federation", `Converting post ${post.id} to Create activity`);
