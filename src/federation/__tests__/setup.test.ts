@@ -56,9 +56,10 @@ describe("Federation Setup", () => {
       const federation = createFedifyFederation();
 
       // Use Fedify's context to get the actor
-      const ctx = federation.createContext(new Request("https://example.com/users/erik"), {
-        documentLoader: async () => ({ document: {}, contextUrl: null }),
-      });
+      const ctx = federation.createContext(
+        new Request("https://example.com/users/erik"),
+        undefined
+      );
 
       const actor = await ctx.getActor("erik");
 
@@ -72,9 +73,10 @@ describe("Federation Setup", () => {
       const { createFedifyFederation } = await import("../setup");
       const federation = createFedifyFederation();
 
-      const ctx = federation.createContext(new Request("https://example.com/users/unknown"), {
-        documentLoader: async () => ({ document: {}, contextUrl: null }),
-      });
+      const ctx = federation.createContext(
+        new Request("https://example.com/users/unknown"),
+        undefined
+      );
 
       const actor = await ctx.getActor("unknown");
 
@@ -85,9 +87,10 @@ describe("Federation Setup", () => {
       const { createFedifyFederation } = await import("../setup");
       const federation = createFedifyFederation();
 
-      const ctx = federation.createContext(new Request("https://example.com/users/erik"), {
-        documentLoader: async () => ({ document: {}, contextUrl: null }),
-      });
+      const ctx = federation.createContext(
+        new Request("https://example.com/users/erik"),
+        undefined
+      );
 
       const actor = await ctx.getActor("erik");
 
@@ -99,9 +102,10 @@ describe("Federation Setup", () => {
       const { createFedifyFederation } = await import("../setup");
       const federation = createFedifyFederation();
 
-      const ctx = federation.createContext(new Request("https://example.com/users/erik"), {
-        documentLoader: async () => ({ document: {}, contextUrl: null }),
-      });
+      const ctx = federation.createContext(
+        new Request("https://example.com/users/erik"),
+        undefined
+      );
 
       const actor = await ctx.getActor("erik");
 
@@ -113,9 +117,10 @@ describe("Federation Setup", () => {
       const { createFedifyFederation } = await import("../setup");
       const federation = createFedifyFederation();
 
-      const ctx = federation.createContext(new Request("https://example.com/users/erik"), {
-        documentLoader: async () => ({ document: {}, contextUrl: null }),
-      });
+      const ctx = federation.createContext(
+        new Request("https://example.com/users/erik"),
+        undefined
+      );
 
       const actor = await ctx.getActor("erik");
 
@@ -127,9 +132,10 @@ describe("Federation Setup", () => {
       const { createFedifyFederation } = await import("../setup");
       const federation = createFedifyFederation();
 
-      const ctx = federation.createContext(new Request("https://example.com/users/erik"), {
-        documentLoader: async () => ({ document: {}, contextUrl: null }),
-      });
+      const ctx = federation.createContext(
+        new Request("https://example.com/users/erik"),
+        undefined
+      );
 
       const actor = await ctx.getActor("erik");
 

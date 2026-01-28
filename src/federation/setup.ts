@@ -1,5 +1,14 @@
-import { createFederation, Person, CryptographicKey, MemoryKvStore } from "@fedify/fedify";
+import {
+  createFederation,
+  Person,
+  CryptographicKey,
+  MemoryKvStore,
+  Follow,
+  Undo,
+  isActor,
+} from "@fedify/fedify";
 import { getOrCreateKeyPair } from "./keys";
+import { addFollower, removeFollower, getAllFollowers } from "./followers";
 import { logger } from "@/utils/logger";
 
 // Context type for federation - we use void since we don't need request-specific data
@@ -63,13 +72,55 @@ export function createFedifyFederation() {
       return [keyPair];
     });
 
-  // Set up inbox dispatcher - handles incoming activities
-  // Implementation will be added in Task #1319
-  federation.setInboxDispatcher("/users/{identifier}/inbox", async (_ctx, _identifier) => {
-    // Placeholder - returns empty collection
-    // Actual Follow/Undo handling will be implemented in Task #1319
-    return { items: [] };
-  });
+  // Set up inbox listeners - handles incoming activities
+  federation
+    .setInboxListeners("/users/{identifier}/inbox")
+    .on(Follow, async (ctx, follow) => {
+      const followerActor = await follow.getActor(ctx);
+      if (!isActor(followerActor)) {
+        logger.warn("federation", "Follow activity has no valid actor");
+        return;
+      }
+
+      const actorId = followerActor.id;
+      const inboxId = followerActor.inboxId;
+
+      if (!actorId || !inboxId) {
+        logger.warn("federation", "Follow actor missing id or inbox");
+        return;
+      }
+
+      // Get shared inbox if available (for efficient batch delivery)
+      const endpoints = followerActor.endpoints;
+      const sharedInbox = endpoints?.sharedInbox;
+
+      addFollower({
+        actor_uri: actorId.href,
+        inbox_uri: inboxId.href,
+        shared_inbox_uri: sharedInbox?.href ?? null,
+      });
+
+      // Fedify automatically sends Accept when we return without error
+      logger.info("federation", `Accepted follow from: ${actorId.href}`);
+    })
+    .on(Undo, async (ctx, undo) => {
+      // Check if this is an Undo of a Follow
+      const object = await undo.getObject(ctx);
+      if (!(object instanceof Follow)) {
+        return; // Not an unfollow, ignore
+      }
+
+      const actor = await undo.getActor(ctx);
+      if (!isActor(actor) || !actor.id) {
+        logger.warn("federation", "Undo activity has no valid actor");
+        return;
+      }
+
+      const removed = removeFollower(actor.id.href);
+      if (removed) {
+        logger.info("federation", `Unfollowed by: ${actor.id.href}`);
+      }
+    });
 
   // Set up outbox dispatcher - lists activities sent by this actor
   // Implementation will be added in Task #1320
@@ -79,13 +130,27 @@ export function createFedifyFederation() {
     return { items: [] };
   });
 
-  // Set up followers collection dispatcher - lists followers
-  // Implementation will be added in Task #1318
-  federation.setFollowersDispatcher("/users/{identifier}/followers", async (_ctx, _identifier) => {
-    // Placeholder - returns empty collection
-    // Actual follower listing will be implemented in Task #1318
-    return { items: [] };
-  });
+  // Set up followers collection dispatcher - returns list of followers
+  federation.setFollowersDispatcher(
+    "/users/{identifier}/followers",
+    async (_ctx, identifier) => {
+      if (identifier !== "erik") {
+        return null;
+      }
+
+      const followerList = getAllFollowers();
+      // Return Recipient objects with required id and inboxId
+      return {
+        items: followerList.map((f) => ({
+          id: new URL(f.actor_uri),
+          inboxId: new URL(f.inbox_uri),
+          endpoints: f.shared_inbox_uri
+            ? { sharedInbox: new URL(f.shared_inbox_uri) }
+            : undefined,
+        })),
+      };
+    }
+  );
 
   logger.info("federation", "Federation configured");
   return federation;
