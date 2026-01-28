@@ -71,6 +71,13 @@ beforeAll(async () => {
       tag_id INTEGER NOT NULL REFERENCES tags(id) ON DELETE CASCADE,
       PRIMARY KEY (post_id, tag_id)
     );
+
+    CREATE TABLE sources (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      name TEXT NOT NULL,
+      url TEXT NOT NULL,
+      feed_url TEXT
+    );
   `);
 
   testDb = drizzle(testSqlite, { schema });
@@ -1210,5 +1217,461 @@ describe("POST /api/posts/:id/unpublish", () => {
     expect(res.status).toBe(400);
     const json = await res.json();
     expect(json.error).toBe("Invalid post ID");
+  });
+});
+
+describe("GET /api/sources", () => {
+  let testApiKey: string;
+
+  beforeEach(async () => {
+    testSqlite.exec("DELETE FROM sources");
+    testSqlite.exec("DELETE FROM api_keys");
+    testSqlite.exec("DELETE FROM authors");
+
+    const author = testSqlite
+      .prepare(
+        "INSERT INTO authors (email, display_name, created_at) VALUES (?, ?, ?) RETURNING id"
+      )
+      .get("test@example.com", "Test User", Date.now()) as { id: number };
+
+    const { hashToken } = await import("../../auth/crypto");
+    testApiKey = "ek_test1234567890abcdef1234567890abcdef1234567890abcdef1234567890ab";
+    const keyHash = await hashToken(testApiKey);
+
+    testSqlite
+      .prepare("INSERT INTO api_keys (author_id, key_hash, name, created_at) VALUES (?, ?, ?, ?)")
+      .run(author.id, keyHash, "Test Key", Date.now());
+  });
+
+  it("returns empty array when no sources", async () => {
+    const { api } = await import("../api");
+
+    const res = await api.request("/sources", {
+      headers: { Authorization: `Bearer ${testApiKey}` },
+    });
+
+    expect(res.status).toBe(200);
+    const json = await res.json();
+    expect(json).toEqual({ data: [] });
+  });
+
+  it("returns all sources", async () => {
+    testSqlite
+      .prepare("INSERT INTO sources (name, url, feed_url) VALUES (?, ?, ?)")
+      .run("Test Blog", "https://test.com", "https://test.com/feed.xml");
+    testSqlite
+      .prepare("INSERT INTO sources (name, url) VALUES (?, ?)")
+      .run("Another Blog", "https://another.com");
+
+    const { api } = await import("../api");
+
+    const res = await api.request("/sources", {
+      headers: { Authorization: `Bearer ${testApiKey}` },
+    });
+
+    expect(res.status).toBe(200);
+    const json = await res.json();
+    expect(json.data).toHaveLength(2);
+    expect(json.data[0].name).toBe("Test Blog");
+    expect(json.data[0].feed_url).toBe("https://test.com/feed.xml");
+    expect(json.data[1].name).toBe("Another Blog");
+    expect(json.data[1].feed_url).toBeNull();
+  });
+});
+
+describe("GET /api/sources/:id", () => {
+  let testApiKey: string;
+
+  beforeEach(async () => {
+    testSqlite.exec("DELETE FROM sources");
+    testSqlite.exec("DELETE FROM api_keys");
+    testSqlite.exec("DELETE FROM authors");
+
+    const author = testSqlite
+      .prepare(
+        "INSERT INTO authors (email, display_name, created_at) VALUES (?, ?, ?) RETURNING id"
+      )
+      .get("test@example.com", "Test User", Date.now()) as { id: number };
+
+    const { hashToken } = await import("../../auth/crypto");
+    testApiKey = "ek_test1234567890abcdef1234567890abcdef1234567890abcdef1234567890ab";
+    const keyHash = await hashToken(testApiKey);
+
+    testSqlite
+      .prepare("INSERT INTO api_keys (author_id, key_hash, name, created_at) VALUES (?, ?, ?, ?)")
+      .run(author.id, keyHash, "Test Key", Date.now());
+  });
+
+  it("returns a source by ID", async () => {
+    const source = testSqlite
+      .prepare("INSERT INTO sources (name, url, feed_url) VALUES (?, ?, ?) RETURNING id")
+      .get("Test Blog", "https://test.com", "https://test.com/feed.xml") as { id: number };
+
+    const { api } = await import("../api");
+
+    const res = await api.request(`/sources/${source.id}`, {
+      headers: { Authorization: `Bearer ${testApiKey}` },
+    });
+
+    expect(res.status).toBe(200);
+    const json = await res.json();
+    expect(json.data.id).toBe(source.id);
+    expect(json.data.name).toBe("Test Blog");
+    expect(json.data.url).toBe("https://test.com");
+    expect(json.data.feed_url).toBe("https://test.com/feed.xml");
+  });
+
+  it("returns 404 for non-existent source", async () => {
+    const { api } = await import("../api");
+
+    const res = await api.request("/sources/99999", {
+      headers: { Authorization: `Bearer ${testApiKey}` },
+    });
+
+    expect(res.status).toBe(404);
+    const json = await res.json();
+    expect(json.error).toBe("Source not found");
+  });
+
+  it("returns 400 for invalid ID", async () => {
+    const { api } = await import("../api");
+
+    const res = await api.request("/sources/abc", {
+      headers: { Authorization: `Bearer ${testApiKey}` },
+    });
+
+    expect(res.status).toBe(400);
+    const json = await res.json();
+    expect(json.error).toBe("Invalid source ID");
+  });
+});
+
+describe("POST /api/sources", () => {
+  let testApiKey: string;
+
+  beforeEach(async () => {
+    testSqlite.exec("DELETE FROM sources");
+    testSqlite.exec("DELETE FROM api_keys");
+    testSqlite.exec("DELETE FROM authors");
+
+    const author = testSqlite
+      .prepare(
+        "INSERT INTO authors (email, display_name, created_at) VALUES (?, ?, ?) RETURNING id"
+      )
+      .get("test@example.com", "Test User", Date.now()) as { id: number };
+
+    const { hashToken } = await import("../../auth/crypto");
+    testApiKey = "ek_test1234567890abcdef1234567890abcdef1234567890abcdef1234567890ab";
+    const keyHash = await hashToken(testApiKey);
+
+    testSqlite
+      .prepare("INSERT INTO api_keys (author_id, key_hash, name, created_at) VALUES (?, ?, ?, ?)")
+      .run(author.id, keyHash, "Test Key", Date.now());
+  });
+
+  it("creates a source with name and url", async () => {
+    const { api } = await import("../api");
+
+    const res = await api.request("/sources", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${testApiKey}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        name: "New Source",
+        url: "https://newsource.com",
+      }),
+    });
+
+    expect(res.status).toBe(201);
+    const json = await res.json();
+    expect(json.data.name).toBe("New Source");
+    expect(json.data.url).toBe("https://newsource.com");
+    expect(json.data.feed_url).toBeNull();
+  });
+
+  it("creates a source with feed_url", async () => {
+    const { api } = await import("../api");
+
+    const res = await api.request("/sources", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${testApiKey}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        name: "Blog with Feed",
+        url: "https://blog.com",
+        feed_url: "https://blog.com/rss.xml",
+      }),
+    });
+
+    expect(res.status).toBe(201);
+    const json = await res.json();
+    expect(json.data.feed_url).toBe("https://blog.com/rss.xml");
+  });
+
+  it("returns 400 when name is missing", async () => {
+    const { api } = await import("../api");
+
+    const res = await api.request("/sources", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${testApiKey}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        url: "https://example.com",
+      }),
+    });
+
+    expect(res.status).toBe(400);
+    const json = await res.json();
+    expect(json.error).toBe("Name is required");
+  });
+
+  it("returns 400 when url is missing", async () => {
+    const { api } = await import("../api");
+
+    const res = await api.request("/sources", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${testApiKey}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        name: "Test Source",
+      }),
+    });
+
+    expect(res.status).toBe(400);
+    const json = await res.json();
+    expect(json.error).toBe("URL is required");
+  });
+});
+
+describe("POST /api/posts with source_id", () => {
+  let testApiKey: string;
+
+  beforeEach(async () => {
+    testSqlite.exec("DELETE FROM post_tags");
+    testSqlite.exec("DELETE FROM tags");
+    testSqlite.exec("DELETE FROM posts");
+    testSqlite.exec("DELETE FROM sources");
+    testSqlite.exec("DELETE FROM api_keys");
+    testSqlite.exec("DELETE FROM authors");
+
+    const author = testSqlite
+      .prepare(
+        "INSERT INTO authors (email, display_name, created_at) VALUES (?, ?, ?) RETURNING id"
+      )
+      .get("test@example.com", "Test User", Date.now()) as { id: number };
+
+    const { hashToken } = await import("../../auth/crypto");
+    testApiKey = "ek_test1234567890abcdef1234567890abcdef1234567890abcdef1234567890ab";
+    const keyHash = await hashToken(testApiKey);
+
+    testSqlite
+      .prepare("INSERT INTO api_keys (author_id, key_hash, name, created_at) VALUES (?, ?, ?, ?)")
+      .run(author.id, keyHash, "Test Key", Date.now());
+  });
+
+  it("creates a link post with source_id", async () => {
+    // Create a source first
+    const source = testSqlite
+      .prepare("INSERT INTO sources (name, url) VALUES (?, ?) RETURNING id")
+      .get("Test Blog", "https://testblog.com") as { id: number };
+
+    const { api } = await import("../api");
+
+    const res = await api.request("/posts", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${testApiKey}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        type: "link",
+        title: "Interesting Article",
+        content: "My thoughts on this article",
+        url: "https://testblog.com/article",
+        source_id: source.id,
+      }),
+    });
+
+    expect(res.status).toBe(201);
+    const json = await res.json();
+    expect(json.data.source_id).toBe(source.id);
+    expect(json.data.source).toEqual({
+      id: source.id,
+      name: "Test Blog",
+      url: "https://testblog.com",
+    });
+  });
+
+  it("returns 400 for invalid source_id type", async () => {
+    const { api } = await import("../api");
+
+    const res = await api.request("/posts", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${testApiKey}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        type: "link",
+        content: "Content",
+        url: "https://example.com",
+        source_id: "not-a-number",
+      }),
+    });
+
+    expect(res.status).toBe(400);
+    const json = await res.json();
+    expect(json.error).toBe("source_id must be a number");
+  });
+
+  it("returns 400 for non-existent source_id", async () => {
+    const { api } = await import("../api");
+
+    const res = await api.request("/posts", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${testApiKey}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        type: "link",
+        content: "Content",
+        url: "https://example.com",
+        source_id: 99999,
+      }),
+    });
+
+    expect(res.status).toBe(400);
+    const json = await res.json();
+    expect(json.error).toContain("Source not found");
+  });
+});
+
+describe("PUT /api/posts with source_id", () => {
+  let testApiKey: string;
+
+  beforeEach(async () => {
+    testSqlite.exec("DELETE FROM post_tags");
+    testSqlite.exec("DELETE FROM tags");
+    testSqlite.exec("DELETE FROM posts");
+    testSqlite.exec("DELETE FROM sources");
+    testSqlite.exec("DELETE FROM api_keys");
+    testSqlite.exec("DELETE FROM authors");
+
+    const author = testSqlite
+      .prepare(
+        "INSERT INTO authors (email, display_name, created_at) VALUES (?, ?, ?) RETURNING id"
+      )
+      .get("test@example.com", "Test User", Date.now()) as { id: number };
+
+    const { hashToken } = await import("../../auth/crypto");
+    testApiKey = "ek_test1234567890abcdef1234567890abcdef1234567890abcdef1234567890ab";
+    const keyHash = await hashToken(testApiKey);
+
+    testSqlite
+      .prepare("INSERT INTO api_keys (author_id, key_hash, name, created_at) VALUES (?, ?, ?, ?)")
+      .run(author.id, keyHash, "Test Key", Date.now());
+  });
+
+  it("updates a post with source_id", async () => {
+    // Create source and post
+    const source = testSqlite
+      .prepare("INSERT INTO sources (name, url) VALUES (?, ?) RETURNING id")
+      .get("New Source", "https://newsource.com") as { id: number };
+
+    const now = Date.now();
+    const post = testSqlite
+      .prepare(
+        "INSERT INTO posts (type, content, url, created_at, updated_at) VALUES (?, ?, ?, ?, ?) RETURNING id"
+      )
+      .get("link", "Original content", "https://example.com", now, now) as { id: number };
+
+    const { api } = await import("../api");
+
+    const res = await api.request(`/posts/${post.id}`, {
+      method: "PUT",
+      headers: {
+        Authorization: `Bearer ${testApiKey}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        source_id: source.id,
+      }),
+    });
+
+    expect(res.status).toBe(200);
+    const json = await res.json();
+    expect(json.data.source_id).toBe(source.id);
+    expect(json.data.source).toEqual({
+      id: source.id,
+      name: "New Source",
+      url: "https://newsource.com",
+    });
+  });
+
+  it("clears source_id when set to null", async () => {
+    // Create source and post with source
+    const source = testSqlite
+      .prepare("INSERT INTO sources (name, url) VALUES (?, ?) RETURNING id")
+      .get("Test Source", "https://testsource.com") as { id: number };
+
+    const now = Date.now();
+    const post = testSqlite
+      .prepare(
+        "INSERT INTO posts (type, content, url, source_id, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?) RETURNING id"
+      )
+      .get("link", "Content", "https://example.com", source.id, now, now) as { id: number };
+
+    const { api } = await import("../api");
+
+    const res = await api.request(`/posts/${post.id}`, {
+      method: "PUT",
+      headers: {
+        Authorization: `Bearer ${testApiKey}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        source_id: null,
+      }),
+    });
+
+    expect(res.status).toBe(200);
+    const json = await res.json();
+    expect(json.data.source_id).toBeNull();
+    expect(json.data.source).toBeNull();
+  });
+
+  it("returns 400 for non-existent source_id", async () => {
+    const now = Date.now();
+    const post = testSqlite
+      .prepare(
+        "INSERT INTO posts (type, content, url, created_at, updated_at) VALUES (?, ?, ?, ?, ?) RETURNING id"
+      )
+      .get("link", "Content", "https://example.com", now, now) as { id: number };
+
+    const { api } = await import("../api");
+
+    const res = await api.request(`/posts/${post.id}`, {
+      method: "PUT",
+      headers: {
+        Authorization: `Bearer ${testApiKey}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        source_id: 99999,
+      }),
+    });
+
+    expect(res.status).toBe(400);
+    const json = await res.json();
+    expect(json.error).toContain("Source not found");
   });
 });

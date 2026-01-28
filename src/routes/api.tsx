@@ -12,6 +12,7 @@ import {
   PostType,
 } from "@/services/posts";
 import { createMedia, deleteMedia, isAllowedMimeType } from "@/services/media";
+import { listSources, getSource, createSource } from "@/services/sources";
 
 export const api = new Hono();
 
@@ -83,7 +84,7 @@ api.post("/posts", async (c) => {
   const body = await c.req.json();
 
   // Validate type
-  const { type, title, content, excerpt, url, tags, banner_image_id } = body;
+  const { type, title, content, excerpt, url, source_id, tags, banner_image_id } = body;
 
   if (!type || !["article", "link", "note"].includes(type)) {
     return c.json({ error: "Invalid or missing type. Must be article, link, or note" }, 400);
@@ -118,6 +119,11 @@ api.post("/posts", async (c) => {
     return c.json({ error: "banner_image_id must be a number" }, 400);
   }
 
+  // Validate source_id if provided
+  if (source_id !== undefined && source_id !== null && typeof source_id !== "number") {
+    return c.json({ error: "source_id must be a number" }, 400);
+  }
+
   try {
     const post = createPost({
       type,
@@ -125,6 +131,7 @@ api.post("/posts", async (c) => {
       content: content.trim(),
       excerpt: excerpt?.trim() || null,
       url: url?.trim() || null,
+      source_id: source_id ?? null,
       tags: tags || [],
       banner_image_id: banner_image_id ?? null,
     });
@@ -146,7 +153,7 @@ api.put("/posts/:id", async (c) => {
   }
 
   const body = await c.req.json();
-  const { title, content, excerpt, url, tags, banner_image_id } = body;
+  const { title, content, excerpt, url, source_id, tags, banner_image_id } = body;
 
   // Validate tags if provided
   if (tags !== undefined && !Array.isArray(tags)) {
@@ -162,12 +169,18 @@ api.put("/posts/:id", async (c) => {
     return c.json({ error: "banner_image_id must be a number" }, 400);
   }
 
+  // Validate source_id if provided
+  if (source_id !== undefined && source_id !== null && typeof source_id !== "number") {
+    return c.json({ error: "source_id must be a number" }, 400);
+  }
+
   try {
     const post = updatePost(id, {
       title: title !== undefined ? title?.trim() || null : undefined,
       content: content?.trim(),
       excerpt: excerpt !== undefined ? excerpt?.trim() || null : undefined,
       url: url !== undefined ? url?.trim() || null : undefined,
+      source_id,
       tags,
       banner_image_id,
     });
@@ -237,6 +250,61 @@ api.post("/posts/:id/unpublish", (c) => {
   }
 
   return c.json({ data: post });
+});
+
+/**
+ * GET /api/sources - List all sources
+ */
+api.get("/sources", (c) => {
+  const sources = listSources();
+  return c.json({ data: sources });
+});
+
+/**
+ * GET /api/sources/:id - Get single source
+ */
+api.get("/sources/:id", (c) => {
+  const id = parseInt(c.req.param("id"), 10);
+
+  if (isNaN(id)) {
+    return c.json({ error: "Invalid source ID" }, 400);
+  }
+
+  const source = getSource(id);
+
+  if (!source) {
+    return c.json({ error: "Source not found" }, 404);
+  }
+
+  return c.json({ data: source });
+});
+
+/**
+ * POST /api/sources - Create new source
+ */
+api.post("/sources", async (c) => {
+  const body = await c.req.json();
+  const { name, url, feed_url } = body;
+
+  if (!name || typeof name !== "string" || name.trim().length === 0) {
+    return c.json({ error: "Name is required" }, 400);
+  }
+
+  if (!url || typeof url !== "string" || url.trim().length === 0) {
+    return c.json({ error: "URL is required" }, 400);
+  }
+
+  try {
+    const source = createSource({
+      name: name.trim(),
+      url: url.trim(),
+      feed_url: feed_url?.trim() || null,
+    });
+
+    return c.json({ data: source }, 201);
+  } catch (error) {
+    return c.json({ error: String(error) }, 400);
+  }
 });
 
 /**

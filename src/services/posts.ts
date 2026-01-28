@@ -1,5 +1,5 @@
 import { eq, desc, and, isNotNull } from "drizzle-orm";
-import { db, posts, tags, postTags, media } from "@/db";
+import { db, posts, tags, postTags, media, sources } from "@/db";
 import { mediaUrl } from "./media";
 
 export type PostType = "article" | "link" | "note";
@@ -107,6 +107,7 @@ export interface CreatePostInput {
   content: string;
   excerpt?: string | null;
   url?: string | null;
+  source_id?: number | null;
   tags?: string[]; // Tag slugs
   banner_image_id?: number | null;
 }
@@ -148,13 +149,21 @@ function getOrCreateTag(slug: string): number {
  * Create a new post
  */
 export function createPost(input: CreatePostInput) {
-  const { type, title, content, excerpt, url, tags: tagSlugs, banner_image_id } = input;
+  const { type, title, content, excerpt, url, source_id, tags: tagSlugs, banner_image_id } = input;
 
   // Validate banner_image_id if provided
   if (banner_image_id !== undefined && banner_image_id !== null) {
     const bannerMedia = db.select().from(media).where(eq(media.id, banner_image_id)).get();
     if (!bannerMedia) {
       throw new Error(`Banner image not found: ${banner_image_id}`);
+    }
+  }
+
+  // Validate source_id if provided
+  if (source_id !== undefined && source_id !== null) {
+    const sourceRecord = db.select().from(sources).where(eq(sources.id, source_id)).get();
+    if (!sourceRecord) {
+      throw new Error(`Source not found: ${source_id}`);
     }
   }
 
@@ -172,6 +181,7 @@ export function createPost(input: CreatePostInput) {
       content,
       excerpt: finalExcerpt,
       url: url ?? null,
+      source_id: source_id ?? null,
       banner_image_id: banner_image_id ?? null,
       created_at: now,
       updated_at: now,
@@ -206,9 +216,19 @@ export function createPost(input: CreatePostInput) {
     }
   }
 
+  // Get source info if source_id is set
+  let source: { id: number; name: string; url: string } | null = null;
+  if (post.source_id) {
+    const sourceRecord = db.select().from(sources).where(eq(sources.id, post.source_id)).get();
+    if (sourceRecord) {
+      source = { id: sourceRecord.id, name: sourceRecord.name, url: sourceRecord.url };
+    }
+  }
+
   return {
     ...post,
     banner_url,
+    source,
     published_at: post.published_at?.toISOString() ?? null,
     created_at: post.created_at.toISOString(),
     updated_at: post.updated_at.toISOString(),
@@ -221,6 +241,7 @@ export interface UpdatePostInput {
   content?: string;
   excerpt?: string | null;
   url?: string | null;
+  source_id?: number | null;
   tags?: string[]; // Tag slugs
   banner_image_id?: number | null;
 }
@@ -235,13 +256,21 @@ export function updatePost(id: number, input: UpdatePostInput) {
     return null;
   }
 
-  const { title, content, excerpt, url, tags: tagSlugs, banner_image_id } = input;
+  const { title, content, excerpt, url, source_id, tags: tagSlugs, banner_image_id } = input;
 
   // Validate banner_image_id if provided
   if (banner_image_id !== undefined && banner_image_id !== null) {
     const bannerMedia = db.select().from(media).where(eq(media.id, banner_image_id)).get();
     if (!bannerMedia) {
       throw new Error(`Banner image not found: ${banner_image_id}`);
+    }
+  }
+
+  // Validate source_id if provided
+  if (source_id !== undefined && source_id !== null) {
+    const sourceRecord = db.select().from(sources).where(eq(sources.id, source_id)).get();
+    if (!sourceRecord) {
+      throw new Error(`Source not found: ${source_id}`);
     }
   }
 
@@ -254,6 +283,7 @@ export function updatePost(id: number, input: UpdatePostInput) {
   if (content !== undefined) updates.content = content;
   if (excerpt !== undefined) updates.excerpt = excerpt;
   if (url !== undefined) updates.url = url;
+  if (source_id !== undefined) updates.source_id = source_id;
   if (banner_image_id !== undefined) updates.banner_image_id = banner_image_id;
 
   // Update post
@@ -368,9 +398,19 @@ export function getPost(id: number) {
     }
   }
 
+  // Get source info if source_id is set
+  let source: { id: number; name: string; url: string } | null = null;
+  if (post.source_id) {
+    const sourceRecord = db.select().from(sources).where(eq(sources.id, post.source_id)).get();
+    if (sourceRecord) {
+      source = { id: sourceRecord.id, name: sourceRecord.name, url: sourceRecord.url };
+    }
+  }
+
   return {
     ...post,
     banner_url,
+    source,
     published_at: post.published_at?.toISOString() ?? null,
     created_at: post.created_at.toISOString(),
     updated_at: post.updated_at.toISOString(),
