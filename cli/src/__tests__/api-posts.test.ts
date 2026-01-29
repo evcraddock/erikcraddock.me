@@ -41,7 +41,17 @@ describe("ApiClient post methods", () => {
     });
 
     it("returns posts array on success", async () => {
-      const posts = [{ id: 1, slug: "test-post", title: "Test" }];
+      const posts = [
+        {
+          id: 1,
+          slug: "test-post",
+          type: "article",
+          title: "Test",
+          excerpt: "Test excerpt",
+          published_at: null,
+          tags: [],
+        },
+      ];
       mockFetch = mock(() =>
         Promise.resolve({
           ok: true,

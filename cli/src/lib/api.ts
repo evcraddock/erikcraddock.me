@@ -1,4 +1,6 @@
-import type { ApiResponse, PingResponse, PostListItem, Post } from "../types";
+import * as fs from "fs";
+import * as path from "path";
+import type { ApiResponse, PingResponse, PostListItem, Post, Media } from "../types";
 
 export class ApiClient {
   constructor(
@@ -73,6 +75,7 @@ export class ApiClient {
     content: string;
     excerpt?: string;
     tags?: string[];
+    banner_image_id?: number;
   }): Promise<ApiResponse<Post>> {
     return this.request<Post>("POST", "/posts", data);
   }
@@ -103,6 +106,56 @@ export class ApiClient {
   async unpublishPost(slug: string): Promise<ApiResponse<Post>> {
     return this.request<Post>("POST", `/posts/by-slug/${encodeURIComponent(slug)}/unpublish`);
   }
+
+  async getMedia(id: number): Promise<ApiResponse<Media>> {
+    return this.request<Media>("GET", `/media/${id}`);
+  }
+
+  async uploadMedia(filePath: string, key?: string): Promise<ApiResponse<Media>> {
+    const url = `${this.baseUrl}/media`;
+
+    try {
+      const fileBuffer = fs.readFileSync(filePath);
+      const filename = path.basename(filePath);
+      const mimeType = getMimeType(filename);
+
+      const formData = new FormData();
+      formData.append("file", new Blob([fileBuffer], { type: mimeType }), filename);
+      if (key) {
+        formData.append("key", key);
+      }
+
+      const response = await fetch(url, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${this.apiKey}`,
+        },
+        body: formData,
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        return { error: data.error || `HTTP ${response.status}` };
+      }
+
+      return data;
+    } catch (error) {
+      return { error: String(error) };
+    }
+  }
+}
+
+function getMimeType(filename: string): string {
+  const ext = path.extname(filename).toLowerCase();
+  const mimeTypes: Record<string, string> = {
+    ".jpg": "image/jpeg",
+    ".jpeg": "image/jpeg",
+    ".png": "image/png",
+    ".gif": "image/gif",
+    ".webp": "image/webp",
+  };
+  return mimeTypes[ext] || "application/octet-stream";
 }
 
 export async function verifyApiKey(

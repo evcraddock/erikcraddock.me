@@ -6,6 +6,7 @@ import { edit } from "./edit";
 import { deletePost } from "./delete";
 import { publish } from "./publish";
 import { unpublish } from "./unpublish";
+import { pull } from "./pull";
 
 export function showPostHelp(): void {
   console.log(`ec post - Manage posts
@@ -20,6 +21,7 @@ Commands:
   delete <slug>     Delete a post
   publish <slug>    Publish a post
   unpublish <slug>  Unpublish a post
+  pull <slug>       Download post as markdown file
 
 Options:
   --help, -h        Show help for a command
@@ -29,7 +31,10 @@ Examples:
   ec post list --status draft
   ec post show my-post
   ec post create --title "My Post" --slug my-post --content "Hello world"
+  ec post create --file draft.md
   ec post edit my-post --title "Updated Title"
+  ec post edit my-post --file updated.md
+  ec post pull my-post
   ec post delete my-post
   ec post publish my-post
 `);
@@ -76,6 +81,10 @@ export async function postCommand(args: string[], options: GlobalOptions): Promi
 
     case "unpublish":
       await unpublish(rest, options);
+      break;
+
+    case "pull":
+      await pull(rest, options);
       break;
 
     default:
