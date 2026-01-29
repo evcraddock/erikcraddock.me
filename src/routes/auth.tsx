@@ -169,6 +169,7 @@ auth.post("/login", async (c) => {
  */
 auth.get("/login/verify", async (c) => {
   const token = c.req.query("token");
+  const redirectTo = c.req.query("redirect");
 
   if (!token) {
     logger.debug("auth", "No token provided");
@@ -197,7 +198,12 @@ auth.get("/login/verify", async (c) => {
 
   logger.info("auth", "User logged in", { email });
 
-  return c.redirect("/admin");
+  // Redirect to specified URL or default to /admin
+  // Only allow relative paths to prevent open redirect vulnerability
+  // Reject protocol-relative URLs (//evil.com) and absolute URLs
+  const isRelativePath = redirectTo && redirectTo.startsWith("/") && !redirectTo.startsWith("//");
+  const safeRedirect = isRelativePath ? redirectTo : "/admin";
+  return c.redirect(safeRedirect);
 });
 
 /**
@@ -515,7 +521,7 @@ auth.post("/cli/auth/login", async (c) => {
   logger.debug("auth", "CLI login attempt", { email });
 
   // Create magic link that redirects back to /cli/auth
-  await createMagicLink(email);
+  await createMagicLink(email, "/cli/auth");
 
   return c.html(
     <Layout title="Check Your Email | erikcraddock.me">
@@ -540,7 +546,7 @@ auth.post("/cli/auth/login", async (c) => {
           We've sent a login link to your email. Click it to continue.
         </p>
         <p class="text-sm text-gray-500 dark:text-gray-500">
-          After clicking the link, return to this page to get your API key.
+          After clicking the link, you'll be redirected back here to get your API key.
         </p>
       </div>
     </Layout>

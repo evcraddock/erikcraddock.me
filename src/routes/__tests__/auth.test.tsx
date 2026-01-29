@@ -314,6 +314,63 @@ describe("GET /login/verify", () => {
     const sessions = testSqlite.prepare("SELECT * FROM sessions").all();
     expect(sessions).toHaveLength(1);
   });
+
+  it("redirects to specified path when valid redirect param provided", async () => {
+    const { hashToken } = await import("../../auth/crypto");
+    const { auth } = await import("../auth");
+
+    const token = "redirect-test-token";
+    const tokenHash = await hashToken(token);
+    const expiresAt = nowSeconds() + 15 * 60;
+
+    testSqlite.exec(`
+      INSERT INTO magic_links (email, token_hash, expires_at) 
+      VALUES ('session-test@example.com', '${tokenHash}', ${expiresAt})
+    `);
+
+    const res = await auth.request(`/login/verify?token=${token}&redirect=/cli/auth`);
+
+    expect(res.status).toBe(302);
+    expect(res.headers.get("Location")).toBe("/cli/auth");
+  });
+
+  it("falls back to /admin for absolute URL redirect (open redirect protection)", async () => {
+    const { hashToken } = await import("../../auth/crypto");
+    const { auth } = await import("../auth");
+
+    const token = "open-redirect-test-token";
+    const tokenHash = await hashToken(token);
+    const expiresAt = nowSeconds() + 15 * 60;
+
+    testSqlite.exec(`
+      INSERT INTO magic_links (email, token_hash, expires_at) 
+      VALUES ('session-test@example.com', '${tokenHash}', ${expiresAt})
+    `);
+
+    const res = await auth.request(`/login/verify?token=${token}&redirect=https://evil.com`);
+
+    expect(res.status).toBe(302);
+    expect(res.headers.get("Location")).toBe("/admin");
+  });
+
+  it("falls back to /admin for protocol-relative URL redirect", async () => {
+    const { hashToken } = await import("../../auth/crypto");
+    const { auth } = await import("../auth");
+
+    const token = "protocol-relative-test-token";
+    const tokenHash = await hashToken(token);
+    const expiresAt = nowSeconds() + 15 * 60;
+
+    testSqlite.exec(`
+      INSERT INTO magic_links (email, token_hash, expires_at) 
+      VALUES ('session-test@example.com', '${tokenHash}', ${expiresAt})
+    `);
+
+    const res = await auth.request(`/login/verify?token=${token}&redirect=//evil.com`);
+
+    expect(res.status).toBe(302);
+    expect(res.headers.get("Location")).toBe("/admin");
+  });
 });
 
 describe("POST /logout", () => {
