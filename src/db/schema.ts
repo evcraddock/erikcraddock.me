@@ -107,9 +107,7 @@ export const magicLinks = sqliteTable("magic_links", {
 // Sessions for authenticated users
 export const sessions = sqliteTable("sessions", {
   id: text("id").primaryKey(), // Random token (use crypto.randomUUID())
-  author_id: integer("author_id")
-    .notNull()
-    .references(() => authors.id, { onDelete: "cascade" }),
+  author_id: integer("author_id").references(() => authors.id, { onDelete: "cascade" }), // null for admin
   expires_at: integer("expires_at", { mode: "timestamp" }).notNull(),
   created_at: integer("created_at", { mode: "timestamp" }).notNull(),
 });
