@@ -9,8 +9,10 @@ cd cli
 bun run src/index.ts post create \
   --title "Integration Test Post" \
   --slug integration-test-post \
-  --content "# Hello World\n\nThis is a test post created via CLI."
+  --content $'# Hello World\n\nThis is a test post created via CLI.'
 ```
+
+> **Note:** Use `$'...'` syntax in bash to interpret `\n` as actual newlines.
 
 ## Expected Output
 

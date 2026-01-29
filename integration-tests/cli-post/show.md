@@ -9,10 +9,12 @@ cd cli
 bun run src/index.ts post create \
   --title "Show Test" \
   --slug show-test \
-  --content "# Content\n\nWith markdown." \
+  --content $'# Content\n\nWith markdown.' \
   --excerpt "Short summary" \
   --tags demo
 ```
+
+> **Note:** Use `$'...'` syntax in bash to interpret `\n` as actual newlines.
 
 ## Show Post
 
