@@ -1,5 +1,6 @@
 import { homedir } from "os";
 import { join } from "path";
+import { mkdir } from "node:fs/promises";
 import { parse, stringify } from "yaml";
 import type { Config } from "../types";
 
@@ -8,6 +9,10 @@ const CONFIG_FILE = join(CONFIG_DIR, "config.yaml");
 
 export function getConfigPath(): string {
   return CONFIG_FILE;
+}
+
+export function getConfigDir(): string {
+  return CONFIG_DIR;
 }
 
 export async function loadConfig(): Promise<Config> {
@@ -21,7 +26,7 @@ export async function loadConfig(): Promise<Config> {
 
 export async function saveConfig(config: Config): Promise<void> {
   // Ensure config directory exists
-  await Bun.write(join(CONFIG_DIR, ".keep"), "");
+  await mkdir(CONFIG_DIR, { recursive: true });
 
   const content = stringify(config);
   await Bun.write(CONFIG_FILE, content);

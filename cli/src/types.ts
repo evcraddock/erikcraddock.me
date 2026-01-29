@@ -3,6 +3,7 @@ export interface GlobalOptions {
   apiUrl?: string;
   apiKey?: string;
   json?: boolean;
+  help?: boolean;
 }
 
 export interface Config {

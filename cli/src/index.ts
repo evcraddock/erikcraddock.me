@@ -4,7 +4,7 @@ import { configShow } from "./commands/config";
 import { login } from "./commands/login";
 import type { GlobalOptions } from "./types";
 
-function parseArgs(args: string[]): {
+export function parseArgs(args: string[]): {
   command: string[];
   options: GlobalOptions;
 } {
@@ -30,7 +30,7 @@ function parseArgs(args: string[]): {
     } else if (!arg.startsWith("-")) {
       command.push(arg);
     } else if (arg === "--help" || arg === "-h") {
-      command.push("help");
+      options.help = true;
     } else {
       // Unknown flag, add to command for subcommand to handle
       command.push(arg);
@@ -58,6 +58,7 @@ Global Options:
   --json          Output as JSON (where applicable)
   --api-url URL   Override API URL
   --api-key KEY   Override API key
+  --help, -h      Show help for a command
 
 Examples:
   ec login
@@ -66,16 +67,63 @@ Examples:
 `);
 }
 
+function showLoginHelp(): void {
+  console.log(`ec login - Authenticate and store API key
+
+Usage: ec login [options]
+
+Opens a browser to authenticate with erikcraddock.me, then prompts
+you to paste the generated API key.
+
+Options:
+  --api-url URL   Override API URL (default: from config or prompt)
+  --verbose, -v   Show debug output
+  --help, -h      Show this help message
+
+Examples:
+  ec login
+  ec login --api-url https://erikcraddock.me/api
+`);
+}
+
+function showConfigHelp(): void {
+  console.log(`ec config - Manage CLI configuration
+
+Usage: ec config <subcommand> [options]
+
+Subcommands:
+  show            Display current configuration
+
+Options:
+  --help, -h      Show this help message
+
+Configuration is stored in ~/.config/ec/config.yaml
+
+Examples:
+  ec config show
+`);
+}
+
 async function main(): Promise<void> {
   const args = process.argv.slice(2);
   const { command, options } = parseArgs(args);
 
-  if (command.length === 0 || command[0] === "help") {
+  if (command.length === 0) {
+    if (options.help) {
+      showHelp();
+      return;
+    }
     showHelp();
     return;
   }
 
   const [cmd, subcmd] = command;
+
+  // Handle help for commands
+  if (cmd === "help") {
+    showHelp();
+    return;
+  }
 
   switch (cmd) {
     case "version":
@@ -84,14 +132,23 @@ async function main(): Promise<void> {
       break;
 
     case "login":
+      if (options.help) {
+        showLoginHelp();
+        return;
+      }
       await login(options);
       break;
 
     case "config":
+      if (options.help) {
+        showConfigHelp();
+        return;
+      }
       if (subcmd === "show" || !subcmd) {
         await configShow();
       } else {
         console.error(`Unknown config command: ${subcmd}`);
+        console.error("Run 'ec config --help' for usage.");
         process.exit(1);
       }
       break;
