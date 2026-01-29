@@ -200,7 +200,9 @@ auth.get("/login/verify", async (c) => {
 
   // Redirect to specified URL or default to /admin
   // Only allow relative paths to prevent open redirect vulnerability
-  const safeRedirect = redirectTo?.startsWith("/") ? redirectTo : "/admin";
+  // Reject protocol-relative URLs (//evil.com) and absolute URLs
+  const isRelativePath = redirectTo && redirectTo.startsWith("/") && !redirectTo.startsWith("//");
+  const safeRedirect = isRelativePath ? redirectTo : "/admin";
   return c.redirect(safeRedirect);
 });
 
