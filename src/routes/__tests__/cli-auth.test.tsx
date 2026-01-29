@@ -1,13 +1,12 @@
-import { describe, it, expect, beforeAll, afterAll, beforeEach, vi } from "vitest";
-import { drizzle } from "drizzle-orm/better-sqlite3";
-import Database from "better-sqlite3";
-import * as schema from "../../db/schema";
+import { describe, it, expect, beforeAll, beforeEach, vi } from "vitest";
+import { createTestDb } from "../../db/test-utils";
+import { authors, sessions, apiKeys, magicLinks } from "../../db/schema";
+import { eq, ne } from "drizzle-orm";
+import type { drizzle } from "drizzle-orm/better-sqlite3";
+import type * as schema from "../../db/schema";
 
-// Create test database before mocking
 let testDb: ReturnType<typeof drizzle<typeof schema>>;
-let testSqlite: InstanceType<typeof Database>;
 
-// Mock the db module to use our test database
 vi.mock("../../db", async () => {
   const schema = await import("../../db/schema");
   return {
@@ -16,85 +15,27 @@ vi.mock("../../db", async () => {
   };
 });
 
-// Mock email service
 vi.mock("../../services/email", () => ({
   sendEmail: vi.fn().mockResolvedValue(true),
 }));
 
 beforeAll(async () => {
-  // Create in-memory database for tests
-  testSqlite = new Database(":memory:");
+  testDb = createTestDb();
 
-  // Create tables
-  testSqlite.exec(`
-    CREATE TABLE authors (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      email TEXT NOT NULL UNIQUE,
-      created_at INTEGER NOT NULL
-    );
-
-    CREATE TABLE sessions (
-      id TEXT PRIMARY KEY,
-      author_id INTEGER NOT NULL,
-      expires_at INTEGER NOT NULL,
-      created_at INTEGER NOT NULL
-    );
-
-    CREATE TABLE api_keys (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      author_id INTEGER NOT NULL,
-      key_hash TEXT NOT NULL UNIQUE,
-      name TEXT NOT NULL,
-      created_at INTEGER NOT NULL,
-      last_used_at INTEGER,
-      revoked_at INTEGER
-    );
-
-    CREATE TABLE magic_links (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      email TEXT NOT NULL,
-      token_hash TEXT NOT NULL UNIQUE,
-      expires_at INTEGER NOT NULL,
-      used_at INTEGER
-    );
-
-    CREATE TABLE passkey_challenges (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      challenge TEXT NOT NULL,
-      email TEXT,
-      created_at INTEGER NOT NULL
-    );
-
-    CREATE TABLE passkeys (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      author_id INTEGER NOT NULL,
-      credential_id TEXT NOT NULL UNIQUE,
-      public_key TEXT NOT NULL,
-      counter INTEGER NOT NULL DEFAULT 0,
-      name TEXT,
-      created_at INTEGER NOT NULL
-    );
-  `);
-
-  // Seed a test author
-  testSqlite.exec(`
-    INSERT INTO authors (email, created_at)
-    VALUES ('cli-test@example.com', ${Math.floor(Date.now() / 1000)})
-  `);
-
-  testDb = drizzle(testSqlite, { schema });
-});
-
-afterAll(() => {
-  testSqlite.close();
+  testDb
+    .insert(authors)
+    .values({
+      email: "cli-test@example.com",
+      created_at: new Date(),
+    })
+    .run();
 });
 
 beforeEach(() => {
-  // Clear tables before each test (keep cli-test author)
-  testSqlite.exec("DELETE FROM magic_links");
-  testSqlite.exec("DELETE FROM sessions");
-  testSqlite.exec("DELETE FROM api_keys");
-  testSqlite.exec("DELETE FROM authors WHERE email != 'cli-test@example.com'");
+  testDb.delete(magicLinks).run();
+  testDb.delete(sessions).run();
+  testDb.delete(apiKeys).run();
+  testDb.delete(authors).where(ne(authors.email, "cli-test@example.com")).run();
 });
 
 describe("GET /cli/auth", () => {
@@ -112,18 +53,24 @@ describe("GET /cli/auth", () => {
   });
 
   it("generates API key when authenticated", async () => {
-    // Create a valid session - need to get author ID first
-    const author = testSqlite
-      .prepare("SELECT id FROM authors WHERE email = ?")
-      .get("cli-test@example.com") as { id: number };
+    const author = testDb
+      .select()
+      .from(authors)
+      .where(eq(authors.email, "cli-test@example.com"))
+      .get()!;
     const sessionId = "test-cli-session-12345";
-    const expiresAt = Math.floor(Date.now() / 1000) + 3600; // 1 hour from now
-    const createdAt = Math.floor(Date.now() / 1000);
+    const expiresAt = new Date(Date.now() + 3600000);
+    const createdAt = new Date();
 
-    testSqlite.exec(`
-      INSERT INTO sessions (id, author_id, expires_at, created_at)
-      VALUES ('${sessionId}', ${author.id}, ${expiresAt}, ${createdAt})
-    `);
+    testDb
+      .insert(sessions)
+      .values({
+        id: sessionId,
+        author_id: author.id,
+        expires_at: expiresAt,
+        created_at: createdAt,
+      })
+      .run();
 
     const { auth } = await import("../auth");
 
@@ -137,7 +84,7 @@ describe("GET /cli/auth", () => {
     const html = await res.text();
     expect(html).toContain("API Key Generated");
     expect(html).toContain("Copy this key and paste it into your terminal");
-    expect(html).toContain("ek_"); // API key prefix
+    expect(html).toContain("ek_");
     expect(html).toContain("This key won&#39;t be shown again");
   });
 });
@@ -171,7 +118,6 @@ describe("POST /cli/auth/login", () => {
       body: formData,
     });
 
-    // Should redirect to /cli/auth?error=email
     expect(res.status).toBe(302);
     expect(res.headers.get("Location")).toContain("/cli/auth?error=email");
   });

@@ -8,6 +8,13 @@
       "when": 1769662862477,
       "tag": "0000_fine_mysterio",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "6",
+      "when": 1769665508066,
+      "tag": "0001_colorful_spirit",
+      "breakpoints": true
     }
   ]
 }

@@ -4,6 +4,7 @@ import { requireApiKey } from "@/auth/api-key";
 import {
   listPosts,
   getPost,
+  getPostBySlug,
   createPost,
   updatePost,
   deletePost,
@@ -80,6 +81,10 @@ api.get("/posts/:id", (c) => {
   return c.json({ data: post });
 });
 
+// Slug validation pattern: lowercase letters, numbers, hyphens only
+const SLUG_PATTERN = /^[a-z0-9-]+$/;
+const SLUG_MAX_LENGTH = 200;
+
 /**
  * POST /api/posts - Create new post
  */
@@ -87,10 +92,32 @@ api.post("/posts", async (c) => {
   const body = await c.req.json();
 
   // Validate type
-  const { type, title, content, excerpt, url, source_id, tags, banner_image_id } = body;
+  const { type, slug, title, content, excerpt, url, source_id, tags, banner_image_id } = body;
 
   if (!type || !["article", "link", "note"].includes(type)) {
     return c.json({ error: "Invalid or missing type. Must be article, link, or note" }, 400);
+  }
+
+  // Validate slug
+  if (!slug || typeof slug !== "string" || slug.trim().length === 0) {
+    return c.json({ error: "Slug is required" }, 400);
+  }
+
+  if (!SLUG_PATTERN.test(slug)) {
+    return c.json(
+      { error: "Invalid slug format. Use only lowercase letters, numbers, and hyphens" },
+      400
+    );
+  }
+
+  if (slug.length > SLUG_MAX_LENGTH) {
+    return c.json({ error: `Slug must be ${SLUG_MAX_LENGTH} characters or less` }, 400);
+  }
+
+  // Check for duplicate slug
+  const existingPost = getPostBySlug(slug);
+  if (existingPost) {
+    return c.json({ error: "Slug already exists" }, 400);
   }
 
   // Validate content
@@ -130,6 +157,7 @@ api.post("/posts", async (c) => {
   try {
     const post = createPost({
       type,
+      slug,
       title: title?.trim() || null,
       content: content.trim(),
       excerpt: excerpt?.trim() || null,
@@ -254,6 +282,146 @@ api.post("/posts/:id/unpublish", (c) => {
   }
 
   const post = unpublishPost(id);
+
+  if (!post) {
+    return c.json({ error: "Post not found" }, 404);
+  }
+
+  return c.json({ data: post });
+});
+
+/**
+ * GET /api/posts/by-slug/:slug - Get single post by slug
+ */
+api.get("/posts/by-slug/:slug", (c) => {
+  const slug = c.req.param("slug");
+
+  const post = getPostBySlug(slug);
+
+  if (!post) {
+    return c.json({ error: "Post not found" }, 404);
+  }
+
+  return c.json({ data: post });
+});
+
+/**
+ * PUT /api/posts/by-slug/:slug - Update post by slug
+ */
+api.put("/posts/by-slug/:slug", async (c) => {
+  const slug = c.req.param("slug");
+
+  const existingPost = getPostBySlug(slug);
+
+  if (!existingPost) {
+    return c.json({ error: "Post not found" }, 404);
+  }
+
+  const body = await c.req.json();
+  const { title, content, excerpt, url, source_id, tags, banner_image_id } = body;
+
+  // Validate tags if provided
+  if (tags !== undefined && !Array.isArray(tags)) {
+    return c.json({ error: "Tags must be an array" }, 400);
+  }
+
+  // Validate banner_image_id if provided
+  if (
+    banner_image_id !== undefined &&
+    banner_image_id !== null &&
+    typeof banner_image_id !== "number"
+  ) {
+    return c.json({ error: "banner_image_id must be a number" }, 400);
+  }
+
+  // Validate source_id if provided
+  if (source_id !== undefined && source_id !== null && typeof source_id !== "number") {
+    return c.json({ error: "source_id must be a number" }, 400);
+  }
+
+  try {
+    const post = updatePost(existingPost.id, {
+      title: title !== undefined ? title?.trim() || null : undefined,
+      content: content?.trim(),
+      excerpt: excerpt !== undefined ? excerpt?.trim() || null : undefined,
+      url: url !== undefined ? url?.trim() || null : undefined,
+      source_id,
+      tags,
+      banner_image_id,
+    });
+
+    if (!post) {
+      return c.json({ error: "Post not found" }, 404);
+    }
+
+    return c.json({ data: post });
+  } catch (error) {
+    return c.json({ error: String(error) }, 400);
+  }
+});
+
+/**
+ * DELETE /api/posts/by-slug/:slug - Delete post by slug
+ */
+api.delete("/posts/by-slug/:slug", (c) => {
+  const slug = c.req.param("slug");
+
+  const existingPost = getPostBySlug(slug);
+
+  if (!existingPost) {
+    return c.json({ error: "Post not found" }, 404);
+  }
+
+  const deleted = deletePost(existingPost.id);
+
+  if (!deleted) {
+    return c.json({ error: "Post not found" }, 404);
+  }
+
+  return c.body(null, 204);
+});
+
+/**
+ * POST /api/posts/by-slug/:slug/publish - Publish a post by slug
+ * Also sends Create activity to all followers via ActivityPub.
+ */
+api.post("/posts/by-slug/:slug/publish", async (c) => {
+  const slug = c.req.param("slug");
+
+  const existingPost = getPostBySlug(slug);
+
+  if (!existingPost) {
+    return c.json({ error: "Post not found" }, 404);
+  }
+
+  const post = publishPost(existingPost.id);
+
+  if (!post) {
+    return c.json({ error: "Post not found" }, 404);
+  }
+
+  // Send Create activity to followers (fire and forget - don't block response)
+  // Fedify handles retries if delivery fails
+  federatePost(existingPost.id).catch(() => {
+    // Error already logged in federatePost
+  });
+
+  return c.json({ data: post });
+});
+
+/**
+ * POST /api/posts/by-slug/:slug/unpublish - Unpublish a post by slug
+ */
+api.post("/posts/by-slug/:slug/unpublish", (c) => {
+  const slug = c.req.param("slug");
+
+  const existingPost = getPostBySlug(slug);
+
+  if (!existingPost) {
+    return c.json({ error: "Post not found" }, 404);
+  }
+
+  const post = unpublishPost(existingPost.id);
 
   if (!post) {
     return c.json({ error: "Post not found" }, 404);
