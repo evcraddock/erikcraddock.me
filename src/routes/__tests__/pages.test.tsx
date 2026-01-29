@@ -230,10 +230,10 @@ describe("pages routes", () => {
     });
   });
 
-  describe("GET /posts/:id", () => {
-    it("returns 200 and displays post content for valid ID", async () => {
+  describe("GET /posts/:slug", () => {
+    it("returns 200 and displays post content for valid slug", async () => {
       const app = getApp();
-      const res = await app.request("/posts/1");
+      const res = await app.request("/posts/test-post");
 
       expect(res.status).toBe(200);
 
@@ -244,7 +244,7 @@ describe("pages routes", () => {
 
     it("renders markdown content", async () => {
       const app = getApp();
-      const res = await app.request("/posts/1");
+      const res = await app.request("/posts/test-post");
       const html = await res.text();
 
       expect(html).toContain("<strong>markdown</strong>");
@@ -252,7 +252,7 @@ describe("pages routes", () => {
 
     it("displays tags linked to /tags/:slug", async () => {
       const app = getApp();
-      const res = await app.request("/posts/1");
+      const res = await app.request("/posts/test-post");
       const html = await res.text();
 
       expect(html).toContain('href="/tags/testing"');
@@ -263,7 +263,7 @@ describe("pages routes", () => {
 
     it("includes back link to home", async () => {
       const app = getApp();
-      const res = await app.request("/posts/1");
+      const res = await app.request("/posts/test-post");
       const html = await res.text();
 
       expect(html).toContain('href="/"');
@@ -272,7 +272,7 @@ describe("pages routes", () => {
 
     it("includes dark mode classes", async () => {
       const app = getApp();
-      const res = await app.request("/posts/1");
+      const res = await app.request("/posts/test-post");
       const html = await res.text();
 
       expect(html).toContain("dark:text-blue-400");
@@ -280,29 +280,9 @@ describe("pages routes", () => {
       expect(html).toContain("dark:text-gray-300");
     });
 
-    it("returns 404 for non-existent post ID", async () => {
+    it("returns 404 for non-existent slug", async () => {
       const app = getApp();
-      const res = await app.request("/posts/999");
-
-      expect(res.status).toBe(404);
-
-      const html = await res.text();
-      expect(html).toContain("Post Not Found");
-    });
-
-    it("returns 404 for invalid non-numeric ID", async () => {
-      const app = getApp();
-      const res = await app.request("/posts/abc");
-
-      expect(res.status).toBe(404);
-
-      const html = await res.text();
-      expect(html).toContain("Post Not Found");
-    });
-
-    it("returns 404 for negative ID", async () => {
-      const app = getApp();
-      const res = await app.request("/posts/-1");
+      const res = await app.request("/posts/does-not-exist");
 
       expect(res.status).toBe(404);
 
@@ -342,14 +322,8 @@ describe("pages routes", () => {
         })
         .run();
 
-      const postRow = testDb
-        .select()
-        .from(posts)
-        .all()
-        .find((p) => p.slug === "banner-post")!;
-
       const app = getApp();
-      const res = await app.request(`/posts/${postRow.id}`);
+      const res = await app.request("/posts/banner-post");
 
       expect(res.status).toBe(200);
 
@@ -390,14 +364,8 @@ describe("pages routes", () => {
         })
         .run();
 
-      const postRow = testDb
-        .select()
-        .from(posts)
-        .all()
-        .find((p) => p.slug === "og-banner-post")!;
-
       const app = getApp();
-      const res = await app.request(`/posts/${postRow.id}`);
+      const res = await app.request("/posts/og-banner-post");
 
       expect(res.status).toBe(200);
 
@@ -408,7 +376,7 @@ describe("pages routes", () => {
 
     it("does not display banner image when not set", async () => {
       const app = getApp();
-      const res = await app.request("/posts/1");
+      const res = await app.request("/posts/test-post");
 
       expect(res.status).toBe(200);
 
@@ -518,10 +486,10 @@ describe("pages routes", () => {
       });
     });
 
-    describe("GET /posts/:id (single note page)", () => {
+    describe("GET /posts/:slug (single note page)", () => {
       it("displays note with left border styling", async () => {
         const app = getApp();
-        const res = await app.request("/posts/4");
+        const res = await app.request("/posts/short-note");
         const html = await res.text();
 
         expect(res.status).toBe(200);
@@ -531,7 +499,7 @@ describe("pages routes", () => {
 
       it("displays full note content", async () => {
         const app = getApp();
-        const res = await app.request("/posts/4");
+        const res = await app.request("/posts/short-note");
         const html = await res.text();
 
         expect(html).toContain("Short note content 🚀");
@@ -539,7 +507,7 @@ describe("pages routes", () => {
 
       it("uses 'Note' as title fallback in page title", async () => {
         const app = getApp();
-        const res = await app.request("/posts/4");
+        const res = await app.request("/posts/short-note");
         const html = await res.text();
 
         expect(html).toContain("<title>Note | erikcraddock.me</title>");
@@ -547,7 +515,7 @@ describe("pages routes", () => {
 
       it("does not display title heading for notes", async () => {
         const app = getApp();
-        const res = await app.request("/posts/4");
+        const res = await app.request("/posts/short-note");
         const html = await res.text();
 
         expect(html).not.toContain("<h1");

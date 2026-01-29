@@ -51,7 +51,7 @@ function PostCard({ post }: { post: PostWithSource }) {
         </a>
       )}
 
-      <a href={`/posts/${post.id}`} class="block group">
+      <a href={`/posts/${post.slug}`} class="block group">
         {/* Title for articles and links (notes don't have titles) */}
         {post.title ? (
           <h2 class="text-xl font-semibold text-gray-900 dark:text-gray-100 group-hover:text-blue-600 dark:group-hover:text-blue-400 mb-2">
@@ -236,16 +236,8 @@ export function createPagesRoutes(db: Database): Hono {
   });
 
   // Single post page
-  pages.get("/posts/:id", (c) => {
-    const id = Number(c.req.param("id"));
-
-    // Validate ID is a number
-    if (Number.isNaN(id)) {
-      return c.html(
-        <NotFound title="Post Not Found" message="The post you're looking for doesn't exist." />,
-        404
-      );
-    }
+  pages.get("/posts/:slug", (c) => {
+    const slug = c.req.param("slug");
 
     // Query the post with source info
     const result = db
@@ -255,7 +247,7 @@ export function createPagesRoutes(db: Database): Hono {
       })
       .from(posts)
       .leftJoin(sources, eq(posts.source_id, sources.id))
-      .where(eq(posts.id, id))
+      .where(eq(posts.slug, slug))
       .get();
 
     if (!result) {
@@ -279,7 +271,7 @@ export function createPagesRoutes(db: Database): Hono {
       })
       .from(postTags)
       .innerJoin(tags, eq(postTags.tag_id, tags.id))
-      .where(eq(postTags.post_id, id))
+      .where(eq(postTags.post_id, post.id))
       .all();
 
     // Get banner image URL if set
