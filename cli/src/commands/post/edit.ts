@@ -148,7 +148,7 @@ export async function edit(args: string[], globalOptions: GlobalOptions): Promis
       console.log(`📤 Processing ${localImages.length} image(s)...`);
 
       try {
-        const urlMap = await processImages(imageRefs, slug, client);
+        const { urlMap } = await processImages(imageRefs, slug, client);
         content = rewriteContent(bodyContent, urlMap);
       } catch (error) {
         console.error(`❌ Image processing failed: ${error}`);
