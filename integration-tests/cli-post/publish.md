@@ -1,6 +1,6 @@
 # Test: Publish and Unpublish
 
-Test publishing and unpublishing posts.
+Test publishing and unpublishing posts, verifying visibility on the website.
 
 ## Setup
 
@@ -13,6 +13,18 @@ bun run src/index.ts post create \
 ```
 
 > **Note:** Use `$'...'` syntax in bash to interpret `\n` as actual newlines.
+
+## Verify Draft Not on Home Page
+
+Before publishing, the post should NOT appear on the home page.
+
+```bash
+~/.local/share/pi-skills/browser-tools/browser-nav.js http://localhost:5000
+sleep 1
+~/.local/share/pi-skills/browser-tools/browser-screenshot.js
+```
+
+**Expected:** Home page does NOT show "Publish Test" in the post list.
 
 ## Publish
 
@@ -27,29 +39,25 @@ bun run src/index.ts post publish publish-test
    Title: Publish Test
 ```
 
-**Verify via CLI:**
+## Verify Published Post on Home Page
 
 ```bash
-bun run src/index.ts post list --status published
-```
-
-Should include `publish-test`.
-
-## Verify in Browser
-
-After publishing, the post should be visible on the website.
-
-```bash
-~/.local/share/pi-skills/browser-tools/browser-nav.js http://localhost:5000/posts/publish-test
-```
-
-Take a screenshot to verify:
-
-```bash
+~/.local/share/pi-skills/browser-tools/browser-nav.js http://localhost:5000
+sleep 1
 ~/.local/share/pi-skills/browser-tools/browser-screenshot.js
 ```
 
-**Expected:** Post page displays with title "Publish Test" and content.
+**Expected:** Home page shows "Publish Test" in the post list.
+
+## Verify Post Page
+
+```bash
+~/.local/share/pi-skills/browser-tools/browser-nav.js http://localhost:5000/posts/publish-test
+sleep 1
+~/.local/share/pi-skills/browser-tools/browser-screenshot.js
+```
+
+**Expected:** Post page displays with title "Publish Test", date, and rendered markdown content.
 
 ## Unpublish
 
@@ -65,38 +73,44 @@ bun run src/index.ts post unpublish publish-test
    Status: draft
 ```
 
-**Verify via CLI:**
+## Verify Unpublished Not on Home Page
 
 ```bash
-bun run src/index.ts post list --status draft
+~/.local/share/pi-skills/browser-tools/browser-nav.js http://localhost:5000
+sleep 1
+~/.local/share/pi-skills/browser-tools/browser-screenshot.js
 ```
 
-Should include `publish-test`.
+**Expected:** Home page does NOT show "Publish Test" in the post list.
 
-## Verify Unpublished Not Visible
-
-After unpublishing, the post should not be publicly accessible.
+## Re-publish and Delete
 
 ```bash
-~/.local/share/pi-skills/browser-tools/browser-nav.js http://localhost:5000/posts/publish-test
+bun run src/index.ts post publish publish-test
 ```
 
-**Expected:** 404 page or "Post not found" message.
-
-## Publish Non-Existent
-
-```bash
-bun run src/index.ts post publish does-not-exist
-```
-
-**Expected:**
-
-```
-❌ Post not found: does-not-exist
-```
-
-## Cleanup
+Verify it's back on home page, then delete:
 
 ```bash
 bun run src/index.ts post delete publish-test --force
 ```
+
+## Verify Deleted Not on Home Page
+
+```bash
+~/.local/share/pi-skills/browser-tools/browser-nav.js http://localhost:5000
+sleep 1
+~/.local/share/pi-skills/browser-tools/browser-screenshot.js
+```
+
+**Expected:** Home page does NOT show "Publish Test" in the post list.
+
+## Verify Deleted Post Page Returns 404
+
+```bash
+~/.local/share/pi-skills/browser-tools/browser-nav.js http://localhost:5000/posts/publish-test
+sleep 1
+~/.local/share/pi-skills/browser-tools/browser-screenshot.js
+```
+
+**Expected:** 404 page or "Post not found" message.
