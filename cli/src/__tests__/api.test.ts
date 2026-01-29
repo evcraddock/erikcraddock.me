@@ -15,7 +15,7 @@ describe("ApiClient", () => {
             { status: 200 }
           )
         )
-      );
+      ) as unknown as typeof fetch;
 
       try {
         const client = new ApiClient("https://example.com/api", "ek_test");
@@ -36,7 +36,7 @@ describe("ApiClient", () => {
             status: 401,
           })
         )
-      );
+      ) as unknown as typeof fetch;
 
       try {
         const client = new ApiClient("https://example.com/api", "bad_key");
@@ -50,7 +50,9 @@ describe("ApiClient", () => {
 
     it("returns error on network failure", async () => {
       const originalFetch = globalThis.fetch;
-      globalThis.fetch = mock(() => Promise.reject(new Error("Network error")));
+      globalThis.fetch = mock(() =>
+        Promise.reject(new Error("Network error"))
+      ) as unknown as typeof fetch;
 
       try {
         const client = new ApiClient("https://example.com/api", "ek_test");
@@ -73,7 +75,7 @@ describe("ApiClient", () => {
             status: 200,
           })
         );
-      });
+      }) as unknown as typeof fetch;
 
       try {
         const client = new ApiClient("https://example.com/api", "ek_mykey123");
@@ -99,7 +101,7 @@ describe("verifyApiKey", () => {
           { status: 200 }
         )
       )
-    );
+    ) as unknown as typeof fetch;
 
     try {
       const result = await verifyApiKey("https://example.com/api", "ek_validkey");
@@ -115,7 +117,7 @@ describe("verifyApiKey", () => {
     const originalFetch = globalThis.fetch;
     globalThis.fetch = mock(() =>
       Promise.resolve(new Response(JSON.stringify({ error: "Unauthorized" }), { status: 401 }))
-    );
+    ) as unknown as typeof fetch;
 
     try {
       const result = await verifyApiKey("https://example.com/api", "ek_badkey");
@@ -129,7 +131,9 @@ describe("verifyApiKey", () => {
 
   it("returns failure on network error", async () => {
     const originalFetch = globalThis.fetch;
-    globalThis.fetch = mock(() => Promise.reject(new Error("Connection refused")));
+    globalThis.fetch = mock(() =>
+      Promise.reject(new Error("Connection refused"))
+    ) as unknown as typeof fetch;
 
     try {
       const result = await verifyApiKey("https://example.com/api", "ek_key");
@@ -149,7 +153,7 @@ describe("verifyApiKey", () => {
           status: 200,
         })
       )
-    );
+    ) as unknown as typeof fetch;
 
     try {
       const result = await verifyApiKey("https://example.com/api", "ek_key");
