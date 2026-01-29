@@ -14,7 +14,7 @@ function generateSessionId(): string {
 /**
  * Check if email is the admin email from env
  */
-function isAdminEmail(email: string): boolean {
+export function isAdminEmail(email: string): boolean {
   const adminEmail = process.env.ADMIN_EMAIL?.toLowerCase().trim();
   return !!adminEmail && email.toLowerCase() === adminEmail;
 }

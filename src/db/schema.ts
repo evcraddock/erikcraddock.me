@@ -85,9 +85,8 @@ export const passkeys = sqliteTable("passkeys", {
 // API keys for programmatic access
 export const apiKeys = sqliteTable("api_keys", {
   id: integer("id").primaryKey({ autoIncrement: true }),
-  author_id: integer("author_id")
-    .notNull()
-    .references(() => authors.id, { onDelete: "cascade" }),
+  // Nullable for admin keys (admin may not have an author record)
+  author_id: integer("author_id").references(() => authors.id, { onDelete: "cascade" }),
   key_hash: text("key_hash").notNull().unique(),
   name: text("name"),
   created_at: integer("created_at", { mode: "timestamp" }).notNull(),

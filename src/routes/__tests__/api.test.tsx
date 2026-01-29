@@ -414,3 +414,88 @@ describe("POST /api/posts/by-slug/:slug/unpublish", () => {
     expect(res.status).toBe(404);
   });
 });
+
+describe("GET /api/posts - status filter", () => {
+  let api: typeof import("../api").api;
+
+  beforeAll(async () => {
+    const module = await import("../api");
+    api = module.api;
+  });
+
+  beforeEach(() => {
+    // Create both draft and published posts
+    testDb
+      .insert(posts)
+      .values([
+        {
+          slug: "draft-post",
+          type: "article",
+          title: "Draft Post",
+          content: "Draft content",
+          published_at: null,
+          created_at: new Date(),
+          updated_at: new Date(),
+        },
+        {
+          slug: "published-post",
+          type: "article",
+          title: "Published Post",
+          content: "Published content",
+          published_at: new Date(),
+          created_at: new Date(),
+          updated_at: new Date(),
+        },
+      ])
+      .run();
+  });
+
+  it("returns only published posts by default", async () => {
+    const res = await api.request("/posts", { headers: authHeader });
+    expect(res.status).toBe(200);
+    const json = await res.json();
+    expect(json.data).toHaveLength(1);
+    expect(json.data[0].slug).toBe("published-post");
+  });
+
+  it("returns only draft posts when status=draft", async () => {
+    const res = await api.request("/posts?status=draft", { headers: authHeader });
+    expect(res.status).toBe(200);
+    const json = await res.json();
+    expect(json.data).toHaveLength(1);
+    expect(json.data[0].slug).toBe("draft-post");
+  });
+
+  it("returns only published posts when status=published", async () => {
+    const res = await api.request("/posts?status=published", { headers: authHeader });
+    expect(res.status).toBe(200);
+    const json = await res.json();
+    expect(json.data).toHaveLength(1);
+    expect(json.data[0].slug).toBe("published-post");
+  });
+
+  it("returns all posts when status=all", async () => {
+    const res = await api.request("/posts?status=all", { headers: authHeader });
+    expect(res.status).toBe(200);
+    const json = await res.json();
+    expect(json.data).toHaveLength(2);
+    const slugs = json.data.map((p: { slug: string }) => p.slug);
+    expect(slugs).toContain("draft-post");
+    expect(slugs).toContain("published-post");
+  });
+
+  it("rejects invalid status value", async () => {
+    const res = await api.request("/posts?status=invalid", { headers: authHeader });
+    expect(res.status).toBe(400);
+    const json = await res.json();
+    expect(json.error).toContain("Invalid status");
+  });
+
+  it("includes slug field in response", async () => {
+    const res = await api.request("/posts", { headers: authHeader });
+    expect(res.status).toBe(200);
+    const json = await res.json();
+    expect(json.data[0]).toHaveProperty("slug");
+    expect(json.data[0].slug).toBe("published-post");
+  });
+});

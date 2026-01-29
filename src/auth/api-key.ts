@@ -19,7 +19,7 @@ export function getAuthorByEmail(email: string) {
  * Create a new API key for an author
  */
 export async function createApiKey(
-  authorId: number,
+  authorId: number | null,
   name: string
 ): Promise<{ id: number; key: string }> {
   const { key, keyHash } = await generateApiKey();
@@ -98,6 +98,7 @@ export async function validateApiKey(key: string): Promise<string | null> {
 
   const keyHash = await hashToken(key);
 
+  // Use leftJoin to handle admin keys (null author_id)
   const result = db
     .select({
       keyId: apiKeys.id,
@@ -106,7 +107,7 @@ export async function validateApiKey(key: string): Promise<string | null> {
       email: authors.email,
     })
     .from(apiKeys)
-    .innerJoin(authors, eq(apiKeys.author_id, authors.id))
+    .leftJoin(authors, eq(apiKeys.author_id, authors.id))
     .where(eq(apiKeys.key_hash, keyHash))
     .get();
 
@@ -123,9 +124,20 @@ export async function validateApiKey(key: string): Promise<string | null> {
   // Update last_used_at
   db.update(apiKeys).set({ last_used_at: new Date() }).where(eq(apiKeys.id, result.keyId)).run();
 
-  logger.debug("auth", "API key validated", { keyId: result.keyId, email: result.email });
+  // For admin keys (null author_id), return ADMIN_EMAIL
+  // For author keys, return the author's email
+  const email = result.email ?? process.env.ADMIN_EMAIL;
 
-  return result.email;
+  if (!email) {
+    logger.error("auth", "API key has no associated email and ADMIN_EMAIL not set", {
+      keyId: result.keyId,
+    });
+    return null;
+  }
+
+  logger.debug("auth", "API key validated", { keyId: result.keyId, email });
+
+  return email;
 }
 
 /**

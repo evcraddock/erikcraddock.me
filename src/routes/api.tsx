@@ -11,6 +11,7 @@ import {
   publishPost,
   unpublishPost,
   PostType,
+  PostStatus,
 } from "@/services/posts";
 import { createMedia, deleteMedia, isAllowedMimeType } from "@/services/media";
 import { listSources, getSource, createSource } from "@/services/sources";
@@ -40,12 +41,14 @@ api.get("/ping", (c) => {
  *   - type: 'article' | 'link' | 'note'
  *   - tag: tag slug to filter by
  *   - limit: max number of posts (default 50)
+ *   - status: 'draft' | 'published' | 'all' (default 'published')
  */
 api.get("/posts", (c) => {
   const type = c.req.query("type") as PostType | undefined;
   const tag = c.req.query("tag");
   const limitParam = c.req.query("limit");
   const limit = limitParam ? parseInt(limitParam, 10) : undefined;
+  const status = c.req.query("status") as PostStatus | undefined;
 
   // Validate type if provided
   if (type && !["article", "link", "note"].includes(type)) {
@@ -57,7 +60,12 @@ api.get("/posts", (c) => {
     return c.json({ error: "Invalid limit. Must be between 1 and 100" }, 400);
   }
 
-  const posts = listPosts({ type, tag, limit });
+  // Validate status if provided
+  if (status && !["draft", "published", "all"].includes(status)) {
+    return c.json({ error: "Invalid status. Must be draft, published, or all" }, 400);
+  }
+
+  const posts = listPosts({ type, tag, limit, status });
 
   return c.json({ data: posts });
 });

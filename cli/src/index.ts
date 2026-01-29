@@ -2,6 +2,7 @@
 import { version } from "./commands/version";
 import { configShow } from "./commands/config";
 import { login } from "./commands/login";
+import { postCommand, showPostHelp } from "./commands/post";
 import type { GlobalOptions } from "./types";
 
 export function parseArgs(args: string[]): {
@@ -50,6 +51,7 @@ Usage: ec <command> [options]
 Commands:
   login           Authenticate and store API key
   config show     Show current configuration
+  post            Manage posts (list, show, create, edit, delete, publish)
   version         Show CLI version
   help            Show this help message
 
@@ -63,6 +65,8 @@ Global Options:
 Examples:
   ec login
   ec config show
+  ec post list
+  ec post create --title "My Post" --slug my-post --content "Hello"
   ec version
 `);
 }
@@ -151,6 +155,14 @@ async function main(): Promise<void> {
         console.error("Run 'ec config --help' for usage.");
         process.exit(1);
       }
+      break;
+
+    case "post":
+      if (options.help && !subcmd) {
+        showPostHelp();
+        return;
+      }
+      await postCommand(command.slice(1), options);
       break;
 
     default:
