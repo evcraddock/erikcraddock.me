@@ -1,6 +1,7 @@
 import { eq } from "drizzle-orm";
 import { db, authors } from "@/db";
 import { logger } from "@/utils/logger";
+import { normalizeEmail, isValidEmail, isSelfDelete } from "./email";
 
 /**
  * List all authors
@@ -11,17 +12,16 @@ export function listAuthors() {
 
 /**
  * Add an email to the authors allow list.
- * Returns the new author, or null if the email already exists.
+ * Returns the new author, or null if the email already exists or is invalid.
  */
 export function addAuthor(email: string): { id: number; email: string; created_at: Date } | null {
-  const normalized = email.toLowerCase().trim();
+  const normalized = normalizeEmail(email);
 
-  if (!normalized || !normalized.includes("@")) {
+  if (!isValidEmail(email)) {
     logger.warn("authors", "Invalid email provided", { email });
     return null;
   }
 
-  // Check if already exists
   const existing = db.select().from(authors).where(eq(authors.email, normalized)).get();
   if (existing) {
     logger.debug("authors", "Author already exists", { email: normalized });
@@ -43,7 +43,7 @@ export function addAuthor(email: string): { id: number; email: string; created_a
 
 /**
  * Delete an author by ID.
- * Returns false if the author doesn't exist or if trying to delete the admin.
+ * Returns false if the author doesn't exist or if trying to delete yourself.
  */
 export function deleteAuthor(authorId: number, currentEmail: string): boolean {
   const author = db.select().from(authors).where(eq(authors.id, authorId)).get();
@@ -53,7 +53,7 @@ export function deleteAuthor(authorId: number, currentEmail: string): boolean {
     return false;
   }
 
-  if (author.email.toLowerCase() === currentEmail.toLowerCase()) {
+  if (isSelfDelete(author.email, currentEmail)) {
     logger.warn("authors", "Cannot delete own email", { email: currentEmail });
     return false;
   }

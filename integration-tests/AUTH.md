@@ -12,7 +12,7 @@ Pass/fail tests for magic link and session authentication.
 
 - Dev server running (`make dev`)
 - Browser open via browser-tools skill
-- Admin author seeded: `ADMIN_EMAIL=your@email.com bun scripts/seed.ts`
+- `ADMIN_EMAIL` set in `.env`
 
 If any prerequisite fails, mark ALL tests in this file as FAIL and move on.
 

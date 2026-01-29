@@ -70,6 +70,32 @@ Use the `browser-tools` skill to open pages and take screenshots when verifying:
 - **Styles**: Tailwind CSS
 - **Storage**: S3-compatible (Garage)
 
+## Database Changes
+
+**NEVER use `drizzle-kit push`** - it bypasses migrations and causes drift.
+
+### Schema Change Workflow
+
+1. Modify schema in `src/db/schema.ts`
+2. Generate migration: `make db-generate`
+3. Review the generated SQL in `drizzle/`
+4. Commit both the schema change AND the migration file
+5. Migrations run automatically on app startup
+
+### Rules
+
+- Every schema change MUST have a corresponding migration file
+- Migration files are immutable once committed - never edit them
+- The `drizzle/` folder must be committed to git
+- Pre-push hook and CI will fail if migrations are out of sync
+
+### Commands
+
+```bash
+make db-generate   # Generate migration from schema changes
+make db-studio     # Browse database with Drizzle Studio
+```
+
 ## Development
 
 **ALWAYS start the dev server using `make dev`** - this runs all services via overmind.

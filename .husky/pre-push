@@ -1,3 +1,7 @@
 npm run lint
 npm run typecheck
 npm test
+
+# Check migrations are up to date
+npx drizzle-kit generate
+git diff --exit-code drizzle/
