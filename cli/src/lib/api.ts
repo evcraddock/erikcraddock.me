@@ -74,6 +74,8 @@ export class ApiClient {
     title?: string;
     content: string;
     excerpt?: string;
+    url?: string;
+    source_id?: number;
     tags?: string[];
     banner_image_id?: number;
   }): Promise<ApiResponse<Post>> {
@@ -86,7 +88,10 @@ export class ApiClient {
       title?: string;
       content?: string;
       excerpt?: string;
+      url?: string;
+      source_id?: number;
       tags?: string[];
+      banner_image_id?: number;
     }
   ): Promise<ApiResponse<Post>> {
     return this.request<Post>("PUT", `/posts/by-slug/${encodeURIComponent(slug)}`, data);

@@ -1,13 +1,7 @@
 ---
-slug: quick-thought
-type: note
-tags: [thought]
+slug: quick-update
 ---
 
-Just a quick note to self. Notes don't require a title - they're for short, informal posts.
+Just shipped a new feature! 🚀
 
-Perfect for:
-
-- Quick thoughts
-- Links with brief commentary
-- Status updates
+The CLI now supports creating posts from markdown files with frontmatter.

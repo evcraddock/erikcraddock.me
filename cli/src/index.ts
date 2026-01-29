@@ -3,6 +3,8 @@ import { version } from "./commands/version";
 import { configShow } from "./commands/config";
 import { login } from "./commands/login";
 import { postCommand, showPostHelp } from "./commands/post";
+import { linkCommand } from "./commands/link";
+import { noteCommand } from "./commands/note";
 import type { GlobalOptions } from "./types";
 
 export function parseArgs(args: string[]): {
@@ -52,6 +54,8 @@ Commands:
   login           Authenticate and store API key
   config show     Show current configuration
   post            Manage posts (list, show, create, edit, delete, publish)
+  link            Manage links (list, show, create, edit, delete, publish)
+  note            Manage notes (list, show, create, edit, delete, publish)
   version         Show CLI version
   help            Show this help message
 
@@ -67,6 +71,8 @@ Examples:
   ec config show
   ec post list
   ec post create --title "My Post" --slug my-post --content "Hello"
+  ec link create --url "https://..." --slug my-link --content "Commentary"
+  ec note create --slug quick-thought --content "Just a thought"
   ec version
 `);
 }
@@ -163,6 +169,14 @@ async function main(): Promise<void> {
         return;
       }
       await postCommand(command.slice(1), options);
+      break;
+
+    case "link":
+      await linkCommand(command.slice(1), options);
+      break;
+
+    case "note":
+      await noteCommand(command.slice(1), options);
       break;
 
     default:
