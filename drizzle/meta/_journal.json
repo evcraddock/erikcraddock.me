@@ -15,6 +15,13 @@
       "when": 1769665508066,
       "tag": "0001_colorful_spirit",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "6",
+      "when": 1769668666936,
+      "tag": "0002_solid_midnight",
+      "breakpoints": true
     }
   ]
 }

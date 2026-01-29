@@ -12,14 +12,24 @@ function generateSessionId(): string {
 }
 
 /**
- * Create a new session for an author
+ * Check if email is the admin email from env
+ */
+function isAdminEmail(email: string): boolean {
+  const adminEmail = process.env.ADMIN_EMAIL?.toLowerCase().trim();
+  return !!adminEmail && email.toLowerCase() === adminEmail;
+}
+
+/**
+ * Create a new session
+ * Admin (ADMIN_EMAIL) sessions have null author_id
+ * Author sessions reference the authors table
  */
 export async function createSession(email: string): Promise<string | null> {
-  // Look up author by email
   const author = db.select().from(authors).where(eq(authors.email, email)).get();
 
-  if (!author) {
-    logger.error("auth", "Cannot create session - author not found", { email });
+  // Must be either admin or in authors table
+  if (!author && !isAdminEmail(email)) {
+    logger.error("auth", "Cannot create session - not admin or author", { email });
     return null;
   }
 
@@ -30,7 +40,7 @@ export async function createSession(email: string): Promise<string | null> {
   db.insert(sessions)
     .values({
       id: sessionId,
-      author_id: author.id,
+      author_id: author?.id ?? null,
       expires_at: expiresAt,
       created_at: now,
     })
@@ -42,8 +52,9 @@ export async function createSession(email: string): Promise<string | null> {
 }
 
 /**
- * Get session and author info by session ID
+ * Get session info by session ID
  * Returns null if session doesn't exist or is expired
+ * For admin sessions (author_id null), returns ADMIN_EMAIL from env
  */
 export async function getSession(
   sessionId: string
@@ -66,7 +77,17 @@ export async function getSession(
     return null;
   }
 
-  // Get author
+  // Admin session (no author_id) - get email from env
+  if (session.author_id === null) {
+    const adminEmail = process.env.ADMIN_EMAIL;
+    if (!adminEmail) {
+      logger.error("auth", "Admin session but ADMIN_EMAIL not set");
+      return null;
+    }
+    return { session, authorEmail: adminEmail };
+  }
+
+  // Author session - get email from database
   const author = db.select().from(authors).where(eq(authors.id, session.author_id)).get();
 
   if (!author) {
