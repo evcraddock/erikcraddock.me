@@ -75,6 +75,7 @@ export class ApiClient {
     content: string;
     excerpt?: string;
     tags?: string[];
+    banner_image_id?: number;
   }): Promise<ApiResponse<Post>> {
     return this.request<Post>("POST", "/posts", data);
   }

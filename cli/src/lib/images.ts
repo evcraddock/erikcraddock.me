@@ -67,31 +67,37 @@ function parseImageRef(src: string, basePath: string): ImageReference {
   return { original: src, type: "local", localPath: resolved };
 }
 
+export interface ProcessedImages {
+  urlMap: Map<string, string>;
+  idMap: Map<string, number>; // original -> media ID
+}
+
 /**
- * Process images: upload local files, resolve IDs, build URL map
+ * Process images: upload local files, resolve IDs, build URL and ID maps
  */
 export async function processImages(
   refs: ImageReference[],
   slug: string,
   client: ApiClient
-): Promise<Map<string, string>> {
+): Promise<ProcessedImages> {
   const urlMap = new Map<string, string>();
+  const idMap = new Map<string, number>();
 
   for (const ref of refs) {
     if (ref.type === "url") {
-      // External URLs stay as-is
+      // External URLs stay as-is (no ID)
       urlMap.set(ref.original, ref.original);
       continue;
     }
 
     if (ref.type === "id") {
       // Fetch URL for image ID
-      const url = await resolveImageId(ref.imageId!, client);
-      if (url) {
-        urlMap.set(ref.original, url);
-      } else {
+      const result = await client.getMedia(ref.imageId!);
+      if (result.error || !result.data) {
         throw new Error(`Image not found: ${ref.original}`);
       }
+      urlMap.set(ref.original, result.data.url);
+      idMap.set(ref.original, ref.imageId!);
       continue;
     }
 
@@ -105,29 +111,23 @@ export async function processImages(
         throw new Error(`File not found: ${ref.original} (resolved to ${ref.localPath})`);
       }
 
-      const url = await uploadImage(ref.localPath, slug, client);
+      const { url, id } = await uploadImage(ref.localPath, slug, client);
       urlMap.set(ref.original, url);
+      idMap.set(ref.original, id);
     }
   }
 
-  return urlMap;
+  return { urlMap, idMap };
 }
 
 /**
- * Resolve an image ID to its URL
+ * Upload a local image file, returns URL and media ID
  */
-async function resolveImageId(id: number, client: ApiClient): Promise<string | null> {
-  const result = await client.getMedia(id);
-  if (result.error || !result.data) {
-    return null;
-  }
-  return result.data.url;
-}
-
-/**
- * Upload a local image file
- */
-async function uploadImage(filePath: string, slug: string, client: ApiClient): Promise<string> {
+async function uploadImage(
+  filePath: string,
+  slug: string,
+  client: ApiClient
+): Promise<{ url: string; id: number }> {
   const filename = path.basename(filePath);
   const key = `posts/${slug}/${filename}`;
 
@@ -136,7 +136,7 @@ async function uploadImage(filePath: string, slug: string, client: ApiClient): P
     throw new Error(`Failed to upload ${filename}: ${result.error || "Unknown error"}`);
   }
 
-  return result.data.url;
+  return { url: result.data.url, id: result.data.id };
 }
 
 /**

@@ -125,6 +125,7 @@ export async function create(args: string[], globalOptions: GlobalOptions): Prom
   let tags = options.tags;
   let type = options.type;
   let banner: string | undefined;
+  let bannerImageId: number | undefined;
 
   if (options.file) {
     // File-based creation
@@ -163,14 +164,14 @@ export async function create(args: string[], globalOptions: GlobalOptions): Prom
       console.log(`📤 Processing ${localImages.length} image(s)...`);
 
       try {
-        const urlMap = await processImages(imageRefs, slug, client);
+        const { urlMap, idMap } = await processImages(imageRefs, slug, client);
 
         // Rewrite content
         content = rewriteContent(bodyContent, urlMap);
 
-        // Rewrite banner if it was a local/ID reference
-        if (banner && urlMap.has(banner)) {
-          banner = urlMap.get(banner);
+        // Get banner image ID if banner was processed
+        if (banner && idMap.has(banner)) {
+          bannerImageId = idMap.get(banner);
         }
       } catch (error) {
         console.error(`❌ Image processing failed: ${error}`);
@@ -207,10 +208,6 @@ export async function create(args: string[], globalOptions: GlobalOptions): Prom
     process.exit(1);
   }
 
-  // Add banner to content if present (as HTML comment for now, or could be stored differently)
-  // For now, we'll just include it in the API call if the API supports it
-  // TODO: Handle banner field when API supports it
-
   const result = await client.createPost({
     type: postType,
     slug,
@@ -218,6 +215,7 @@ export async function create(args: string[], globalOptions: GlobalOptions): Prom
     content,
     excerpt,
     tags,
+    banner_image_id: bannerImageId,
   });
 
   if (result.error) {
