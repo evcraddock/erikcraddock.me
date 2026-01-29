@@ -11,6 +11,8 @@ export interface PostFrontmatter {
   status?: string;
   created?: string;
   type?: string;
+  url?: string;
+  source?: string;
 }
 
 export interface ParsedMarkdown {
@@ -154,6 +156,12 @@ export function generateMarkdown(frontmatter: PostFrontmatter, content: string):
   }
   if (frontmatter.type) {
     lines.push(`type: ${frontmatter.type}`);
+  }
+  if (frontmatter.url) {
+    lines.push(`url: ${frontmatter.url}`);
+  }
+  if (frontmatter.source) {
+    lines.push(`source: ${frontmatter.source}`);
   }
   if (frontmatter.status) {
     lines.push(`status: ${frontmatter.status}`);

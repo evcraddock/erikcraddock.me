@@ -38,6 +38,8 @@ export interface Post {
   title: string | null;
   content: string;
   excerpt: string | null;
+  url: string | null;
+  source_id: number | null;
   published_at: string | null;
   created_at: string;
   updated_at: string;
