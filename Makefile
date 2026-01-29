@@ -1,6 +1,6 @@
 .PHONY: dev dev-stop dev-restart dev-status dev-logs dev-tail \
         connect-app connect-css connect-docker \
-        db-generate db-migrate db-push db-studio db-seed \
+        db-generate db-migrate db-studio \
         check pre-pr help
 
 SOCKET := ./.overmind.sock
@@ -30,9 +30,7 @@ help: ## Show this help
 	@echo "Database:"
 	@echo "  db-generate     Generate migrations from schema changes"
 	@echo "  db-migrate      Run pending migrations"
-	@echo "  db-push         Push schema directly to database (dev only)"
 	@echo "  db-studio       Open Drizzle Studio to browse database"
-	@echo "  db-seed         Seed database with sample data"
 	@echo ""
 	@echo "Quality:"
 	@echo "  check           Run linting and tests"
@@ -137,17 +135,9 @@ db-migrate: ## Run pending migrations
 	@mkdir -p data
 	npx drizzle-kit migrate
 
-db-push: ## Push schema directly to database (dev only)
-	@mkdir -p data
-	npx drizzle-kit push
-
 db-studio: ## Open Drizzle Studio to browse database
 	@mkdir -p data
 	npx drizzle-kit studio
-
-db-seed: ## Seed database with sample data
-	@mkdir -p data
-	bun scripts/seed.ts
 
 # =============================================================================
 # Quality

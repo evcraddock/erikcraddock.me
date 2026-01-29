@@ -3,30 +3,16 @@ import { Context, Next } from "hono";
 import { db, apiKeys, authors } from "@/db";
 import { logger } from "@/utils/logger";
 import { hashToken } from "./crypto";
+import { generateApiKey, API_KEY_PREFIX, isValidApiKeyFormat } from "./api-key-utils";
 
-const API_KEY_PREFIX = "ek_";
+// Re-export for external use
+export { generateApiKey, API_KEY_PREFIX };
 
 /**
  * Get author by email
  */
 export function getAuthorByEmail(email: string) {
   return db.select().from(authors).where(eq(authors.email, email)).get();
-}
-
-/**
- * Generate a new API key
- * Returns { key, keyHash } - key is shown once, keyHash is stored
- */
-export async function generateApiKey(): Promise<{ key: string; keyHash: string }> {
-  // Generate 32 random bytes as hex (64 chars)
-  const array = new Uint8Array(32);
-  crypto.getRandomValues(array);
-  const randomPart = Array.from(array, (b) => b.toString(16).padStart(2, "0")).join("");
-
-  const key = `${API_KEY_PREFIX}${randomPart}`;
-  const keyHash = await hashToken(key);
-
-  return { key, keyHash };
 }
 
 /**
@@ -105,7 +91,7 @@ export async function revokeApiKey(keyId: number, authorId: number): Promise<boo
  * Validate an API key and return the author email if valid
  */
 export async function validateApiKey(key: string): Promise<string | null> {
-  if (!key.startsWith(API_KEY_PREFIX)) {
+  if (!isValidApiKeyFormat(key)) {
     logger.debug("auth", "Invalid API key format");
     return null;
   }
@@ -175,5 +161,3 @@ declare module "hono" {
     };
   }
 }
-
-export { API_KEY_PREFIX };

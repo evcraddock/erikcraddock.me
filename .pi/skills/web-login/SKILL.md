@@ -11,7 +11,7 @@ Login to erikcraddock.me using magic link authentication.
 
 - Dev server running (`make dev`)
 - Browser open via browser-tools skill
-- Admin email seeded: `ADMIN_EMAIL=your@email.com bun scripts/seed.ts`
+- `ADMIN_EMAIL` set in `.env`
 
 ## Steps
 
