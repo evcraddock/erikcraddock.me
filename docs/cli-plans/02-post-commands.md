@@ -6,15 +6,16 @@ Implement CRUD commands for articles. User can list, view, create, edit, delete,
 
 ## Deliverables
 
-- [ ] `ec post list` with `--limit`, `--tag`, `--status` filters
-- [ ] `ec post show <slug>`
-- [ ] `ec post create --title --slug --content [--excerpt] [--tags]`
-- [ ] `ec post edit <slug> [--title] [--content] [--excerpt] [--tags]`
-- [ ] `ec post delete <slug>` with confirmation
-- [ ] `ec post publish <slug>`
-- [ ] `ec post unpublish <slug>`
-- [ ] API: slug-based lookups for posts
-- [ ] Table and JSON output formats
+- [x] `ec post list` with `--limit`, `--tag`, `--status` filters
+- [x] `ec post show <slug>`
+- [x] `ec post create --title --slug --content [--excerpt] [--tags]`
+- [x] `ec post edit <slug> [--title] [--content] [--excerpt] [--tags]`
+- [x] `ec post delete <slug>` with confirmation
+- [x] `ec post publish <slug>`
+- [x] `ec post unpublish <slug>`
+- [x] API: slug-based lookups for posts (done in #1396)
+- [x] API: status filter for list
+- [x] Table and JSON output formats
 
 ## Implementation
 

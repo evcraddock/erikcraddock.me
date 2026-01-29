@@ -20,3 +20,26 @@ export interface PingResponse {
   status: string;
   authenticated: string;
 }
+
+export interface PostListItem {
+  id: number;
+  slug: string;
+  type: string;
+  title: string | null;
+  excerpt: string | null;
+  published_at: string | null;
+  tags: string[];
+}
+
+export interface Post {
+  id: number;
+  slug: string;
+  type: string;
+  title: string | null;
+  content: string;
+  excerpt: string | null;
+  published_at: string | null;
+  created_at: string;
+  updated_at: string;
+  tags: string[];
+}

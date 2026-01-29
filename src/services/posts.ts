@@ -1,4 +1,4 @@
-import { eq, desc, and, isNotNull } from "drizzle-orm";
+import { eq, desc, and, isNotNull, isNull } from "drizzle-orm";
 import { db, posts, tags, postTags, media, sources } from "@/db";
 import { mediaUrl } from "./media";
 
@@ -6,6 +6,7 @@ export type PostType = "article" | "link" | "note";
 
 export interface PostListItem {
   id: number;
+  slug: string;
   type: string;
   title: string | null;
   excerpt: string | null;
@@ -13,20 +14,33 @@ export interface PostListItem {
   tags: string[];
 }
 
+export type PostStatus = "draft" | "published" | "all";
+
 export interface ListPostsOptions {
   type?: PostType;
   tag?: string;
   limit?: number;
+  status?: PostStatus;
 }
 
 /**
- * List published posts with optional filtering
+ * List posts with optional filtering
  */
 export function listPosts(options: ListPostsOptions = {}): PostListItem[] {
-  const { type, tag, limit = 50 } = options;
+  const { type, tag, limit = 50, status } = options;
 
   // Build conditions
-  const conditions = [isNotNull(posts.published_at)];
+  const conditions = [];
+
+  // Status filter (default to published only for backwards compatibility)
+  if (status === "draft") {
+    conditions.push(isNull(posts.published_at));
+  } else if (status === "all") {
+    // No filter - show both drafts and published
+  } else {
+    // Default and "published": show published only (backwards compatible)
+    conditions.push(isNotNull(posts.published_at));
+  }
 
   if (type) {
     conditions.push(eq(posts.type, type));
@@ -56,17 +70,26 @@ export function listPosts(options: ListPostsOptions = {}): PostListItem[] {
 
   // Get posts - don't apply limit at DB level if filtering by tag
   // (we need to filter first, then apply limit)
-  const baseQuery = db
+  // Order by created_at for drafts/all, published_at for published only
+  const orderColumn =
+    status === "draft" || status === "all" ? posts.created_at : posts.published_at;
+
+  const selectQuery = db
     .select({
       id: posts.id,
+      slug: posts.slug,
       type: posts.type,
       title: posts.title,
       excerpt: posts.excerpt,
       published_at: posts.published_at,
     })
-    .from(posts)
-    .where(and(...conditions))
-    .orderBy(desc(posts.published_at));
+    .from(posts);
+
+  // Apply conditions if any, otherwise no where clause
+  const baseQuery =
+    conditions.length > 0
+      ? selectQuery.where(and(...conditions)).orderBy(desc(orderColumn))
+      : selectQuery.orderBy(desc(orderColumn));
 
   // Only apply DB-level limit if not filtering by tag
   const postResults = postIds ? baseQuery.all() : baseQuery.limit(limit).all();
@@ -90,6 +113,7 @@ export function listPosts(options: ListPostsOptions = {}): PostListItem[] {
 
     return {
       id: post.id,
+      slug: post.slug,
       type: post.type,
       title: post.title,
       excerpt: post.excerpt,

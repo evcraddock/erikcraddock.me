@@ -1,4 +1,4 @@
-import type { ApiResponse, PingResponse } from "../types";
+import type { ApiResponse, PingResponse, PostListItem, Post } from "../types";
 
 export class ApiClient {
   constructor(
@@ -38,6 +38,65 @@ export class ApiClient {
 
   async ping(): Promise<ApiResponse<PingResponse>> {
     return this.request<PingResponse>("GET", "/ping");
+  }
+
+  async listPosts(options?: {
+    type?: string;
+    tag?: string;
+    limit?: number;
+    status?: string;
+  }): Promise<ApiResponse<PostListItem[]>> {
+    const params = new URLSearchParams();
+    if (options?.type) params.set("type", options.type);
+    if (options?.tag) params.set("tag", options.tag);
+    if (options?.limit) params.set("limit", String(options.limit));
+    if (options?.status) params.set("status", options.status);
+
+    const query = params.toString();
+    const path = query ? `/posts?${query}` : "/posts";
+    return this.request<PostListItem[]>("GET", path);
+  }
+
+  async getPost(slug: string): Promise<ApiResponse<Post>> {
+    return this.request<Post>("GET", `/posts/by-slug/${encodeURIComponent(slug)}`);
+  }
+
+  async createPost(data: {
+    type: string;
+    slug: string;
+    title?: string;
+    content: string;
+    excerpt?: string;
+    tags?: string[];
+  }): Promise<ApiResponse<Post>> {
+    return this.request<Post>("POST", "/posts", data);
+  }
+
+  async updatePost(
+    slug: string,
+    data: {
+      title?: string;
+      content?: string;
+      excerpt?: string;
+      tags?: string[];
+    }
+  ): Promise<ApiResponse<Post>> {
+    return this.request<Post>("PUT", `/posts/by-slug/${encodeURIComponent(slug)}`, data);
+  }
+
+  async deletePost(slug: string): Promise<ApiResponse<{ success: boolean }>> {
+    return this.request<{ success: boolean }>(
+      "DELETE",
+      `/posts/by-slug/${encodeURIComponent(slug)}`
+    );
+  }
+
+  async publishPost(slug: string): Promise<ApiResponse<Post>> {
+    return this.request<Post>("POST", `/posts/by-slug/${encodeURIComponent(slug)}/publish`);
+  }
+
+  async unpublishPost(slug: string): Promise<ApiResponse<Post>> {
+    return this.request<Post>("POST", `/posts/by-slug/${encodeURIComponent(slug)}/unpublish`);
   }
 }
 
