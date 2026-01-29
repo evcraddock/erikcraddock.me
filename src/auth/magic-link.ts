@@ -28,8 +28,10 @@ export async function isAuthorizedEmail(email: string): Promise<boolean> {
  * Create a magic link for the given email.
  * Returns true if email was sent (or logged in dev), false if email not authorized.
  * Always appears successful to caller to avoid leaking valid emails.
+ * @param email - The email address to send the magic link to
+ * @param redirectTo - Optional URL to redirect to after verification (default: /admin)
  */
-export async function createMagicLink(email: string): Promise<boolean> {
+export async function createMagicLink(email: string, redirectTo?: string): Promise<boolean> {
   const normalizedEmail = email.toLowerCase().trim();
 
   // Check if email is authorized
@@ -65,7 +67,8 @@ export async function createMagicLink(email: string): Promise<boolean> {
   // Build the magic link URL
   const domain = process.env.DOMAIN || "localhost:5000";
   const protocol = process.env.NODE_ENV === "production" ? "https" : "http";
-  const magicLinkUrl = `${protocol}://${domain}/login/verify?token=${token}`;
+  const redirectParam = redirectTo ? `&redirect=${encodeURIComponent(redirectTo)}` : "";
+  const magicLinkUrl = `${protocol}://${domain}/login/verify?token=${token}${redirectParam}`;
 
   const devMode = process.env.SMTP_DEV_MODE === "true";
 
