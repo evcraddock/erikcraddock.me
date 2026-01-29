@@ -1,6 +1,6 @@
-# Test: Create Post with Images
+# Test: Create Post with Images and Banner
 
-Test creating posts with local images that get uploaded and URL-rewritten.
+Test creating posts with local images and banner that get uploaded and displayed.
 
 ## Setup
 
@@ -10,7 +10,7 @@ Verify sample image exists:
 ls -la cli/examples/sample-image.png
 ```
 
-## Create Post with Image
+## Create Post with Image and Banner
 
 ```bash
 cd cli
@@ -37,7 +37,7 @@ curl -s -o /dev/null -w "%{http_code}" http://localhost:5000/media/posts/image-d
 
 **Expected:** `200`
 
-## Verify URL Was Rewritten
+## Verify URL Was Rewritten in Content
 
 ```bash
 bun run src/index.ts post pull image-demo-post --output /tmp/pulled.md
@@ -46,7 +46,7 @@ grep "sample-image" /tmp/pulled.md
 
 **Expected:** Shows `/media/posts/image-demo-post/sample-image.png` (not `./sample-image.png`)
 
-## Publish and View in Browser
+## Publish and View Banner in Browser
 
 ```bash
 bun run src/index.ts post publish image-demo-post
@@ -56,7 +56,11 @@ sleep 1
 ~/.local/share/pi-skills/browser-tools/browser-screenshot.js
 ```
 
-**Expected:** Post page shows with image rendered (may be small - it's a 1x1 pixel test image).
+**Expected:**
+
+- Banner image displays at the TOP of the post (above the title)
+- Title "Post with Images" appears below the banner
+- Inline image displays in the content
 
 ## Cleanup
 
