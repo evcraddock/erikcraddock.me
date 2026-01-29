@@ -3,7 +3,7 @@ title: Post with Images
 slug: image-demo-post
 tags: [images, demo]
 excerpt: Demonstrates local image upload and URL rewriting.
-banner: ./sample-image.jpg
+banner: ./sample-image.png
 type: article
 ---
 
@@ -16,7 +16,7 @@ This post demonstrates how local images are handled.
 The frontmatter includes a `banner` field pointing to a local file:
 
 ```yaml
-banner: ./sample-image.jpg
+banner: ./sample-image.png
 ```
 
 When you create this post, the CLI:
@@ -29,11 +29,11 @@ When you create this post, the CLI:
 
 You can also include images in the content:
 
-![Sample Image](./sample-image.jpg)
+![Sample Image](./sample-image.png)
 
 ## How It Works
 
-Local paths like `./image.jpg` or `../images/photo.png` are:
+Local paths like `./image.png` or `../images/photo.png` are:
 
 - Resolved relative to the markdown file
 - Uploaded to `/media/posts/{slug}/{filename}`
@@ -43,6 +43,6 @@ External URLs (`https://...`) are left unchanged.
 
 ## Try It
 
-1. Make sure `sample-image.jpg` exists in the examples folder
+1. Make sure `sample-image.png` exists in the examples folder
 2. Run: `ec post create --file examples/with-images.md`
 3. Check the created post - images will have server URLs
