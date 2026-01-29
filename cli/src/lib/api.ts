@@ -24,6 +24,11 @@ export class ApiClient {
         body: body ? JSON.stringify(body) : undefined,
       });
 
+      // Handle 204 No Content
+      if (response.status === 204) {
+        return { data: { success: true } as T };
+      }
+
       const data = await response.json();
 
       if (!response.ok) {

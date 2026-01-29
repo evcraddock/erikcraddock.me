@@ -397,9 +397,12 @@ auth.get("/cli/auth", async (c) => {
 
   const email = sessionData.authorEmail;
 
-  // Get author to create API key
+  // Get author if exists (admin may not have an author record)
   const author = getAuthorByEmail(email);
-  if (!author) {
+  const { isAdminEmail } = await import("@/auth/session");
+
+  // Must be admin or have an author record (security check - should already be enforced by session creation)
+  if (!author && !isAdminEmail(email)) {
     return c.html(
       <Layout title="Error | erikcraddock.me">
         <div class="max-w-md mx-auto">
@@ -410,9 +413,9 @@ auth.get("/cli/auth", async (c) => {
     );
   }
 
-  // Generate API key
+  // Generate API key (author_id is null for admin without author record)
   const keyName = `CLI - ${new Date().toISOString().split("T")[0]}`;
-  const { key } = await createApiKey(author.id, keyName);
+  const { key } = await createApiKey(author?.id ?? null, keyName);
 
   logger.info("auth", "CLI API key generated", { email, keyName });
 

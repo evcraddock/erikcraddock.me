@@ -1,100 +1,69 @@
 ---
 name: web-login
-description: Login to the local web app using magic link authentication. Use when needing to authenticate with the web app at localhost:5000.
+description: Complete login via magic link on the current page. Use when a login form is already open in the browser.
 ---
 
 # Web Login
 
-Login to erikcraddock.me using magic link authentication.
+Complete magic link authentication on the current page. Works on `/login`, `/cli/auth`, or any page with the email login form.
 
 ## Prerequisites
 
 - Dev server running (`make dev`)
-- Browser open via browser-tools skill
+- Browser already open to a page with login form
 - `ADMIN_EMAIL` set in `.env`
 
 ## Steps
 
-### 1. Navigate to Login
+### 1. Get Admin Email
 
 ```bash
-~/.local/share/pi-skills/browser-tools/browser-nav.js http://localhost:5000/login
+ADMIN_EMAIL=$(grep ADMIN_EMAIL .env | cut -d= -f2)
 ```
 
-### 2. Get Admin Email
-
-Check .env or use default test email:
+### 2. Fill Email and Submit
 
 ```bash
-ADMIN_EMAIL=$(grep ADMIN_EMAIL .env 2>/dev/null | cut -d= -f2 || echo "test@example.com")
-echo $ADMIN_EMAIL
+~/.local/share/pi-skills/browser-tools/browser-eval.js "(function() {
+  var input = document.querySelector('input[type=email]');
+  var setter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value').set;
+  setter.call(input, '$ADMIN_EMAIL');
+  input.dispatchEvent(new Event('input', { bubbles: true }));
+  setTimeout(function() { document.querySelector('button[type=submit]').click(); }, 100);
+})()"
 ```
 
-### 3. Fill Email
+### 3. Get Magic Link from Logs
 
-Replace `ADMIN_EMAIL_HERE` with actual email:
-
-```bash
-~/.local/share/pi-skills/browser-tools/browser-eval.js '(function() {
-  var input = document.querySelector("input[type=email]");
-  var setter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, "value").set;
-  setter.call(input, "ADMIN_EMAIL_HERE");
-  input.dispatchEvent(new Event("input", { bubbles: true }));
-})()'
-```
-
-### 4. Submit Form
+The magic link is split across two lines in the logs. Join lines and extract the full URL including redirect param:
 
 ```bash
-~/.local/share/pi-skills/browser-tools/browser-eval.js 'document.querySelector("button[type=submit]").click()'
-```
-
-### 5. Verify Success Message
-
-Take screenshot - should show "Check your email" success message.
-
-### 6. Get Magic Link from Logs
-
-```bash
-cd /home/erik/Private/code/github/evcraddock/erikcraddock.me && \
-TMUX_SOCK=$(ls -t /tmp/tmux-$(id -u)/overmind-erikcraddock-me-* 2>/dev/null | head -1) && \
-tmux -L "$(basename $TMUX_SOCK)" capture-pane -t erikcraddock-me:app -p -S -50 | grep -oP 'http://localhost:5000/login/verify\?token=[a-f0-9]+'
-```
-
-### 7. Navigate to Magic Link
-
-> **BLOCKED**: Requires /login/verify route (Task #1305)
-
-```bash
-~/.local/share/pi-skills/browser-tools/browser-nav.js "MAGIC_LINK_URL_HERE"
-```
-
-### 8. Verify Login
-
-Take screenshot - should see Admin Dashboard or protected page.
-
-## Quick Login (All Steps)
-
-```bash
-# 1. Open login page
-~/.local/share/pi-skills/browser-tools/browser-nav.js http://localhost:5000/login
-
-# 2. Fill and submit (replace email)
-~/.local/share/pi-skills/browser-tools/browser-eval.js '(function() {
-  var input = document.querySelector("input[type=email]");
-  var setter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, "value").set;
-  setter.call(input, "test@example.com");
-  input.dispatchEvent(new Event("input", { bubbles: true }));
-  setTimeout(function() { document.querySelector("button[type=submit]").click(); }, 100);
-})()'
-
-# 3. Get magic link from logs
-MAGIC_LINK=$(cd /home/erik/Private/code/github/evcraddock/erikcraddock.me && \
-  TMUX_SOCK=$(ls -t /tmp/tmux-$(id -u)/overmind-erikcraddock-me-* 2>/dev/null | head -1) && \
-  tmux -L "$(basename $TMUX_SOCK)" capture-pane -t erikcraddock-me:app -p -S -50 | \
-  grep -oP 'http://localhost:5000/login/verify\?token=[a-f0-9]+' | tail -1)
+sleep 2
+MAGIC_LINK=$(make dev-tail 2>&1 | tr -d '\n' | grep -oP 'http://localhost:5000/login/verify\?token=[a-f0-9]+(&redirect=[A-Za-z0-9%]+)?' | tail -1)
 echo "Magic link: $MAGIC_LINK"
-
-# 4. Navigate to magic link (when /login/verify is implemented)
-# ~/.local/share/pi-skills/browser-tools/browser-nav.js "$MAGIC_LINK"
 ```
+
+**Important:** The URL includes `&redirect=...` which tells the verify endpoint where to redirect after login. Don't strip this!
+
+### 4. Navigate to Magic Link
+
+```bash
+~/.local/share/pi-skills/browser-tools/browser-nav.js "$MAGIC_LINK"
+```
+
+Browser will redirect back to the original page (e.g., `/cli/auth`) after login completes.
+
+## Troubleshooting
+
+### No magic link in logs
+
+- Check `make dev-tail` manually
+- Ensure ADMIN_EMAIL in .env matches what the form expects
+
+### Magic link truncated / redirect lost
+
+The log output wraps long URLs across lines. Use `tr -d '\n'` to join lines before grepping. Make sure the regex captures the `&redirect=` param.
+
+### Login redirects to wrong page
+
+Check that the magic link includes the `&redirect=` parameter. If missing, the original page didn't pass the redirect correctly.

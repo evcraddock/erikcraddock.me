@@ -22,6 +22,13 @@
       "when": 1769668666936,
       "tag": "0002_solid_midnight",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "6",
+      "when": 1769725002112,
+      "tag": "0003_burly_the_hand",
+      "breakpoints": true
     }
   ]
 }
