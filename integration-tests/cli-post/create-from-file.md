@@ -54,7 +54,19 @@ bun run src/index.ts post show file-created-post
 
 **Expected:** Shows title "File Created Post", tags "Test, File Based", and content starting with "# Hello from File".
 
-## Verify in Browser
+## Publish and Verify on Home Page
+
+```bash
+bun run src/index.ts post publish file-created-post
+
+~/.local/share/pi-skills/browser-tools/browser-nav.js http://localhost:5000
+sleep 1
+~/.local/share/pi-skills/browser-tools/browser-screenshot.js
+```
+
+**Expected:** Home page shows "File Created Post" with excerpt.
+
+## Verify Post Page
 
 ```bash
 ~/.local/share/pi-skills/browser-tools/browser-nav.js http://localhost:5000/posts/file-created-post
@@ -62,7 +74,11 @@ sleep 1
 ~/.local/share/pi-skills/browser-tools/browser-screenshot.js
 ```
 
-**Expected:** Post page shows "Draft" (not published yet).
+**Expected:**
+
+- Title: "File Created Post"
+- Tags: "Test", "File Based"
+- Content: Rendered markdown with heading, code, and bullet list
 
 ## Pull Back and Verify Roundtrip
 
