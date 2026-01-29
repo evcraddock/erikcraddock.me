@@ -43,3 +43,13 @@ export interface Post {
   updated_at: string;
   tags: string[];
 }
+
+export interface Media {
+  id: number;
+  filename: string;
+  mime_type: string;
+  s3_key: string;
+  alt_text: string | null;
+  created_at: string;
+  url: string;
+}

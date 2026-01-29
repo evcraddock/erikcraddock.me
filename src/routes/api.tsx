@@ -13,7 +13,7 @@ import {
   PostType,
   PostStatus,
 } from "@/services/posts";
-import { createMedia, deleteMedia, isAllowedMimeType } from "@/services/media";
+import { createMedia, deleteMedia, getMedia, isAllowedMimeType } from "@/services/media";
 import { listSources, getSource, createSource } from "@/services/sources";
 import { federatePost } from "@/federation/publish";
 
@@ -537,6 +537,25 @@ api.post(
     }
   }
 );
+
+/**
+ * GET /api/media/:id - Get media record by ID
+ */
+api.get("/media/:id", async (c) => {
+  const id = parseInt(c.req.param("id"), 10);
+
+  if (isNaN(id)) {
+    return c.json({ error: "Invalid media ID" }, 400);
+  }
+
+  const record = getMedia(id);
+
+  if (!record) {
+    return c.json({ error: "Media not found" }, 404);
+  }
+
+  return c.json({ data: record });
+});
 
 /**
  * DELETE /api/media/:id - Delete media file

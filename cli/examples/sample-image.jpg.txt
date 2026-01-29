@@ -1,0 +1,5 @@
+This is a placeholder. To test image uploads:
+
+1. Replace this file with an actual image named "sample-image.jpg"
+2. Or copy any .jpg file to this location:
+   cp /path/to/any/image.jpg cli/examples/sample-image.jpg

@@ -1,8 +1,13 @@
+import * as fs from "fs";
+import * as path from "path";
 import type { GlobalOptions } from "../../types";
 import { ApiClient } from "../../lib/api";
 import { loadConfig } from "../../lib/config";
+import { parseMarkdown } from "../../lib/markdown";
+import { detectImages, processImages, rewriteContent } from "../../lib/images";
 
 interface CreateOptions {
+  file?: string;
   title?: string;
   slug?: string;
   content?: string;
@@ -21,6 +26,10 @@ function parseCreateArgs(args: string[]): { options: CreateOptions; help: boolea
 
     if (arg === "--help" || arg === "-h") {
       help = true;
+    } else if (arg === "--file" && args[i + 1]) {
+      options.file = args[++i];
+    } else if (arg.startsWith("--file=")) {
+      options.file = arg.split("=").slice(1).join("=");
     } else if (arg === "--title" && args[i + 1]) {
       options.title = args[++i];
     } else if (arg.startsWith("--title=")) {
@@ -62,21 +71,30 @@ function showCreateHelp(): void {
   console.log(`ec post create - Create a new post
 
 Usage: ec post create [options]
+       ec post create --file <path>
 
 Options:
+  --file <path>       Create from markdown file with frontmatter
   --title <title>     Post title (required for articles)
   --slug <slug>       URL slug (required, lowercase letters, numbers, hyphens)
-  --content <text>    Post content in markdown (required)
+  --content <text>    Post content in markdown (required unless --file)
   --excerpt <text>    Short excerpt/summary
   --tags <tags>       Comma-separated list of tags
   --type <type>       Post type: article, link, note (default: article)
   --json              Output as JSON
   --help, -h          Show this help message
 
+File-based creation:
+  When using --file, frontmatter fields (title, slug, tags, excerpt, type, banner)
+  are extracted from the markdown file. Command-line options override frontmatter.
+
+  Local images (./path.jpg) are uploaded automatically.
+  Image IDs (image:42) are resolved to URLs.
+
 Examples:
-  ec post create --title "My Post" --slug my-post --content "# Hello\\n\\nWorld"
-  ec post create --title "Tech Post" --slug tech-post --content "Content" --tags tech,rust
-  ec post create --type note --slug quick-note --content "A quick thought"
+  ec post create --title "My Post" --slug my-post --content "# Hello"
+  ec post create --file draft.md
+  ec post create --file draft.md --tags extra,tags
 `);
 }
 
@@ -86,31 +104,6 @@ export async function create(args: string[], globalOptions: GlobalOptions): Prom
   if (help) {
     showCreateHelp();
     return;
-  }
-
-  // Validate required fields
-  if (!options.slug) {
-    console.error("❌ Missing required option: --slug");
-    console.error("Run 'ec post create --help' for usage.");
-    process.exit(1);
-  }
-
-  if (!options.content) {
-    console.error("❌ Missing required option: --content");
-    console.error("Run 'ec post create --help' for usage.");
-    process.exit(1);
-  }
-
-  const type = options.type || "article";
-
-  if (!["article", "link", "note"].includes(type)) {
-    console.error("❌ Invalid type. Must be: article, link, or note");
-    process.exit(1);
-  }
-
-  if (type === "article" && !options.title) {
-    console.error("❌ Articles require a title. Use --title option.");
-    process.exit(1);
   }
 
   const config = await loadConfig();
@@ -123,13 +116,108 @@ export async function create(args: string[], globalOptions: GlobalOptions): Prom
   }
 
   const client = new ApiClient(apiUrl, apiKey);
+
+  // Determine values from file or options
+  let title = options.title;
+  let slug = options.slug;
+  let content = options.content;
+  let excerpt = options.excerpt;
+  let tags = options.tags;
+  let type = options.type;
+  let banner: string | undefined;
+
+  if (options.file) {
+    // File-based creation
+    const filePath = path.resolve(options.file);
+
+    if (!fs.existsSync(filePath)) {
+      console.error(`❌ File not found: ${options.file}`);
+      process.exit(1);
+    }
+
+    const fileContent = fs.readFileSync(filePath, "utf-8");
+    const basePath = path.dirname(filePath);
+    const { frontmatter, content: bodyContent } = parseMarkdown(fileContent);
+
+    // Use frontmatter values, allow CLI overrides
+    title = options.title ?? frontmatter.title;
+    slug = options.slug ?? frontmatter.slug;
+    excerpt = options.excerpt ?? frontmatter.excerpt;
+    type = options.type ?? frontmatter.type;
+    banner = frontmatter.banner;
+
+    // Merge tags: CLI tags override, or use frontmatter
+    tags = options.tags ?? frontmatter.tags;
+
+    // Process images
+    const imageRefs = detectImages(banner, bodyContent, basePath);
+    const localImages = imageRefs.filter((r) => r.type === "local" || r.type === "id");
+
+    if (localImages.length > 0) {
+      if (!slug) {
+        console.error("❌ Slug is required before uploading images.");
+        console.error("   Add 'slug:' to frontmatter or use --slug option.");
+        process.exit(1);
+      }
+
+      console.log(`📤 Processing ${localImages.length} image(s)...`);
+
+      try {
+        const urlMap = await processImages(imageRefs, slug, client);
+
+        // Rewrite content
+        content = rewriteContent(bodyContent, urlMap);
+
+        // Rewrite banner if it was a local/ID reference
+        if (banner && urlMap.has(banner)) {
+          banner = urlMap.get(banner);
+        }
+      } catch (error) {
+        console.error(`❌ Image processing failed: ${error}`);
+        process.exit(1);
+      }
+    } else {
+      content = bodyContent;
+    }
+  }
+
+  // Validate required fields
+  if (!slug) {
+    console.error("❌ Missing required option: --slug");
+    console.error("   Or add 'slug:' to frontmatter when using --file");
+    process.exit(1);
+  }
+
+  if (!content) {
+    console.error("❌ Missing required option: --content");
+    console.error("   Or provide content in markdown file when using --file");
+    process.exit(1);
+  }
+
+  const postType = type || "article";
+
+  if (!["article", "link", "note"].includes(postType)) {
+    console.error("❌ Invalid type. Must be: article, link, or note");
+    process.exit(1);
+  }
+
+  if (postType === "article" && !title) {
+    console.error("❌ Articles require a title.");
+    console.error("   Use --title option or add 'title:' to frontmatter.");
+    process.exit(1);
+  }
+
+  // Add banner to content if present (as HTML comment for now, or could be stored differently)
+  // For now, we'll just include it in the API call if the API supports it
+  // TODO: Handle banner field when API supports it
+
   const result = await client.createPost({
-    type,
-    slug: options.slug,
-    title: options.title,
-    content: options.content,
-    excerpt: options.excerpt,
-    tags: options.tags,
+    type: postType,
+    slug,
+    title,
+    content,
+    excerpt,
+    tags,
   });
 
   if (result.error) {
@@ -148,6 +236,9 @@ export async function create(args: string[], globalOptions: GlobalOptions): Prom
     console.log(`   Status: draft`);
     if (post.tags.length > 0) {
       console.log(`   Tags: ${post.tags.join(", ")}`);
+    }
+    if (options.file) {
+      console.log(`   Source: ${options.file}`);
     }
   }
 }
