@@ -26,8 +26,10 @@ api.use("*", requireApiKey);
 api.get("/ping", (c) => {
   const auth = c.get("apiAuth");
   return c.json({
-    status: "ok",
-    authenticated: auth.email,
+    data: {
+      status: "ok",
+      authenticated: auth.email,
+    },
   });
 });
 
