@@ -1,13 +1,11 @@
-import { describe, it, expect, beforeAll, afterAll, vi } from "vitest";
-import { drizzle } from "drizzle-orm/better-sqlite3";
-import Database from "better-sqlite3";
-import * as schema from "../../db/schema";
+import { describe, it, expect, beforeAll, vi } from "vitest";
+import { createTestDb } from "../../db/test-utils";
+import { posts, tags, postTags, sources, media } from "../../db/schema";
+import type { drizzle } from "drizzle-orm/better-sqlite3";
+import type * as schema from "../../db/schema";
 
-// Create test database before mocking
 let testDb: ReturnType<typeof drizzle<typeof schema>>;
-let testSqlite: InstanceType<typeof Database>;
 
-// Mock the db module to use our test database
 vi.mock("../../db", async () => {
   const schema = await import("../../db/schema");
   return {
@@ -17,94 +15,99 @@ vi.mock("../../db", async () => {
 });
 
 beforeAll(async () => {
-  // Create in-memory database for tests
-  testSqlite = new Database(":memory:");
+  testDb = createTestDb();
 
-  // Create tables
-  testSqlite.exec(`
-    CREATE TABLE media (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      filename TEXT NOT NULL,
-      mime_type TEXT NOT NULL,
-      s3_key TEXT NOT NULL UNIQUE,
-      alt_text TEXT,
-      created_at INTEGER NOT NULL
-    );
+  const now = new Date();
 
-    CREATE TABLE posts (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      type TEXT NOT NULL,
-      title TEXT,
-      content TEXT NOT NULL,
-      excerpt TEXT,
-      url TEXT,
-      source_id INTEGER,
-      banner_image_id INTEGER REFERENCES media(id) ON DELETE SET NULL,
-      published_at INTEGER,
-      created_at INTEGER NOT NULL,
-      updated_at INTEGER NOT NULL
-    );
+  testDb
+    .insert(posts)
+    .values([
+      {
+        id: 1,
+        slug: "test-post",
+        type: "article",
+        title: "Test Post",
+        content: "This is test content with **markdown**.",
+        published_at: now,
+        created_at: now,
+        updated_at: now,
+      },
+      {
+        id: 2,
+        slug: "draft-post",
+        type: "article",
+        title: "Draft Post",
+        content: "This is a draft.",
+        created_at: now,
+        updated_at: now,
+      },
+      {
+        id: 3,
+        slug: "another-post",
+        type: "article",
+        title: "Another Post",
+        content: "Another post content.",
+        published_at: now,
+        created_at: now,
+        updated_at: now,
+      },
+      {
+        id: 4,
+        slug: "short-note",
+        type: "note",
+        title: null,
+        content: "Short note content 🚀",
+        published_at: now,
+        created_at: now,
+        updated_at: now,
+      },
+      {
+        id: 5,
+        slug: "long-note",
+        type: "note",
+        title: null,
+        content: "x".repeat(300),
+        published_at: now,
+        created_at: now,
+        updated_at: now,
+      },
+    ])
+    .run();
 
-    CREATE TABLE tags (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      name TEXT NOT NULL UNIQUE,
-      slug TEXT NOT NULL UNIQUE
-    );
+  testDb
+    .insert(tags)
+    .values([
+      { id: 1, name: "Testing", slug: "testing" },
+      { id: 2, name: "TypeScript", slug: "typescript" },
+      { id: 3, name: "Empty Tag", slug: "empty-tag" },
+    ])
+    .run();
 
-    CREATE TABLE post_tags (
-      post_id INTEGER NOT NULL,
-      tag_id INTEGER NOT NULL,
-      PRIMARY KEY (post_id, tag_id)
-    );
+  testDb
+    .insert(postTags)
+    .values([
+      { post_id: 1, tag_id: 1 },
+      { post_id: 1, tag_id: 2 },
+      { post_id: 2, tag_id: 1 },
+      { post_id: 3, tag_id: 2 },
+    ])
+    .run();
 
-    CREATE TABLE sources (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      name TEXT NOT NULL,
-      url TEXT NOT NULL,
-      feed_url TEXT
-    );
-  `);
-
-  testDb = drizzle(testSqlite, { schema });
-
-  // Insert test data
-  const now = Date.now();
-  testSqlite.exec(`
-    INSERT INTO posts (id, type, title, content, published_at, created_at, updated_at)
-    VALUES (1, 'article', 'Test Post', 'This is test content with **markdown**.', ${now}, ${now}, ${now});
-
-    INSERT INTO posts (id, type, title, content, created_at, updated_at)
-    VALUES (2, 'article', 'Draft Post', 'This is a draft.', ${now}, ${now});
-
-    INSERT INTO posts (id, type, title, content, published_at, created_at, updated_at)
-    VALUES (3, 'article', 'Another Post', 'Another post content.', ${now}, ${now}, ${now});
-
-    INSERT INTO posts (id, type, title, content, published_at, created_at, updated_at)
-    VALUES (4, 'note', NULL, 'Short note content 🚀', ${now}, ${now}, ${now});
-
-    INSERT INTO posts (id, type, title, content, published_at, created_at, updated_at)
-    VALUES (5, 'note', NULL, '${"x".repeat(300)}', ${now}, ${now}, ${now});
-
-    INSERT INTO tags (id, name, slug) VALUES (1, 'Testing', 'testing');
-    INSERT INTO tags (id, name, slug) VALUES (2, 'TypeScript', 'typescript');
-    INSERT INTO tags (id, name, slug) VALUES (3, 'Empty Tag', 'empty-tag');
-
-    INSERT INTO post_tags (post_id, tag_id) VALUES (1, 1);
-    INSERT INTO post_tags (post_id, tag_id) VALUES (1, 2);
-    INSERT INTO post_tags (post_id, tag_id) VALUES (2, 1);
-    INSERT INTO post_tags (post_id, tag_id) VALUES (3, 2);
-
-    INSERT INTO sources (id, name, url, feed_url) VALUES (1, 'Test Blog', 'https://example.com', 'https://example.com/feed.xml');
-    INSERT INTO sources (id, name, url, feed_url) VALUES (2, 'Another Site', 'https://another.example.com', NULL);
-  `);
-});
-
-afterAll(() => {
-  testSqlite.close();
+  testDb
+    .insert(sources)
+    .values([
+      {
+        id: 1,
+        name: "Test Blog",
+        url: "https://example.com",
+        feed_url: "https://example.com/feed.xml",
+      },
+      { id: 2, name: "Another Site", url: "https://another.example.com", feed_url: null },
+    ])
+    .run();
 });
 
 describe("pages routes", () => {
-  // Import after mock is set up - use dynamic import
   let createPagesRoutes: typeof import("../pages").createPagesRoutes;
 
   beforeAll(async () => {
@@ -112,7 +115,6 @@ describe("pages routes", () => {
     createPagesRoutes = module.createPagesRoutes;
   });
 
-  // Cast through unknown to satisfy TypeScript - the drizzle APIs are compatible at runtime
   const getApp = () =>
     createPagesRoutes(testDb as unknown as Parameters<typeof createPagesRoutes>[0]);
 
@@ -245,7 +247,6 @@ describe("pages routes", () => {
       const res = await app.request("/posts/1");
       const html = await res.text();
 
-      // Markdown **bold** should render as <strong>
       expect(html).toContain("<strong>markdown</strong>");
     });
 
@@ -310,22 +311,42 @@ describe("pages routes", () => {
     });
 
     it("displays banner image when set", async () => {
-      // Add media record
-      testSqlite.exec(
-        "INSERT INTO media (filename, mime_type, s3_key, created_at) VALUES ('page-banner.jpg', 'image/jpeg', 'page-banner.jpg', 1000)"
-      );
-      const mediaRow = testSqlite
-        .prepare("SELECT id FROM media WHERE s3_key = 'page-banner.jpg'")
-        .get() as { id: number };
+      testDb
+        .insert(media)
+        .values({
+          filename: "page-banner.jpg",
+          mime_type: "image/jpeg",
+          s3_key: "page-banner.jpg",
+          created_at: new Date(),
+        })
+        .run();
 
-      // Add post with banner
-      const now = Date.now();
-      testSqlite.exec(
-        `INSERT INTO posts (type, title, content, banner_image_id, published_at, created_at, updated_at) VALUES ('article', 'Banner Post', 'Content here', ${mediaRow.id}, ${now}, ${now}, ${now})`
-      );
-      const postRow = testSqlite
-        .prepare("SELECT id FROM posts WHERE title = 'Banner Post'")
-        .get() as { id: number };
+      const mediaRow = testDb
+        .select()
+        .from(media)
+        .all()
+        .find((m) => m.s3_key === "page-banner.jpg")!;
+
+      const now = new Date();
+      testDb
+        .insert(posts)
+        .values({
+          slug: "banner-post",
+          type: "article",
+          title: "Banner Post",
+          content: "Content here",
+          banner_image_id: mediaRow.id,
+          published_at: now,
+          created_at: now,
+          updated_at: now,
+        })
+        .run();
+
+      const postRow = testDb
+        .select()
+        .from(posts)
+        .all()
+        .find((p) => p.slug === "banner-post")!;
 
       const app = getApp();
       const res = await app.request(`/posts/${postRow.id}`);
@@ -338,22 +359,42 @@ describe("pages routes", () => {
     });
 
     it("includes og:image meta tag when banner is set", async () => {
-      // Add media record
-      testSqlite.exec(
-        "INSERT INTO media (filename, mime_type, s3_key, created_at) VALUES ('og-banner.jpg', 'image/jpeg', 'og-banner.jpg', 1000)"
-      );
-      const mediaRow = testSqlite
-        .prepare("SELECT id FROM media WHERE s3_key = 'og-banner.jpg'")
-        .get() as { id: number };
+      testDb
+        .insert(media)
+        .values({
+          filename: "og-banner.jpg",
+          mime_type: "image/jpeg",
+          s3_key: "og-banner.jpg",
+          created_at: new Date(),
+        })
+        .run();
 
-      // Add post with banner
-      const now = Date.now();
-      testSqlite.exec(
-        `INSERT INTO posts (type, title, content, banner_image_id, published_at, created_at, updated_at) VALUES ('article', 'OG Banner Post', 'Content here', ${mediaRow.id}, ${now}, ${now}, ${now})`
-      );
-      const postRow = testSqlite
-        .prepare("SELECT id FROM posts WHERE title = 'OG Banner Post'")
-        .get() as { id: number };
+      const mediaRow = testDb
+        .select()
+        .from(media)
+        .all()
+        .find((m) => m.s3_key === "og-banner.jpg")!;
+
+      const now = new Date();
+      testDb
+        .insert(posts)
+        .values({
+          slug: "og-banner-post",
+          type: "article",
+          title: "OG Banner Post",
+          content: "Content here",
+          banner_image_id: mediaRow.id,
+          published_at: now,
+          created_at: now,
+          updated_at: now,
+        })
+        .run();
+
+      const postRow = testDb
+        .select()
+        .from(posts)
+        .all()
+        .find((p) => p.slug === "og-banner-post")!;
 
       const app = getApp();
       const res = await app.request(`/posts/${postRow.id}`);
@@ -367,18 +408,11 @@ describe("pages routes", () => {
 
     it("does not display banner image when not set", async () => {
       const app = getApp();
-
-      // Use existing post without banner (from test setup)
-      const postRow = testSqlite
-        .prepare("SELECT id FROM posts WHERE title = 'Test Post'")
-        .get() as { id: number };
-
-      const res = await app.request(`/posts/${postRow.id}`);
+      const res = await app.request("/posts/1");
 
       expect(res.status).toBe(200);
 
       const html = await res.text();
-      // Should not have a banner image element before the title
       expect(html).not.toContain('class="w-full h-64 object-cover');
     });
   });
@@ -391,7 +425,6 @@ describe("pages routes", () => {
       expect(res.status).toBe(200);
 
       const html = await res.text();
-      // Quotes are HTML-escaped as &quot;
       expect(html).toContain("Posts tagged");
       expect(html).toContain("Testing");
     });
@@ -401,9 +434,7 @@ describe("pages routes", () => {
       const res = await app.request("/tags/testing");
       const html = await res.text();
 
-      // Post 1 is published and has "testing" tag
       expect(html).toContain("Test Post");
-      // Post 2 is a draft with "testing" tag - should NOT appear
       expect(html).not.toContain("Draft Post");
     });
 
@@ -412,7 +443,6 @@ describe("pages routes", () => {
       const res = await app.request("/tags/typescript");
       const html = await res.text();
 
-      // Posts 1 and 3 have "typescript" tag
       expect(html).toContain("Test Post");
       expect(html).toContain("Another Post");
     });
@@ -443,7 +473,6 @@ describe("pages routes", () => {
       expect(res.status).toBe(200);
 
       const html = await res.text();
-      // Quotes are HTML-escaped as &quot;
       expect(html).toContain("No posts tagged");
       expect(html).toContain("Empty Tag");
       expect(html).toContain("yet.");
@@ -467,7 +496,6 @@ describe("pages routes", () => {
         const res = await app.request("/");
         const html = await res.text();
 
-        // Short note should show full content
         expect(html).toContain("Short note content 🚀");
       });
 
@@ -476,7 +504,6 @@ describe("pages routes", () => {
         const res = await app.request("/");
         const html = await res.text();
 
-        // Notes should have left border class
         expect(html).toContain("border-l-2");
         expect(html).toContain("border-l-gray-300");
       });
@@ -486,10 +513,8 @@ describe("pages routes", () => {
         const res = await app.request("/");
         const html = await res.text();
 
-        // Long note (300 chars of 'x') should be truncated
-        // Should not contain all 300 x's, but should have truncated version
         expect(html).not.toContain("x".repeat(300));
-        expect(html).toContain("…"); // Ellipsis for truncated content
+        expect(html).toContain("…");
       });
     });
 
@@ -517,7 +542,6 @@ describe("pages routes", () => {
         const res = await app.request("/posts/4");
         const html = await res.text();
 
-        // The <title> should contain "Note" since notes don't have titles
         expect(html).toContain("<title>Note | erikcraddock.me</title>");
       });
 
@@ -526,8 +550,6 @@ describe("pages routes", () => {
         const res = await app.request("/posts/4");
         const html = await res.text();
 
-        // Should not have an h1 with "Short note content" (that's content, not title)
-        // Notes have no title, so there shouldn't be a title heading
         expect(html).not.toContain("<h1");
       });
     });

@@ -3,6 +3,7 @@ import { sqliteTable, text, integer, primaryKey } from "drizzle-orm/sqlite-core"
 // Posts - articles, links, and notes
 export const posts = sqliteTable("posts", {
   id: integer("id").primaryKey({ autoIncrement: true }),
+  slug: text("slug").notNull().unique(),
   type: text("type").notNull(), // 'article' | 'link' | 'note'
   title: text("title"),
   content: text("content").notNull(),

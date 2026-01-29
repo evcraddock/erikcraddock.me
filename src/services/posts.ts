@@ -103,6 +103,7 @@ export function listPosts(options: ListPostsOptions = {}): PostListItem[] {
 
 export interface CreatePostInput {
   type: PostType;
+  slug: string;
   title?: string | null;
   content: string;
   excerpt?: string | null;
@@ -149,7 +150,17 @@ function getOrCreateTag(slug: string): number {
  * Create a new post
  */
 export function createPost(input: CreatePostInput) {
-  const { type, title, content, excerpt, url, source_id, tags: tagSlugs, banner_image_id } = input;
+  const {
+    type,
+    slug,
+    title,
+    content,
+    excerpt,
+    url,
+    source_id,
+    tags: tagSlugs,
+    banner_image_id,
+  } = input;
 
   // Validate banner_image_id if provided
   if (banner_image_id !== undefined && banner_image_id !== null) {
@@ -177,6 +188,7 @@ export function createPost(input: CreatePostInput) {
     .insert(posts)
     .values({
       type,
+      slug,
       title: title ?? null,
       content,
       excerpt: finalExcerpt,
@@ -377,6 +389,52 @@ export function deletePost(id: number): boolean {
  */
 export function getPost(id: number) {
   const post = db.select().from(posts).where(eq(posts.id, id)).get();
+
+  if (!post) {
+    return null;
+  }
+
+  const postTagRecords = db
+    .select({ name: tags.name })
+    .from(postTags)
+    .innerJoin(tags, eq(postTags.tag_id, tags.id))
+    .where(eq(postTags.post_id, post.id))
+    .all();
+
+  // Get banner URL if banner_image_id is set
+  let banner_url: string | null = null;
+  if (post.banner_image_id) {
+    const bannerMedia = db.select().from(media).where(eq(media.id, post.banner_image_id)).get();
+    if (bannerMedia) {
+      banner_url = mediaUrl(bannerMedia.s3_key);
+    }
+  }
+
+  // Get source info if source_id is set
+  let source: { id: number; name: string; url: string } | null = null;
+  if (post.source_id) {
+    const sourceRecord = db.select().from(sources).where(eq(sources.id, post.source_id)).get();
+    if (sourceRecord) {
+      source = { id: sourceRecord.id, name: sourceRecord.name, url: sourceRecord.url };
+    }
+  }
+
+  return {
+    ...post,
+    banner_url,
+    source,
+    published_at: post.published_at?.toISOString() ?? null,
+    created_at: post.created_at.toISOString(),
+    updated_at: post.updated_at.toISOString(),
+    tags: postTagRecords.map((t) => t.name),
+  };
+}
+
+/**
+ * Get a single post by slug
+ */
+export function getPostBySlug(slug: string) {
+  const post = db.select().from(posts).where(eq(posts.slug, slug)).get();
 
   if (!post) {
     return null;
