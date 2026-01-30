@@ -14,6 +14,46 @@ Personal website and blog that can be followed from Mastodon via ActivityPub.
 - **Garage** - S3-compatible object storage (dev)
 - **Mailpit** - Dev mail server
 
+## CLI
+
+The `ec` CLI provides content management from the command line.
+
+### Install
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/evcraddock/erikcraddock.me/main/install.sh | bash
+```
+
+Or download binaries directly from [Releases](https://github.com/evcraddock/erikcraddock.me/releases).
+
+### Setup
+
+```bash
+ec login  # Opens browser to authenticate and stores API key
+```
+
+### Commands
+
+```bash
+ec post list                    # List posts
+ec post create --file draft.md  # Create from markdown file
+ec post edit my-post            # Edit a post
+ec post publish my-post         # Publish a post
+
+ec link create --url "..." --slug my-link --content "Commentary"
+ec note create --slug thought --content "A quick note"
+
+ec source list                  # List sources (blogroll)
+ec source create --name "HN" --url "https://news.ycombinator.com"
+
+ec tag list                     # List tags with counts
+
+ec image upload ./photo.jpg --post my-post  # Upload image
+ec image delete 42              # Delete image
+```
+
+Run `ec --help` or `ec <command> --help` for full usage.
+
 ## Getting Started
 
 ### Prerequisites
