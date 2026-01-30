@@ -3,11 +3,11 @@ import type { GlobalOptions } from "../../types";
 import { ApiClient } from "../../lib/api";
 import { loadConfig } from "../../lib/config";
 
-interface DeleteOptions {
+export interface DeleteOptions {
   yes?: boolean;
 }
 
-function parseDeleteArgs(args: string[]): {
+export function parseDeleteArgs(args: string[]): {
   id: number | null;
   options: DeleteOptions;
   help: boolean;
@@ -32,7 +32,7 @@ function parseDeleteArgs(args: string[]): {
   return { id, options, help };
 }
 
-function showDeleteHelp(): void {
+export function showDeleteHelp(): void {
   console.log(`ec image delete - Delete an image
 
 Usage: ec image delete <id> [options]

@@ -4,15 +4,15 @@ import type { GlobalOptions } from "../../types";
 import { ApiClient } from "../../lib/api";
 import { loadConfig } from "../../lib/config";
 
-interface UploadOptions {
+export interface UploadOptions {
   alt?: string;
   key?: string;
   post?: string;
 }
 
-const ALLOWED_EXTENSIONS = [".jpg", ".jpeg", ".png", ".gif", ".webp"];
+export const ALLOWED_EXTENSIONS = [".jpg", ".jpeg", ".png", ".gif", ".webp"];
 
-function parseUploadArgs(args: string[]): {
+export function parseUploadArgs(args: string[]): {
   file: string | null;
   options: UploadOptions;
   help: boolean;
@@ -49,7 +49,7 @@ function parseUploadArgs(args: string[]): {
   return { file, options, help };
 }
 
-function showUploadHelp(): void {
+export function showUploadHelp(): void {
   console.log(`ec image upload - Upload an image
 
 Usage: ec image upload <file> [options]
@@ -77,7 +77,7 @@ Examples:
 `);
 }
 
-function resolveKey(
+export function resolveKey(
   filePath: string,
   options: { key?: string; post?: string }
 ): string | undefined {
@@ -102,7 +102,7 @@ function resolveKey(
   return undefined;
 }
 
-function validateFile(filePath: string): string | null {
+export function validateFile(filePath: string): string | null {
   if (!fs.existsSync(filePath)) {
     return `File not found: ${filePath}`;
   }
