@@ -12,7 +12,6 @@ Personal website and blog that can be followed from Mastodon via ActivityPub.
 - **Hono JSX** - Templates
 - **Tailwind** - Styles
 - **Garage** - S3-compatible object storage (dev)
-- **Mailpit** - Dev mail server
 
 ## CLI
 
@@ -74,7 +73,7 @@ cp .env.example .env
 
 ### Development Setup
 
-The dev environment uses Docker for Garage (S3) and Mailpit (email).
+The dev environment uses Docker for Garage (S3-compatible storage).
 
 ```bash
 # Start everything (app, CSS watcher, Docker services)
@@ -88,13 +87,13 @@ make dev
 
 #### Dev Services
 
-| Service      | Port | Description                               |
-| ------------ | ---- | ----------------------------------------- |
-| App          | 3000 | Main application                          |
-| Mailpit UI   | 8025 | View sent emails at http://localhost:8025 |
-| Mailpit SMTP | 1025 | SMTP server for dev                       |
-| Garage S3    | 3900 | S3-compatible storage                     |
-| Garage Admin | 3903 | Garage admin API                          |
+| Service      | Port | Description           |
+| ------------ | ---- | --------------------- |
+| App          | 5000 | Main application      |
+| Garage S3    | 3900 | S3-compatible storage |
+| Garage Admin | 3903 | Garage admin API      |
+
+> **Note:** In dev mode, magic links are logged to the console instead of sent via email (`SMTP_DEV_MODE=true`).
 
 ### Running
 
@@ -115,11 +114,14 @@ make dev-status
 ### Database
 
 ```bash
-# Push schema changes to database
-make db-push
+# Generate migrations from schema changes
+make db-generate
 
-# Seed database with sample data
-make db-seed
+# Run pending migrations (runs automatically on app start)
+make db-migrate
+
+# Browse database with Drizzle Studio
+make db-studio
 ```
 
 ## Testing
