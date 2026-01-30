@@ -1,35 +1,102 @@
-import { describe, it, expect, beforeAll, beforeEach, vi } from "vitest";
+/* eslint-disable @typescript-eslint/no-require-imports */
+import { describe, it, expect, beforeEach } from "bun:test";
+import { mock } from "bun:test";
 import { createTestDb } from "../../db/test-utils";
 import { authors, sessions, apiKeys, magicLinks } from "../../db/schema";
 import { eq, ne } from "drizzle-orm";
-import type { drizzle } from "drizzle-orm/better-sqlite3";
-import type * as schema from "../../db/schema";
 
-let testDb: ReturnType<typeof drizzle<typeof schema>>;
+// Create test db immediately
+const testDb = createTestDb();
 
-vi.mock("../../db", async () => {
-  const schema = await import("../../db/schema");
+// Mock modules - db first since other modules depend on it
+mock.module("@/db", () => ({
+  db: testDb,
+  ...require("../../db/schema"),
+}));
+
+mock.module("../../db", () => ({
+  db: testDb,
+  ...require("../../db/schema"),
+}));
+
+mock.module("../../services/email", () => ({
+  sendEmail: mock(() => Promise.resolve(true)),
+}));
+
+// Mock api-key with real implementations that use our testDb
+// This ensures we get the real behavior, not a mock from another test
+mock.module("@/auth/api-key", () => {
+  const crypto = require("../../auth/crypto");
+  const apiKeyUtils = require("../../auth/api-key-utils");
+  const schema = require("../../db/schema");
+  const { eq } = require("drizzle-orm");
+
   return {
-    db: testDb,
-    ...schema,
+    generateApiKey: apiKeyUtils.generateApiKey,
+    API_KEY_PREFIX: apiKeyUtils.API_KEY_PREFIX,
+    isValidApiKeyFormat: apiKeyUtils.isValidApiKeyFormat,
+    getAuthorByEmail: (email: string) => {
+      return testDb.select().from(schema.authors).where(eq(schema.authors.email, email)).get();
+    },
+    createApiKey: async (authorId: number | null, name: string) => {
+      const { key, keyHash } = await apiKeyUtils.generateApiKey();
+      const result = testDb
+        .insert(schema.apiKeys)
+        .values({
+          author_id: authorId,
+          key_hash: keyHash,
+          name,
+          created_at: new Date(),
+        })
+        .returning()
+        .get();
+      return { id: result.id, key };
+    },
+    listApiKeys: (authorId: number | null) => {
+      if (authorId === null) {
+        return testDb.select().from(schema.apiKeys).where(eq(schema.apiKeys.author_id, null)).all();
+      }
+      return testDb
+        .select()
+        .from(schema.apiKeys)
+        .where(eq(schema.apiKeys.author_id, authorId))
+        .all();
+    },
+    revokeApiKey: () => true,
+    validateApiKey: async (apiKey: string) => {
+      if (!apiKeyUtils.isValidApiKeyFormat(apiKey)) return null;
+      const rawKey = apiKey.slice(apiKeyUtils.API_KEY_PREFIX.length);
+      const keyHash = await crypto.hashToken(rawKey);
+      const record = testDb
+        .select()
+        .from(schema.apiKeys)
+        .where(eq(schema.apiKeys.key_hash, keyHash))
+        .get();
+      if (!record) return null;
+      if (record.author_id === null) {
+        return { email: process.env.ADMIN_EMAIL || "" };
+      }
+      const author = testDb
+        .select()
+        .from(schema.authors)
+        .where(eq(schema.authors.id, record.author_id))
+        .get();
+      return author ? { email: author.email } : null;
+    },
+    requireApiKey: async (_c: unknown, next: () => Promise<void>) => {
+      await next();
+    },
   };
 });
 
-vi.mock("../../services/email", () => ({
-  sendEmail: vi.fn().mockResolvedValue(true),
-}));
-
-beforeAll(async () => {
-  testDb = createTestDb();
-
-  testDb
-    .insert(authors)
-    .values({
-      email: "cli-test@example.com",
-      created_at: new Date(),
-    })
-    .run();
-});
+// Set up initial data
+testDb
+  .insert(authors)
+  .values({
+    email: "cli-test@example.com",
+    created_at: new Date(),
+  })
+  .run();
 
 beforeEach(() => {
   testDb.delete(magicLinks).run();

@@ -1,36 +1,42 @@
-import { describe, it, expect, beforeAll, beforeEach, vi } from "vitest";
+/* eslint-disable @typescript-eslint/no-require-imports */
+import { describe, it, expect, beforeAll, beforeEach } from "bun:test";
+import { mock } from "bun:test";
 import { createTestDb } from "../../db/test-utils";
 import { posts, sources, tags, postTags } from "../../db/schema";
 import { eq } from "drizzle-orm";
-import type { drizzle } from "drizzle-orm/better-sqlite3";
-import type * as schema from "../../db/schema";
 
-let testDb: ReturnType<typeof drizzle<typeof schema>>;
+// Create test db immediately
+const testDb = createTestDb();
 
-vi.mock("@/db", async () => {
-  const schema = await import("../../db/schema");
-  return {
-    get db() {
-      return testDb;
-    },
-    ...schema,
-  };
-});
-
-// Mock federation setup to avoid bun:sqlite import in tests
-vi.mock("@/federation/setup", () => ({
-  federation: {
-    createContext: vi.fn(),
-    sendActivity: vi.fn(),
-  },
-  createFedifyFederation: vi.fn(),
+// Mock modules
+mock.module("@/db", () => ({
+  db: testDb,
+  ...require("../../db/schema"),
 }));
 
-// Mock API key middleware to bypass auth in tests
-vi.mock("@/auth/api-key", async () => {
-  const actual = await vi.importActual("@/auth/api-key");
+mock.module("@/federation/setup", () => ({
+  federation: {
+    createContext: mock(() => {}),
+    sendActivity: mock(() => {}),
+  },
+  createFedifyFederation: mock(() => {}),
+}));
+
+// Only mock the requireApiKey middleware to bypass auth in tests
+// The actual import happens at runtime, so we mock the whole module
+mock.module("@/auth/api-key", () => {
   return {
-    ...actual,
+    // Re-export utils that the module re-exports
+    generateApiKey: require("../../auth/api-key-utils").generateApiKey,
+    API_KEY_PREFIX: require("../../auth/api-key-utils").API_KEY_PREFIX,
+    isValidApiKeyFormat: require("../../auth/api-key-utils").isValidApiKeyFormat,
+    // Mock functions that use db
+    getAuthorByEmail: () => null,
+    createApiKey: async () => ({ id: 1, key: "ek_test" }),
+    listApiKeys: () => [],
+    revokeApiKey: () => true,
+    validateApiKey: async () => ({ email: "test@example.com" }),
+    // Mock middleware to bypass auth
     requireApiKey: async (
       c: { set: (key: string, value: unknown) => void },
       next: () => Promise<void>
@@ -41,15 +47,13 @@ vi.mock("@/auth/api-key", async () => {
   };
 });
 
-beforeAll(async () => {
-  testDb = createTestDb();
-});
-
 beforeEach(() => {
+  testDb.delete(postTags).run();
+  testDb.delete(tags).run();
   testDb.delete(posts).run();
+  testDb.delete(sources).run();
 });
 
-// Headers for requests (auth is mocked but included for documentation)
 const authHeader = { Authorization: "Bearer ek_test" };
 
 describe("POST /api/posts - slug validation", () => {
@@ -162,7 +166,6 @@ describe("POST /api/posts - slug validation", () => {
   });
 
   it("rejects duplicate slug", async () => {
-    // Create first post
     testDb
       .insert(posts)
       .values({
@@ -326,7 +329,6 @@ describe("DELETE /api/posts/by-slug/:slug", () => {
 
     expect(res.status).toBe(204);
 
-    // Verify deleted
     const post = testDb.select().from(posts).where(eq(posts.slug, "delete-me")).get();
     expect(post).toBeUndefined();
   });
@@ -433,7 +435,6 @@ describe("GET /api/posts - status filter", () => {
   });
 
   beforeEach(() => {
-    // Create both draft and published posts
     testDb
       .insert(posts)
       .values([
@@ -515,10 +516,6 @@ describe("PUT /api/sources/:id", () => {
   beforeAll(async () => {
     const module = await import("../api");
     api = module.api;
-  });
-
-  beforeEach(() => {
-    testDb.delete(sources).run();
   });
 
   it("updates source name", async () => {
@@ -627,10 +624,6 @@ describe("DELETE /api/sources/:id", () => {
     api = module.api;
   });
 
-  beforeEach(() => {
-    testDb.delete(sources).run();
-  });
-
   it("deletes source", async () => {
     const source = testDb
       .insert(sources)
@@ -645,7 +638,6 @@ describe("DELETE /api/sources/:id", () => {
 
     expect(res.status).toBe(204);
 
-    // Verify deleted
     const deleted = testDb.select().from(sources).where(eq(sources.id, source.id)).get();
     expect(deleted).toBeUndefined();
   });
@@ -681,12 +673,6 @@ describe("GET /api/tags", () => {
     api = module.api;
   });
 
-  beforeEach(() => {
-    testDb.delete(postTags).run();
-    testDb.delete(tags).run();
-    testDb.delete(posts).run();
-  });
-
   it("returns empty array when no tags", async () => {
     const res = await api.request("/tags", { headers: authHeader });
 
@@ -696,11 +682,9 @@ describe("GET /api/tags", () => {
   });
 
   it("returns tags with counts", async () => {
-    // Create tags
     const tag1 = testDb.insert(tags).values({ name: "Tech", slug: "tech" }).returning().get();
     const tag2 = testDb.insert(tags).values({ name: "Rust", slug: "rust" }).returning().get();
 
-    // Create posts
     const post1 = testDb
       .insert(posts)
       .values({
@@ -727,7 +711,6 @@ describe("GET /api/tags", () => {
       .returning()
       .get();
 
-    // Tag posts: tag1 has 2 posts, tag2 has 1 post
     testDb.insert(postTags).values({ post_id: post1.id, tag_id: tag1.id }).run();
     testDb.insert(postTags).values({ post_id: post2.id, tag_id: tag1.id }).run();
     testDb.insert(postTags).values({ post_id: post1.id, tag_id: tag2.id }).run();
@@ -738,7 +721,6 @@ describe("GET /api/tags", () => {
     const json = await res.json();
     expect(json.data).toHaveLength(2);
 
-    // Should be ordered by count descending
     expect(json.data[0].slug).toBe("tech");
     expect(json.data[0].count).toBe(2);
     expect(json.data[1].slug).toBe("rust");
@@ -746,7 +728,6 @@ describe("GET /api/tags", () => {
   });
 
   it("returns tags with zero count", async () => {
-    // Create a tag with no posts
     testDb.insert(tags).values({ name: "Unused", slug: "unused" }).run();
 
     const res = await api.request("/tags", { headers: authHeader });

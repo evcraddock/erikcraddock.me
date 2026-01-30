@@ -2,12 +2,10 @@
 FROM oven/bun:1-alpine AS builder
 WORKDIR /app
 
-# Install build dependencies for native modules (better-sqlite3)
-RUN apk add --no-cache python3 make g++
-
-# Install dependencies
+# Install all dependencies (including devDependencies for build tools)
+# Use --ignore-scripts to skip native module compilation (not needed for build)
 COPY package.json bun.lock* ./
-RUN bun install
+RUN bun install --ignore-scripts
 
 # Copy source and build
 COPY . .
@@ -18,11 +16,15 @@ RUN bun run build
 FROM oven/bun:1-alpine
 WORKDIR /app
 
-# Copy built assets and dependencies
+# Copy built assets and migrations
 COPY --from=builder /app/dist ./dist
 COPY --from=builder /app/public ./public
-COPY --from=builder /app/package.json ./
-COPY --from=builder /app/node_modules ./node_modules
+COPY --from=builder /app/drizzle ./drizzle
+
+# Install production dependencies only (no native modules needed)
+# Production code uses bun:sqlite which is built into Bun
+COPY package.json bun.lock* ./
+RUN bun install --production --ignore-scripts
 
 # Create data directory for SQLite
 RUN mkdir -p /app/data

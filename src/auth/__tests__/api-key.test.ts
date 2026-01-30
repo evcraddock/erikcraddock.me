@@ -1,4 +1,4 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect } from "bun:test";
 import { API_KEY_PREFIX, isValidApiKeyFormat, generateApiKey } from "../api-key-utils";
 
 describe("API_KEY_PREFIX", () => {

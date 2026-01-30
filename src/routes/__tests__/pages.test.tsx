@@ -1,111 +1,107 @@
-import { describe, it, expect, beforeAll, vi } from "vitest";
+/* eslint-disable @typescript-eslint/no-require-imports */
+import { describe, it, expect, beforeAll } from "bun:test";
+import { mock } from "bun:test";
 import { createTestDb } from "../../db/test-utils";
 import { posts, tags, postTags, sources, media } from "../../db/schema";
-import type { drizzle } from "drizzle-orm/better-sqlite3";
-import type * as schema from "../../db/schema";
 
-let testDb: ReturnType<typeof drizzle<typeof schema>>;
+// Create test db immediately
+const testDb = createTestDb();
 
-vi.mock("../../db", async () => {
-  const schema = await import("../../db/schema");
-  return {
-    db: testDb,
-    ...schema,
-  };
-});
+// Mock the db module
+mock.module("../../db", () => ({
+  db: testDb,
+  ...require("../../db/schema"),
+}));
 
-beforeAll(async () => {
-  testDb = createTestDb();
+// Set up test data
+const now = new Date();
 
-  const now = new Date();
+testDb
+  .insert(posts)
+  .values([
+    {
+      id: 1,
+      slug: "test-post",
+      type: "article",
+      title: "Test Post",
+      content: "This is test content with **markdown**.",
+      published_at: now,
+      created_at: now,
+      updated_at: now,
+    },
+    {
+      id: 2,
+      slug: "draft-post",
+      type: "article",
+      title: "Draft Post",
+      content: "This is a draft.",
+      created_at: now,
+      updated_at: now,
+    },
+    {
+      id: 3,
+      slug: "another-post",
+      type: "article",
+      title: "Another Post",
+      content: "Another post content.",
+      published_at: now,
+      created_at: now,
+      updated_at: now,
+    },
+    {
+      id: 4,
+      slug: "short-note",
+      type: "note",
+      title: null,
+      content: "Short note content 🚀",
+      published_at: now,
+      created_at: now,
+      updated_at: now,
+    },
+    {
+      id: 5,
+      slug: "long-note",
+      type: "note",
+      title: null,
+      content: "x".repeat(300),
+      published_at: now,
+      created_at: now,
+      updated_at: now,
+    },
+  ])
+  .run();
 
-  testDb
-    .insert(posts)
-    .values([
-      {
-        id: 1,
-        slug: "test-post",
-        type: "article",
-        title: "Test Post",
-        content: "This is test content with **markdown**.",
-        published_at: now,
-        created_at: now,
-        updated_at: now,
-      },
-      {
-        id: 2,
-        slug: "draft-post",
-        type: "article",
-        title: "Draft Post",
-        content: "This is a draft.",
-        created_at: now,
-        updated_at: now,
-      },
-      {
-        id: 3,
-        slug: "another-post",
-        type: "article",
-        title: "Another Post",
-        content: "Another post content.",
-        published_at: now,
-        created_at: now,
-        updated_at: now,
-      },
-      {
-        id: 4,
-        slug: "short-note",
-        type: "note",
-        title: null,
-        content: "Short note content 🚀",
-        published_at: now,
-        created_at: now,
-        updated_at: now,
-      },
-      {
-        id: 5,
-        slug: "long-note",
-        type: "note",
-        title: null,
-        content: "x".repeat(300),
-        published_at: now,
-        created_at: now,
-        updated_at: now,
-      },
-    ])
-    .run();
+testDb
+  .insert(tags)
+  .values([
+    { id: 1, name: "Testing", slug: "testing" },
+    { id: 2, name: "TypeScript", slug: "typescript" },
+    { id: 3, name: "Empty Tag", slug: "empty-tag" },
+  ])
+  .run();
 
-  testDb
-    .insert(tags)
-    .values([
-      { id: 1, name: "Testing", slug: "testing" },
-      { id: 2, name: "TypeScript", slug: "typescript" },
-      { id: 3, name: "Empty Tag", slug: "empty-tag" },
-    ])
-    .run();
+testDb
+  .insert(postTags)
+  .values([
+    { post_id: 1, tag_id: 1 },
+    { post_id: 1, tag_id: 2 },
+    { post_id: 2, tag_id: 1 },
+    { post_id: 3, tag_id: 2 },
+  ])
+  .run();
 
-  testDb
-    .insert(postTags)
-    .values([
-      { post_id: 1, tag_id: 1 },
-      { post_id: 1, tag_id: 2 },
-      { post_id: 2, tag_id: 1 },
-      { post_id: 3, tag_id: 2 },
-    ])
-    .run();
-
-  testDb
-    .insert(sources)
-    .values([
-      {
-        id: 1,
-        name: "Test Blog",
-        url: "https://example.com",
-        feed_url: "https://example.com/feed.xml",
-      },
-      { id: 2, name: "Another Site", url: "https://another.example.com", feed_url: null },
-    ])
-    .run();
-});
+testDb
+  .insert(sources)
+  .values([
+    {
+      id: 1,
+      name: "Test Blog",
+      url: "https://example.com",
+      feed_url: "https://example.com/feed.xml",
+    },
+    { id: 2, name: "Another Site", url: "https://another.example.com", feed_url: null },
+  ])
+  .run();
 
 describe("pages routes", () => {
   let createPagesRoutes: typeof import("../pages").createPagesRoutes;

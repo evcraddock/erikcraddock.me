@@ -1,35 +1,31 @@
-import { describe, it, expect, beforeAll, beforeEach, vi } from "vitest";
+/* eslint-disable @typescript-eslint/no-require-imports */
+import { describe, it, expect, beforeEach } from "bun:test";
+import { mock } from "bun:test";
 import { createTestDb } from "../../db/test-utils";
 import { authors, magicLinks, sessions } from "../../db/schema";
 import { eq } from "drizzle-orm";
-import type { drizzle } from "drizzle-orm/better-sqlite3";
-import type * as schema from "../../db/schema";
 
-let testDb: ReturnType<typeof drizzle<typeof schema>>;
+// Create test db immediately
+const testDb = createTestDb();
 
-vi.mock("../../db", async () => {
-  const schema = await import("../../db/schema");
-  return {
-    db: testDb,
-    ...schema,
-  };
-});
-
-vi.mock("../../services/email", () => ({
-  sendEmail: vi.fn().mockResolvedValue(true),
+// Mock modules
+mock.module("../../db", () => ({
+  db: testDb,
+  ...require("../../db/schema"),
 }));
 
-beforeAll(async () => {
-  testDb = createTestDb();
+mock.module("../../services/email", () => ({
+  sendEmail: mock(() => Promise.resolve(true)),
+}));
 
-  testDb
-    .insert(authors)
-    .values({
-      email: "session-test@example.com",
-      created_at: new Date(),
-    })
-    .run();
-});
+// Set up initial data
+testDb
+  .insert(authors)
+  .values({
+    email: "session-test@example.com",
+    created_at: new Date(),
+  })
+  .run();
 
 beforeEach(() => {
   testDb.delete(magicLinks).run();

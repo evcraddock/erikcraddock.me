@@ -98,9 +98,10 @@ if (!post) {
 
 ## Testing
 
-- Use Vitest
+- Use Bun's built-in test runner (`bun test`)
 - Test all public functions
 - Use describe/it blocks
+- Import from `bun:test` (not vitest)
 
 ```typescript
 describe("createPost", () => {
