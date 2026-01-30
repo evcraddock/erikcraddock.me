@@ -1,5 +1,6 @@
 export interface GlobalOptions {
   verbose?: boolean;
+  configPath?: string;
   apiUrl?: string;
   apiKey?: string;
   json?: boolean;

@@ -70,7 +70,7 @@ export async function pull(args: string[], globalOptions: GlobalOptions): Promis
     process.exit(1);
   }
 
-  const config = await loadConfig();
+  const config = await loadConfig(globalOptions.configPath);
   const apiUrl = globalOptions.apiUrl || config.api_url;
   const apiKey = globalOptions.apiKey || config.api_key;
 

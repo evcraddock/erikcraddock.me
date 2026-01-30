@@ -1,9 +1,10 @@
 import { loadConfig, getConfigPath, maskApiKey } from "../lib/config";
 import { info } from "../lib/output";
+import type { GlobalOptions } from "../types";
 
-export async function configShow(): Promise<void> {
-  const config = await loadConfig();
-  const configPath = getConfigPath();
+export async function configShow(globalOptions: GlobalOptions = {}): Promise<void> {
+  const config = await loadConfig(globalOptions.configPath);
+  const configPath = getConfigPath(globalOptions.configPath);
 
   info(`Config file: ${configPath}`);
   info("");

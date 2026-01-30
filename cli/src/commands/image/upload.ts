@@ -135,7 +135,7 @@ export async function upload(args: string[], globalOptions: GlobalOptions): Prom
     process.exit(1);
   }
 
-  const config = await loadConfig();
+  const config = await loadConfig(globalOptions.configPath);
   const apiUrl = globalOptions.apiUrl || config.api_url;
   const apiKey = globalOptions.apiKey || config.api_key;
 

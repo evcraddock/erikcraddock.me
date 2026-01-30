@@ -25,6 +25,10 @@ export function parseArgs(args: string[]): {
       options.verbose = true;
     } else if (arg === "--json") {
       options.json = true;
+    } else if (arg === "--config" && args[i + 1]) {
+      options.configPath = args[++i];
+    } else if (arg.startsWith("--config=")) {
+      options.configPath = arg.split("=")[1];
     } else if (arg === "--api-url" && args[i + 1]) {
       options.apiUrl = args[++i];
     } else if (arg === "--api-key" && args[i + 1]) {
@@ -68,6 +72,7 @@ Commands:
 Global Options:
   --verbose, -v   Enable verbose output
   --json          Output as JSON (where applicable)
+  --config PATH   Use alternate config file (default: ~/.config/ec/config.yaml)
   --api-url URL   Override API URL
   --api-key KEY   Override API key
   --help, -h      Show help for a command
@@ -164,7 +169,7 @@ async function main(): Promise<void> {
         return;
       }
       if (subcmd === "show" || !subcmd) {
-        await configShow();
+        await configShow(options);
       } else {
         console.error(`Unknown config command: ${subcmd}`);
         console.error("Run 'ec config --help' for usage.");

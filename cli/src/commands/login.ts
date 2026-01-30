@@ -1,4 +1,4 @@
-import { loadConfig, saveConfig } from "../lib/config";
+import { loadConfig, saveConfig, getConfigPath } from "../lib/config";
 import { verifyApiKey } from "../lib/api";
 import { success, error, info } from "../lib/output";
 import type { GlobalOptions } from "../types";
@@ -51,7 +51,7 @@ export async function login(options: GlobalOptions): Promise<void> {
   let apiUrl = options.apiUrl;
 
   if (!apiUrl) {
-    const config = await loadConfig();
+    const config = await loadConfig(options.configPath);
     apiUrl = config.api_url || process.env.EC_API_URL;
   }
 
@@ -99,12 +99,15 @@ export async function login(options: GlobalOptions): Promise<void> {
   }
 
   // Save to config
-  await saveConfig({
-    api_url: apiUrl,
-    api_key: apiKey,
-  });
+  await saveConfig(
+    {
+      api_url: apiUrl,
+      api_key: apiKey,
+    },
+    options.configPath
+  );
 
   info("");
   success(`Logged in as ${result.email}`);
-  info("  API key stored in ~/.config/ec/config.yaml");
+  info(`  API key stored in ${getConfigPath(options.configPath)}`);
 }

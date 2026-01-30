@@ -1,7 +1,44 @@
 import { describe, it, expect, afterEach } from "bun:test";
-import { loadConfig, maskApiKey, getApiUrl, getApiKey } from "../lib/config";
+import { loadConfig, maskApiKey, getApiUrl, getApiKey, getConfigPath } from "../lib/config";
+import { homedir } from "os";
+import { join } from "path";
 
 describe("config utilities", () => {
+  describe("getConfigPath", () => {
+    const originalEnv = process.env.EC_CONFIG;
+
+    afterEach(() => {
+      if (originalEnv) {
+        process.env.EC_CONFIG = originalEnv;
+      } else {
+        delete process.env.EC_CONFIG;
+      }
+    });
+
+    it("returns override if provided", () => {
+      const result = getConfigPath("/custom/path/config.yaml");
+      expect(result).toBe("/custom/path/config.yaml");
+    });
+
+    it("returns env var if set", () => {
+      process.env.EC_CONFIG = "/from/env/config.yaml";
+      const result = getConfigPath();
+      expect(result).toBe("/from/env/config.yaml");
+    });
+
+    it("prefers override over env var", () => {
+      process.env.EC_CONFIG = "/from/env/config.yaml";
+      const result = getConfigPath("/override/config.yaml");
+      expect(result).toBe("/override/config.yaml");
+    });
+
+    it("returns default path when no override or env var", () => {
+      delete process.env.EC_CONFIG;
+      const result = getConfigPath();
+      expect(result).toBe(join(homedir(), ".config", "ec", "config.yaml"));
+    });
+  });
+
   describe("maskApiKey", () => {
     it("masks key showing first 4 and last 4 characters", () => {
       expect(maskApiKey("ek_1234567890abcdef")).toBe("ek_1...cdef");
