@@ -42,3 +42,4 @@ data/
 
 # S3/MinIO local data
 .minio/
+cli/dist/

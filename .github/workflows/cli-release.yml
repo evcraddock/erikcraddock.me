@@ -1,0 +1,78 @@
+name: CLI Release
+
+on:
+  push:
+    tags:
+      - "cli-v*"
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    name: Build (${{ matrix.target }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        include:
+          - target: linux-x64
+            os: ubuntu-latest
+          - target: darwin-x64
+            os: macos-latest
+          - target: darwin-arm64
+            os: macos-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Install dependencies
+        run: cd cli && bun install
+
+      - name: Run tests
+        run: cd cli && bun test
+
+      - name: Build binary
+        run: |
+          cd cli
+          bun build ./src/index.ts \
+            --compile \
+            --target=bun-${{ matrix.target }} \
+            --outfile=ec
+
+      - name: Package binary
+        run: |
+          cd cli
+          tar -czvf ec-${{ matrix.target }}.tar.gz ec
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ec-${{ matrix.target }}
+          path: cli/ec-${{ matrix.target }}.tar.gz
+
+  release:
+    name: Create Release
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+
+      - name: Create release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: artifacts/**/*.tar.gz
+          generate_release_notes: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
