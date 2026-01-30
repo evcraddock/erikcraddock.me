@@ -1,5 +1,4 @@
 import { Hono } from "hono";
-import { serveStatic } from "hono/bun";
 import { federation as fedifyMiddleware } from "@fedify/hono";
 import { pages } from "./routes/pages";
 import { feed } from "./routes/feed";
@@ -9,6 +8,9 @@ import { api } from "./routes/api";
 import { mediaRoute } from "./routes/media";
 import { federation } from "./federation/setup";
 import { logger } from "./utils/logger";
+
+// Detect runtime for static file serving
+const isBun = typeof globalThis.Bun !== "undefined";
 
 const app = new Hono();
 
@@ -37,7 +39,16 @@ app.use("*", async (c, next) => {
 });
 
 // Serve static files from public/
-app.use("/css/*", serveStatic({ root: "./public" }));
+// Use runtime-specific static file middleware
+if (isBun) {
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  const { serveStatic } = require("hono/bun");
+  app.use("/css/*", serveStatic({ root: "./public" }));
+} else {
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  const { serveStatic } = require("@hono/node-server/serve-static");
+  app.use("/css/*", serveStatic({ root: "./public" }));
+}
 
 // Mount routes
 app.route("/", pages);
@@ -62,6 +73,25 @@ if (process.env.NODE_ENV !== "production") {
   }
 }
 
+// Start server based on runtime
+if (isBun) {
+  // Bun uses default export
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  (globalThis as any).default = {
+    port,
+    fetch: app.fetch,
+  };
+} else {
+  // Node.js uses @hono/node-server
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  const { serve } = require("@hono/node-server");
+  serve({
+    fetch: app.fetch,
+    port,
+  });
+}
+
+// Export for Bun (this is used when running with bun)
 export default {
   port,
   fetch: app.fetch,
