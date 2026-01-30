@@ -1,4 +1,5 @@
 import { configure, getConsoleSink } from "@logtape/logtape";
+import { AsyncLocalStorage } from "node:async_hooks";
 
 /**
  * Configure logtape to capture Fedify's internal logs.
@@ -6,6 +7,7 @@ import { configure, getConsoleSink } from "@logtape/logtape";
  */
 export async function configureLogtape(): Promise<void> {
   await configure({
+    contextLocalStorage: new AsyncLocalStorage(),
     sinks: {
       console: getConsoleSink(),
     },
