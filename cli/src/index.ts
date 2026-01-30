@@ -5,6 +5,8 @@ import { login } from "./commands/login";
 import { postCommand, showPostHelp } from "./commands/post";
 import { linkCommand } from "./commands/link";
 import { noteCommand } from "./commands/note";
+import { sourceCommand, showSourceHelp } from "./commands/source";
+import { tagCommand, showTagHelp } from "./commands/tag";
 import type { GlobalOptions } from "./types";
 
 export function parseArgs(args: string[]): {
@@ -56,6 +58,8 @@ Commands:
   post            Manage posts (list, show, create, edit, delete, publish)
   link            Manage links (list, show, create, edit, delete, publish)
   note            Manage notes (list, show, create, edit, delete, publish)
+  source          Manage sources (list, show, create, edit, delete)
+  tag             Manage tags (list)
   version         Show CLI version
   help            Show this help message
 
@@ -73,6 +77,8 @@ Examples:
   ec post create --title "My Post" --slug my-post --content "Hello"
   ec link create --url "https://..." --slug my-link --content "Commentary"
   ec note create --slug quick-thought --content "Just a thought"
+  ec source list
+  ec tag list
   ec version
 `);
 }
@@ -177,6 +183,22 @@ async function main(): Promise<void> {
 
     case "note":
       await noteCommand(command.slice(1), options);
+      break;
+
+    case "source":
+      if (options.help && !subcmd) {
+        showSourceHelp();
+        return;
+      }
+      await sourceCommand(command.slice(1), options);
+      break;
+
+    case "tag":
+      if (options.help && !subcmd) {
+        showTagHelp();
+        return;
+      }
+      await tagCommand(command.slice(1), options);
       break;
 
     default:

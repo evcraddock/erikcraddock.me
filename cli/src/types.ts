@@ -55,3 +55,17 @@ export interface Media {
   created_at: string;
   url: string;
 }
+
+export interface Source {
+  id: number;
+  name: string;
+  url: string;
+  feed_url: string | null;
+}
+
+export interface TagWithCount {
+  id: number;
+  name: string;
+  slug: string;
+  count: number;
+}

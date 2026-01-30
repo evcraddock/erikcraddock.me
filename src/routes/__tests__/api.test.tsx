@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeAll, beforeEach, vi } from "vitest";
 import { createTestDb } from "../../db/test-utils";
-import { posts } from "../../db/schema";
+import { posts, sources, tags, postTags } from "../../db/schema";
 import { eq } from "drizzle-orm";
 import type { drizzle } from "drizzle-orm/better-sqlite3";
 import type * as schema from "../../db/schema";
@@ -497,5 +497,255 @@ describe("GET /api/posts - status filter", () => {
     const json = await res.json();
     expect(json.data[0]).toHaveProperty("slug");
     expect(json.data[0].slug).toBe("published-post");
+  });
+});
+
+describe("PUT /api/sources/:id", () => {
+  let api: typeof import("../api").api;
+
+  beforeAll(async () => {
+    const module = await import("../api");
+    api = module.api;
+  });
+
+  beforeEach(() => {
+    testDb.delete(sources).run();
+  });
+
+  it("updates source name", async () => {
+    const source = testDb
+      .insert(sources)
+      .values({ name: "Original", url: "https://example.com" })
+      .returning()
+      .get();
+
+    const res = await api.request(`/sources/${source.id}`, {
+      method: "PUT",
+      headers: { ...authHeader, "Content-Type": "application/json" },
+      body: JSON.stringify({ name: "Updated" }),
+    });
+
+    expect(res.status).toBe(200);
+    const json = await res.json();
+    expect(json.data.name).toBe("Updated");
+    expect(json.data.url).toBe("https://example.com");
+  });
+
+  it("updates source url", async () => {
+    const source = testDb
+      .insert(sources)
+      .values({ name: "Test", url: "https://old.com" })
+      .returning()
+      .get();
+
+    const res = await api.request(`/sources/${source.id}`, {
+      method: "PUT",
+      headers: { ...authHeader, "Content-Type": "application/json" },
+      body: JSON.stringify({ url: "https://new.com" }),
+    });
+
+    expect(res.status).toBe(200);
+    const json = await res.json();
+    expect(json.data.url).toBe("https://new.com");
+  });
+
+  it("updates feed_url to null", async () => {
+    const source = testDb
+      .insert(sources)
+      .values({ name: "Test", url: "https://example.com", feed_url: "https://example.com/feed" })
+      .returning()
+      .get();
+
+    const res = await api.request(`/sources/${source.id}`, {
+      method: "PUT",
+      headers: { ...authHeader, "Content-Type": "application/json" },
+      body: JSON.stringify({ feed_url: null }),
+    });
+
+    expect(res.status).toBe(200);
+    const json = await res.json();
+    expect(json.data.feed_url).toBeNull();
+  });
+
+  it("returns 404 for non-existent source", async () => {
+    const res = await api.request("/sources/99999", {
+      method: "PUT",
+      headers: { ...authHeader, "Content-Type": "application/json" },
+      body: JSON.stringify({ name: "Test" }),
+    });
+
+    expect(res.status).toBe(404);
+    const json = await res.json();
+    expect(json.error).toBe("Source not found");
+  });
+
+  it("rejects empty name", async () => {
+    const source = testDb
+      .insert(sources)
+      .values({ name: "Test", url: "https://example.com" })
+      .returning()
+      .get();
+
+    const res = await api.request(`/sources/${source.id}`, {
+      method: "PUT",
+      headers: { ...authHeader, "Content-Type": "application/json" },
+      body: JSON.stringify({ name: "" }),
+    });
+
+    expect(res.status).toBe(400);
+    const json = await res.json();
+    expect(json.error).toContain("Name cannot be empty");
+  });
+
+  it("rejects invalid source ID", async () => {
+    const res = await api.request("/sources/invalid", {
+      method: "PUT",
+      headers: { ...authHeader, "Content-Type": "application/json" },
+      body: JSON.stringify({ name: "Test" }),
+    });
+
+    expect(res.status).toBe(400);
+    const json = await res.json();
+    expect(json.error).toBe("Invalid source ID");
+  });
+});
+
+describe("DELETE /api/sources/:id", () => {
+  let api: typeof import("../api").api;
+
+  beforeAll(async () => {
+    const module = await import("../api");
+    api = module.api;
+  });
+
+  beforeEach(() => {
+    testDb.delete(sources).run();
+  });
+
+  it("deletes source", async () => {
+    const source = testDb
+      .insert(sources)
+      .values({ name: "Delete Me", url: "https://example.com" })
+      .returning()
+      .get();
+
+    const res = await api.request(`/sources/${source.id}`, {
+      method: "DELETE",
+      headers: authHeader,
+    });
+
+    expect(res.status).toBe(204);
+
+    // Verify deleted
+    const deleted = testDb.select().from(sources).where(eq(sources.id, source.id)).get();
+    expect(deleted).toBeUndefined();
+  });
+
+  it("returns 404 for non-existent source", async () => {
+    const res = await api.request("/sources/99999", {
+      method: "DELETE",
+      headers: authHeader,
+    });
+
+    expect(res.status).toBe(404);
+    const json = await res.json();
+    expect(json.error).toBe("Source not found");
+  });
+
+  it("rejects invalid source ID", async () => {
+    const res = await api.request("/sources/invalid", {
+      method: "DELETE",
+      headers: authHeader,
+    });
+
+    expect(res.status).toBe(400);
+    const json = await res.json();
+    expect(json.error).toBe("Invalid source ID");
+  });
+});
+
+describe("GET /api/tags", () => {
+  let api: typeof import("../api").api;
+
+  beforeAll(async () => {
+    const module = await import("../api");
+    api = module.api;
+  });
+
+  beforeEach(() => {
+    testDb.delete(postTags).run();
+    testDb.delete(tags).run();
+    testDb.delete(posts).run();
+  });
+
+  it("returns empty array when no tags", async () => {
+    const res = await api.request("/tags", { headers: authHeader });
+
+    expect(res.status).toBe(200);
+    const json = await res.json();
+    expect(json.data).toEqual([]);
+  });
+
+  it("returns tags with counts", async () => {
+    // Create tags
+    const tag1 = testDb.insert(tags).values({ name: "Tech", slug: "tech" }).returning().get();
+    const tag2 = testDb.insert(tags).values({ name: "Rust", slug: "rust" }).returning().get();
+
+    // Create posts
+    const post1 = testDb
+      .insert(posts)
+      .values({
+        slug: "post-1",
+        type: "article",
+        title: "Post 1",
+        content: "Content",
+        created_at: new Date(),
+        updated_at: new Date(),
+      })
+      .returning()
+      .get();
+
+    const post2 = testDb
+      .insert(posts)
+      .values({
+        slug: "post-2",
+        type: "article",
+        title: "Post 2",
+        content: "Content",
+        created_at: new Date(),
+        updated_at: new Date(),
+      })
+      .returning()
+      .get();
+
+    // Tag posts: tag1 has 2 posts, tag2 has 1 post
+    testDb.insert(postTags).values({ post_id: post1.id, tag_id: tag1.id }).run();
+    testDb.insert(postTags).values({ post_id: post2.id, tag_id: tag1.id }).run();
+    testDb.insert(postTags).values({ post_id: post1.id, tag_id: tag2.id }).run();
+
+    const res = await api.request("/tags", { headers: authHeader });
+
+    expect(res.status).toBe(200);
+    const json = await res.json();
+    expect(json.data).toHaveLength(2);
+
+    // Should be ordered by count descending
+    expect(json.data[0].slug).toBe("tech");
+    expect(json.data[0].count).toBe(2);
+    expect(json.data[1].slug).toBe("rust");
+    expect(json.data[1].count).toBe(1);
+  });
+
+  it("returns tags with zero count", async () => {
+    // Create a tag with no posts
+    testDb.insert(tags).values({ name: "Unused", slug: "unused" }).run();
+
+    const res = await api.request("/tags", { headers: authHeader });
+
+    expect(res.status).toBe(200);
+    const json = await res.json();
+    expect(json.data).toHaveLength(1);
+    expect(json.data[0].slug).toBe("unused");
+    expect(json.data[0].count).toBe(0);
   });
 });

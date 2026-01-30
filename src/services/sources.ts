@@ -46,3 +46,52 @@ export function createSource(input: CreateSourceInput): Source {
 
   return source;
 }
+
+export interface UpdateSourceInput {
+  name?: string;
+  url?: string;
+  feed_url?: string | null;
+}
+
+/**
+ * Update an existing source
+ */
+export function updateSource(id: number, input: UpdateSourceInput): Source | null {
+  const existing = getSource(id);
+  if (!existing) {
+    return null;
+  }
+
+  const updates: Partial<{ name: string; url: string; feed_url: string | null }> = {};
+
+  if (input.name !== undefined) {
+    updates.name = input.name;
+  }
+  if (input.url !== undefined) {
+    updates.url = input.url;
+  }
+  if (input.feed_url !== undefined) {
+    updates.feed_url = input.feed_url;
+  }
+
+  if (Object.keys(updates).length === 0) {
+    return existing;
+  }
+
+  const source = db.update(sources).set(updates).where(eq(sources.id, id)).returning().get();
+
+  return source ?? null;
+}
+
+/**
+ * Delete a source by ID
+ */
+export function deleteSource(id: number): boolean {
+  const existing = getSource(id);
+  if (!existing) {
+    return false;
+  }
+
+  db.delete(sources).where(eq(sources.id, id)).run();
+  return true;
+}

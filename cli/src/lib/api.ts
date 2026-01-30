@@ -1,6 +1,14 @@
 import * as fs from "fs";
 import * as path from "path";
-import type { ApiResponse, PingResponse, PostListItem, Post, Media } from "../types";
+import type {
+  ApiResponse,
+  PingResponse,
+  PostListItem,
+  Post,
+  Media,
+  Source,
+  TagWithCount,
+} from "../types";
 
 export class ApiClient {
   constructor(
@@ -148,6 +156,45 @@ export class ApiClient {
     } catch (error) {
       return { error: String(error) };
     }
+  }
+
+  // Source methods
+
+  async listSources(): Promise<ApiResponse<Source[]>> {
+    return this.request<Source[]>("GET", "/sources");
+  }
+
+  async getSource(id: number): Promise<ApiResponse<Source>> {
+    return this.request<Source>("GET", `/sources/${id}`);
+  }
+
+  async createSource(data: {
+    name: string;
+    url: string;
+    feed_url?: string;
+  }): Promise<ApiResponse<Source>> {
+    return this.request<Source>("POST", "/sources", data);
+  }
+
+  async updateSource(
+    id: number,
+    data: {
+      name?: string;
+      url?: string;
+      feed_url?: string | null;
+    }
+  ): Promise<ApiResponse<Source>> {
+    return this.request<Source>("PUT", `/sources/${id}`, data);
+  }
+
+  async deleteSource(id: number): Promise<ApiResponse<{ success: boolean }>> {
+    return this.request<{ success: boolean }>("DELETE", `/sources/${id}`);
+  }
+
+  // Tag methods
+
+  async listTags(): Promise<ApiResponse<TagWithCount[]>> {
+    return this.request<TagWithCount[]>("GET", "/tags");
   }
 }
 
