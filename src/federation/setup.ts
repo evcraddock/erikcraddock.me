@@ -1,7 +1,7 @@
 import {
   createFederation,
   Person,
-  CryptographicKey,
+  Endpoints,
   Follow,
   Undo,
   isActor,
@@ -81,13 +81,12 @@ export function createFedifyFederation() {
         return null; // Only support the single user
       }
 
-      // Get or create key pair for this actor
-      const keyPair = await getOrCreateKeyPair();
-
-      const actorUri = ctx.getActorUri(identifier);
+      // Get key pairs using Fedify's method - returns keys in proper format
+      // for both HTTP Signatures (publicKey) and Object Integrity Proofs (assertionMethods)
+      const keys = await ctx.getActorKeyPairs(identifier);
 
       return new Person({
-        id: actorUri,
+        id: ctx.getActorUri(identifier),
         preferredUsername: identifier,
         name: "Erik Craddock",
         summary: "Personal blog - articles, links, and notes",
@@ -96,11 +95,12 @@ export function createFedifyFederation() {
         inbox: ctx.getInboxUri(identifier),
         outbox: ctx.getOutboxUri(identifier),
         followers: ctx.getFollowersUri(identifier),
-        publicKey: new CryptographicKey({
-          id: new URL(`${actorUri}#main-key`),
-          owner: actorUri,
-          publicKey: keyPair.publicKey,
-        }),
+        // Shared inbox for efficient batch delivery to multiple followers on same instance
+        endpoints: new Endpoints({ sharedInbox: ctx.getInboxUri() }),
+        // First key's CryptographicKey for HTTP Signatures (legacy, widely supported)
+        publicKey: keys[0].cryptographicKey,
+        // All keys as Multikey for Object Integrity Proofs (modern standard)
+        assertionMethods: keys.map((key) => key.multikey),
       });
     })
     // Set up key pairs dispatcher - provides keys for HTTP signatures
