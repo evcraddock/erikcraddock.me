@@ -9,6 +9,12 @@ import { mediaRoute } from "./routes/media";
 import { federation } from "./federation/setup";
 import { logger } from "./utils/logger";
 import { rewriteUrlForProxy } from "./utils/proxy";
+import { configureLogtape } from "./utils/logtape-config";
+
+// Configure logtape to capture Fedify's internal logs
+configureLogtape().catch((err) => {
+  logger.error("logtape", "Failed to configure logtape", { error: String(err) });
+});
 
 // Detect runtime for static file serving
 const isBun = typeof globalThis.Bun !== "undefined";
