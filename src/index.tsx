@@ -1,5 +1,5 @@
 import { Hono } from "hono";
-import { federation as fedifyMiddleware } from "@fedify/hono";
+import type { Context, Next } from "hono";
 import { pages } from "./routes/pages";
 import { feed } from "./routes/feed";
 import { auth } from "./routes/auth";
@@ -8,18 +8,64 @@ import { api } from "./routes/api";
 import { mediaRoute } from "./routes/media";
 import { federation } from "./federation/setup";
 import { logger } from "./utils/logger";
+import { rewriteUrlForProxy } from "./utils/proxy";
 
 // Detect runtime for static file serving
 const isBun = typeof globalThis.Bun !== "undefined";
 
 const app = new Hono();
 
+/**
+ * Custom Fedify middleware that handles X-Forwarded-Proto header.
+ *
+ * When running behind a reverse proxy (like Caddy), the request URL
+ * comes in as http:// even though the original request was https://.
+ * This middleware rewrites the request URL to use the correct protocol
+ * before passing it to Fedify.
+ */
+function createProxyAwareFedifyMiddleware() {
+  return async (c: Context, next: Next) => {
+    const forwardedProto = c.req.header("x-forwarded-proto");
+    const forwardedHost = c.req.header("x-forwarded-host") || c.req.header("host");
+
+    let request = c.req.raw;
+
+    // Rewrite URL if behind a proxy with HTTPS
+    const rewrittenUrl = rewriteUrlForProxy(request.url, forwardedProto, forwardedHost);
+    if (rewrittenUrl !== request.url) {
+      request = new Request(rewrittenUrl, {
+        method: request.method,
+        headers: request.headers,
+        body: request.body,
+        // @ts-expect-error - duplex is needed for streaming bodies
+        duplex: "half",
+      });
+    }
+
+    // Call Fedify's fetch directly with the (possibly modified) request
+    const response = await federation.fetch(request, {
+      contextData: undefined,
+      onNotFound: async () => {
+        await next();
+        return c.res;
+      },
+      onNotAcceptable: async () => {
+        await next();
+        if (c.res.status !== 404) return c.res;
+        return new Response("Not acceptable", {
+          status: 406,
+          headers: { "Content-Type": "text/plain", Vary: "Accept" },
+        });
+      },
+    });
+
+    return response;
+  };
+}
+
 // Fedify middleware - handles ActivityPub requests
 // Must be before other routes so it can intercept AP requests via content negotiation
-app.use(
-  "*",
-  fedifyMiddleware(federation, () => undefined)
-);
+app.use("*", createProxyAwareFedifyMiddleware());
 
 // Request logging middleware
 app.use("*", async (c, next) => {
