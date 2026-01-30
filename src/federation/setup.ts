@@ -2,10 +2,10 @@ import {
   createFederation,
   Person,
   CryptographicKey,
-  MemoryKvStore,
   Follow,
   Undo,
   isActor,
+  type KvStore,
 } from "@fedify/fedify";
 import { getOrCreateKeyPair } from "./keys";
 import { addFollower, removeFollower, getAllFollowers } from "./followers";
@@ -17,6 +17,28 @@ export type FederationContext = void;
 
 // Domain from environment
 const domain = process.env.DOMAIN || "localhost:5000";
+
+// Lazy-initialized KV store (avoids bun:sqlite import at module load time for tests)
+let kvStore: KvStore | null = null;
+
+function getKvStore(): KvStore {
+  if (!kvStore) {
+    // Dynamic import to avoid breaking tests that run in Node
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const { Database } = require("bun:sqlite");
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const { SqliteKvStore } = require("@fedify/sqlite");
+
+    const kvPath = process.env.FEDIFY_KV_PATH || "./data/fedify-kv.db";
+    const kvDb = new Database(kvPath);
+    kvDb.exec("PRAGMA journal_mode = WAL;");
+    kvStore = new SqliteKvStore(kvDb);
+
+    logger.info("federation", `KV store initialized at ${kvPath}`);
+  }
+  // Non-null assertion: kvStore is assigned in the if block above
+  return kvStore!;
+}
 
 /**
  * Create and configure the Fedify federation instance.
@@ -31,7 +53,7 @@ export function createFedifyFederation() {
   logger.info("federation", `Creating federation for domain: ${domain}`);
 
   const federation = createFederation<FederationContext>({
-    kv: new MemoryKvStore(), // TODO: Switch to SqliteKvStore for production
+    kv: getKvStore(),
   });
 
   // Set up actor dispatcher - handles requests for /users/{identifier}
