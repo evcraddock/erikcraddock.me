@@ -91,7 +91,8 @@ export function createFedifyFederation() {
         preferredUsername: identifier,
         name: "Erik Craddock",
         summary: "Personal blog - articles, links, and notes",
-        url: new URL("/", ctx.url),
+        // Use canonicalOrigin to ensure correct protocol behind reverse proxy
+        url: new URL("/", ctx.canonicalOrigin),
         inbox: ctx.getInboxUri(identifier),
         outbox: ctx.getOutboxUri(identifier),
         followers: ctx.getFollowersUri(identifier),
