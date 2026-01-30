@@ -114,8 +114,9 @@ export function createFedifyFederation() {
     });
 
   // Set up inbox listeners - handles incoming activities
+  // Second argument registers the shared inbox for efficient batch delivery
   federation
-    .setInboxListeners("/users/{identifier}/inbox")
+    .setInboxListeners("/users/{identifier}/inbox", "/inbox")
     .on(Follow, async (ctx, follow) => {
       const followerActor = await follow.getActor(ctx);
       if (!isActor(followerActor)) {
