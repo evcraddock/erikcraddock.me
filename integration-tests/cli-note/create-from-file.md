@@ -26,7 +26,7 @@ EOF
 
 ```bash
 cd cli
-bun run src/index.ts note create --file /tmp/test-note.md
+bun src/index.ts --config dev-config.yaml note create --file /tmp/test-note.md
 ```
 
 ## Expected Output
@@ -40,7 +40,7 @@ bun run src/index.ts note create --file /tmp/test-note.md
 ## Verify
 
 ```bash
-bun run src/index.ts note show file-note
+bun src/index.ts --config dev-config.yaml note show file-note
 ```
 
 **Expected:** Shows the full content from the file.
@@ -48,7 +48,7 @@ bun run src/index.ts note show file-note
 ## Pull and Verify Roundtrip
 
 ```bash
-bun run src/index.ts note pull file-note -o /tmp/pulled-note.md
+bun src/index.ts --config dev-config.yaml note pull file-note -o /tmp/pulled-note.md
 cat /tmp/pulled-note.md
 ```
 
@@ -57,6 +57,6 @@ cat /tmp/pulled-note.md
 ## Cleanup
 
 ```bash
-bun run src/index.ts note delete file-note --force
+bun src/index.ts --config dev-config.yaml note delete file-note --force
 rm /tmp/test-note.md /tmp/pulled-note.md
 ```

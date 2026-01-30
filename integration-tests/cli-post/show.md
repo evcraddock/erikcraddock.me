@@ -6,7 +6,7 @@ Test displaying post details.
 
 ```bash
 cd cli
-bun run src/index.ts post create \
+bun src/index.ts --config dev-config.yaml post create \
   --title "Show Test" \
   --slug show-test \
   --content $'# Content\n\nWith markdown.' \
@@ -19,7 +19,7 @@ bun run src/index.ts post create \
 ## Show Post
 
 ```bash
-bun run src/index.ts post show show-test
+bun src/index.ts --config dev-config.yaml post show show-test
 ```
 
 **Expected:**
@@ -43,7 +43,7 @@ With markdown.
 ## Show as JSON
 
 ```bash
-bun run src/index.ts post show show-test --json
+bun src/index.ts --config dev-config.yaml post show show-test --json
 ```
 
 **Expected:** Full post object as JSON.
@@ -51,7 +51,7 @@ bun run src/index.ts post show show-test --json
 ## Show Non-Existent
 
 ```bash
-bun run src/index.ts post show does-not-exist
+bun src/index.ts --config dev-config.yaml post show does-not-exist
 ```
 
 **Expected:**
@@ -63,5 +63,5 @@ bun run src/index.ts post show does-not-exist
 ## Cleanup
 
 ```bash
-bun run src/index.ts post delete show-test --force
+bun src/index.ts --config dev-config.yaml post delete show-test --force
 ```

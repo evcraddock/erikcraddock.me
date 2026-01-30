@@ -6,7 +6,7 @@ Create a simple link with required fields only.
 
 ```bash
 cd cli
-bun run src/index.ts link create \
+bun src/index.ts --config dev-config.yaml link create \
   --url "https://example.com/interesting-article" \
   --slug test-link \
   --content "This is an interesting article worth reading."
@@ -23,7 +23,7 @@ bun run src/index.ts link create \
 ## Verify
 
 ```bash
-bun run src/index.ts link show test-link
+bun src/index.ts --config dev-config.yaml link show test-link
 ```
 
 **Expected:**
@@ -42,5 +42,5 @@ This is an interesting article worth reading.
 ## Cleanup
 
 ```bash
-bun run src/index.ts link delete test-link --force
+bun src/index.ts --config dev-config.yaml link delete test-link --force
 ```

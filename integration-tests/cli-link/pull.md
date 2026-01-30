@@ -6,7 +6,7 @@ Test downloading links as markdown files.
 
 ```bash
 cd cli
-bun run src/index.ts link create \
+bun src/index.ts --config dev-config.yaml link create \
   --url "https://example.com/pulled-article" \
   --slug pull-test-link \
   --content "Commentary on the article" \
@@ -17,7 +17,7 @@ bun run src/index.ts link create \
 ## Pull to Default Filename
 
 ```bash
-bun run src/index.ts link pull pull-test-link
+bun src/index.ts --config dev-config.yaml link pull pull-test-link
 ```
 
 **Expected:**
@@ -53,7 +53,7 @@ Commentary on the article
 ## Pull to Custom Path
 
 ```bash
-bun run src/index.ts link pull pull-test-link -o /tmp/custom-link.md
+bun src/index.ts --config dev-config.yaml link pull pull-test-link -o /tmp/custom-link.md
 cat /tmp/custom-link.md
 ```
 
@@ -62,7 +62,7 @@ cat /tmp/custom-link.md
 ## Pull as JSON
 
 ```bash
-bun run src/index.ts link pull pull-test-link --json
+bun src/index.ts --config dev-config.yaml link pull pull-test-link --json
 ```
 
 **Expected:** Full JSON object (not saved to file).
@@ -70,6 +70,6 @@ bun run src/index.ts link pull pull-test-link --json
 ## Cleanup
 
 ```bash
-bun run src/index.ts link delete pull-test-link --force
+bun src/index.ts --config dev-config.yaml link delete pull-test-link --force
 rm pull-test-link.md /tmp/custom-link.md
 ```

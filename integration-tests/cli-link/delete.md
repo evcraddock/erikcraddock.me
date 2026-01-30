@@ -6,7 +6,7 @@ Test deleting links with confirmation.
 
 ```bash
 cd cli
-bun run src/index.ts link create \
+bun src/index.ts --config dev-config.yaml link create \
   --url "https://example.com/to-delete" \
   --slug delete-test-link \
   --content "Link to delete" \
@@ -16,7 +16,7 @@ bun run src/index.ts link create \
 ## Delete with Confirmation (Cancel)
 
 ```bash
-echo "n" | bun run src/index.ts link delete delete-test-link
+echo "n" | bun src/index.ts --config dev-config.yaml link delete delete-test-link
 ```
 
 **Expected:**
@@ -32,7 +32,7 @@ Are you sure? (y/N): Cancelled.
 ## Verify Still Exists
 
 ```bash
-bun run src/index.ts link show delete-test-link
+bun src/index.ts --config dev-config.yaml link show delete-test-link
 ```
 
 **Expected:** Shows the link details.
@@ -40,7 +40,7 @@ bun run src/index.ts link show delete-test-link
 ## Delete with Confirmation (Confirm)
 
 ```bash
-echo "y" | bun run src/index.ts link delete delete-test-link
+echo "y" | bun src/index.ts --config dev-config.yaml link delete delete-test-link
 ```
 
 **Expected:**
@@ -56,7 +56,7 @@ Are you sure? (y/N): ✅ Deleted: delete-test-link
 ## Verify Deleted
 
 ```bash
-bun run src/index.ts link show delete-test-link
+bun src/index.ts --config dev-config.yaml link show delete-test-link
 ```
 
 **Expected:**
@@ -69,13 +69,13 @@ bun run src/index.ts link show delete-test-link
 
 ```bash
 # Create another link
-bun run src/index.ts link create \
+bun src/index.ts --config dev-config.yaml link create \
   --url "https://example.com/force-delete" \
   --slug force-delete-link \
   --content "Force delete"
 
 # Delete without confirmation
-bun run src/index.ts link delete force-delete-link --force
+bun src/index.ts --config dev-config.yaml link delete force-delete-link --force
 ```
 
 **Expected:**

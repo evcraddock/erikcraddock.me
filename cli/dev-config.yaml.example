@@ -1,0 +1,9 @@
+# CLI configuration for local development
+# Copy to dev-config.yaml and fill in your API key:
+#   cp dev-config.yaml.example dev-config.yaml
+#
+# Get an API key by logging in:
+#   bun src/index.ts login --api-url http://localhost:5000/api
+
+api_url: http://localhost:5000/api
+api_key: <your-dev-api-key>

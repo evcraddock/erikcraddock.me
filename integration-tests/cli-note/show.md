@@ -6,7 +6,7 @@ Test showing note details.
 
 ```bash
 cd cli
-bun run src/index.ts note create \
+bun src/index.ts --config dev-config.yaml note create \
   --slug show-test-note \
   --content "This is a test note with some content."
 ```
@@ -14,7 +14,7 @@ bun run src/index.ts note create \
 ## Show Note
 
 ```bash
-bun run src/index.ts note show show-test-note
+bun src/index.ts --config dev-config.yaml note show show-test-note
 ```
 
 **Expected:**
@@ -32,7 +32,7 @@ This is a test note with some content.
 ## Show as JSON
 
 ```bash
-bun run src/index.ts note show show-test-note --json
+bun src/index.ts --config dev-config.yaml note show show-test-note --json
 ```
 
 **Expected:** Full JSON object with `type: "note"`, no title field.
@@ -40,7 +40,7 @@ bun run src/index.ts note show show-test-note --json
 ## Show Non-existent Note
 
 ```bash
-bun run src/index.ts note show nonexistent-note
+bun src/index.ts --config dev-config.yaml note show nonexistent-note
 ```
 
 **Expected:**
@@ -52,5 +52,5 @@ bun run src/index.ts note show nonexistent-note
 ## Cleanup
 
 ```bash
-bun run src/index.ts note delete show-test-note --force
+bun src/index.ts --config dev-config.yaml note delete show-test-note --force
 ```

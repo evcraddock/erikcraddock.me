@@ -14,7 +14,7 @@ ls -la cli/examples/sample-image.png
 
 ```bash
 cd cli
-bun run src/index.ts post create --file examples/with-images.md
+bun src/index.ts --config dev-config.yaml post create --file examples/with-images.md
 ```
 
 **Expected:**
@@ -40,7 +40,7 @@ curl -s -o /dev/null -w "%{http_code}" http://localhost:5000/media/posts/image-d
 ## Verify URL Was Rewritten in Content
 
 ```bash
-bun run src/index.ts post pull image-demo-post --output /tmp/pulled.md
+bun src/index.ts --config dev-config.yaml post pull image-demo-post --output /tmp/pulled.md
 grep "sample-image" /tmp/pulled.md
 ```
 
@@ -49,7 +49,7 @@ grep "sample-image" /tmp/pulled.md
 ## Publish and View Banner in Browser
 
 ```bash
-bun run src/index.ts post publish image-demo-post
+bun src/index.ts --config dev-config.yaml post publish image-demo-post
 
 ~/.local/share/pi-skills/browser-tools/browser-nav.js http://localhost:5000/posts/image-demo-post
 sleep 1
@@ -65,6 +65,6 @@ sleep 1
 ## Cleanup
 
 ```bash
-bun run src/index.ts post delete image-demo-post --force
+bun src/index.ts --config dev-config.yaml post delete image-demo-post --force
 rm /tmp/pulled.md
 ```

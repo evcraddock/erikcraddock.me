@@ -11,8 +11,8 @@ cd cli
 convert -size 100x100 xc:green /tmp/test-delete.jpg
 
 # Upload test images
-bun run src/index.ts image upload /tmp/test-delete.jpg --json
-bun run src/index.ts image upload /tmp/test-delete.jpg --key "delete-test-2.jpg" --json
+bun src/index.ts --config dev-config.yaml image upload /tmp/test-delete.jpg --json
+bun src/index.ts --config dev-config.yaml image upload /tmp/test-delete.jpg --key "delete-test-2.jpg" --json
 ```
 
 Note the IDs from the output.
@@ -20,7 +20,7 @@ Note the IDs from the output.
 ## Delete with Confirmation
 
 ```bash
-bun run src/index.ts image delete <id1>
+bun src/index.ts --config dev-config.yaml image delete <id1>
 ```
 
 **Expected:** Prompt: "Delete image <id1> (test-delete.jpg)? [y/N]"
@@ -32,7 +32,7 @@ Type `y` and press Enter.
 ## Delete with --yes Flag
 
 ```bash
-bun run src/index.ts image delete <id2> --yes
+bun src/index.ts --config dev-config.yaml image delete <id2> --yes
 ```
 
 **Expected:** No prompt, immediate success message.
@@ -41,9 +41,9 @@ bun run src/index.ts image delete <id2> --yes
 
 ```bash
 # Upload another image
-bun run src/index.ts image upload /tmp/test-delete.jpg --key "delete-test-cancel.jpg" --json
+bun src/index.ts --config dev-config.yaml image upload /tmp/test-delete.jpg --key "delete-test-cancel.jpg" --json
 
-bun run src/index.ts image delete <id>
+bun src/index.ts --config dev-config.yaml image delete <id>
 ```
 
 **Expected:** Prompt appears.
@@ -62,7 +62,7 @@ curl -I <url>
 ## Error: Non-existent ID
 
 ```bash
-bun run src/index.ts image delete 99999 --yes 2>&1; echo "Exit: $?"
+bun src/index.ts --config dev-config.yaml image delete 99999 --yes 2>&1; echo "Exit: $?"
 ```
 
 **Expected:** Error message "Media not found" and exit code 1.
@@ -70,7 +70,7 @@ bun run src/index.ts image delete 99999 --yes 2>&1; echo "Exit: $?"
 ## Error: Missing ID
 
 ```bash
-bun run src/index.ts image delete 2>&1; echo "Exit: $?"
+bun src/index.ts --config dev-config.yaml image delete 2>&1; echo "Exit: $?"
 ```
 
 **Expected:** Error message "Image ID is required" and exit code 1.
@@ -79,5 +79,5 @@ bun run src/index.ts image delete 2>&1; echo "Exit: $?"
 
 ```bash
 # Delete any remaining test images
-bun run src/index.ts image delete <remaining-id> --yes
+bun src/index.ts --config dev-config.yaml image delete <remaining-id> --yes
 ```

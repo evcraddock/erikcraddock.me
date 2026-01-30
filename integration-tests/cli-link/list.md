@@ -8,24 +8,24 @@ Test listing links with various filters.
 cd cli
 
 # Create test links
-bun run src/index.ts link create \
+bun src/index.ts --config dev-config.yaml link create \
   --url "https://example.com/draft" \
   --slug link-draft \
   --content "Draft link"
 
-bun run src/index.ts link create \
+bun src/index.ts --config dev-config.yaml link create \
   --url "https://example.com/published" \
   --slug link-published \
   --content "Published link" \
   --tags tech
 
-bun run src/index.ts link publish link-published
+bun src/index.ts --config dev-config.yaml link publish link-published
 ```
 
 ## List All (Default)
 
 ```bash
-bun run src/index.ts link list
+bun src/index.ts --config dev-config.yaml link list
 ```
 
 **Expected:** Shows both links in table format with slug, title, status, date.
@@ -33,7 +33,7 @@ bun run src/index.ts link list
 ## List Drafts Only
 
 ```bash
-bun run src/index.ts link list --status draft
+bun src/index.ts --config dev-config.yaml link list --status draft
 ```
 
 **Expected:** Shows only `link-draft`.
@@ -41,7 +41,7 @@ bun run src/index.ts link list --status draft
 ## List Published Only
 
 ```bash
-bun run src/index.ts link list --status published
+bun src/index.ts --config dev-config.yaml link list --status published
 ```
 
 **Expected:** Shows only `link-published`.
@@ -49,7 +49,7 @@ bun run src/index.ts link list --status published
 ## List by Tag
 
 ```bash
-bun run src/index.ts link list --tag tech
+bun src/index.ts --config dev-config.yaml link list --tag tech
 ```
 
 **Expected:** Shows only `link-published` (has tech tag).
@@ -57,7 +57,7 @@ bun run src/index.ts link list --tag tech
 ## List with Limit
 
 ```bash
-bun run src/index.ts link list --limit 1
+bun src/index.ts --config dev-config.yaml link list --limit 1
 ```
 
 **Expected:** Shows only 1 link.
@@ -65,7 +65,7 @@ bun run src/index.ts link list --limit 1
 ## List as JSON
 
 ```bash
-bun run src/index.ts link list --json
+bun src/index.ts --config dev-config.yaml link list --json
 ```
 
 **Expected:** JSON array of link objects.
@@ -73,6 +73,6 @@ bun run src/index.ts link list --json
 ## Cleanup
 
 ```bash
-bun run src/index.ts link delete link-draft --force
-bun run src/index.ts link delete link-published --force
+bun src/index.ts --config dev-config.yaml link delete link-draft --force
+bun src/index.ts --config dev-config.yaml link delete link-published --force
 ```

@@ -6,7 +6,7 @@ Test editing note content.
 
 ```bash
 cd cli
-bun run src/index.ts note create \
+bun src/index.ts --config dev-config.yaml note create \
   --slug edit-test-note \
   --content "Original content"
 ```
@@ -14,7 +14,7 @@ bun run src/index.ts note create \
 ## Edit Content
 
 ```bash
-bun run src/index.ts note edit edit-test-note --content "Updated content here"
+bun src/index.ts --config dev-config.yaml note edit edit-test-note --content "Updated content here"
 ```
 
 **Expected:**
@@ -27,7 +27,7 @@ bun run src/index.ts note edit edit-test-note --content "Updated content here"
 ## Verify Content Changed
 
 ```bash
-bun run src/index.ts note show edit-test-note
+bun src/index.ts --config dev-config.yaml note show edit-test-note
 ```
 
 **Expected:** Shows "Updated content here" (not original).
@@ -45,7 +45,7 @@ Content updated from file.
 Multiple paragraphs work too.
 EOF
 
-bun run src/index.ts note edit edit-test-note --file /tmp/updated-note.md
+bun src/index.ts --config dev-config.yaml note edit edit-test-note --file /tmp/updated-note.md
 ```
 
 **Expected:**
@@ -59,7 +59,7 @@ bun run src/index.ts note edit edit-test-note --file /tmp/updated-note.md
 ## Verify File Content
 
 ```bash
-bun run src/index.ts note show edit-test-note
+bun src/index.ts --config dev-config.yaml note show edit-test-note
 ```
 
 **Expected:** Shows content from file (slug in frontmatter is ignored).
@@ -67,6 +67,6 @@ bun run src/index.ts note show edit-test-note
 ## Cleanup
 
 ```bash
-bun run src/index.ts note delete edit-test-note --force
+bun src/index.ts --config dev-config.yaml note delete edit-test-note --force
 rm /tmp/updated-note.md
 ```

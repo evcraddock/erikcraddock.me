@@ -8,15 +8,15 @@ Test listing tags with post counts.
 cd cli
 
 # Create posts with tags to have meaningful counts
-bun run src/index.ts post create --title "Tag Test 1" --slug tag-test-1 --content "Content" --tags tech,testing
-bun run src/index.ts post create --title "Tag Test 2" --slug tag-test-2 --content "Content" --tags tech,demo
-bun run src/index.ts post create --title "Tag Test 3" --slug tag-test-3 --content "Content" --tags demo
+bun src/index.ts --config dev-config.yaml post create --title "Tag Test 1" --slug tag-test-1 --content "Content" --tags tech,testing
+bun src/index.ts --config dev-config.yaml post create --title "Tag Test 2" --slug tag-test-2 --content "Content" --tags tech,demo
+bun src/index.ts --config dev-config.yaml post create --title "Tag Test 3" --slug tag-test-3 --content "Content" --tags demo
 ```
 
 ## List All Tags
 
 ```bash
-bun run src/index.ts tag list
+bun src/index.ts --config dev-config.yaml tag list
 ```
 
 **Expected:** Table with TAG and COUNT columns:
@@ -29,7 +29,7 @@ bun run src/index.ts tag list
 ## List as JSON
 
 ```bash
-bun run src/index.ts tag list --json
+bun src/index.ts --config dev-config.yaml tag list --json
 ```
 
 **Expected:** JSON array of tag objects with id, name, slug, count fields.
@@ -39,7 +39,7 @@ bun run src/index.ts tag list --json
 If no posts exist with tags:
 
 ```bash
-bun run src/index.ts tag list
+bun src/index.ts --config dev-config.yaml tag list
 ```
 
 **Expected:** Either "No tags found." or empty table.
@@ -47,7 +47,7 @@ bun run src/index.ts tag list
 ## Cleanup
 
 ```bash
-bun run src/index.ts post delete tag-test-1 --force
-bun run src/index.ts post delete tag-test-2 --force
-bun run src/index.ts post delete tag-test-3 --force
+bun src/index.ts --config dev-config.yaml post delete tag-test-1 --force
+bun src/index.ts --config dev-config.yaml post delete tag-test-2 --force
+bun src/index.ts --config dev-config.yaml post delete tag-test-3 --force
 ```

@@ -6,7 +6,7 @@ Test editing post fields.
 
 ```bash
 cd cli
-bun run src/index.ts post create \
+bun src/index.ts --config dev-config.yaml post create \
   --title "Edit Test" \
   --slug edit-test \
   --content "Original content" \
@@ -16,7 +16,7 @@ bun run src/index.ts post create \
 ## Edit Title
 
 ```bash
-bun run src/index.ts post edit edit-test --title "Updated Title"
+bun src/index.ts --config dev-config.yaml post edit edit-test --title "Updated Title"
 ```
 
 **Expected:**
@@ -29,13 +29,13 @@ bun run src/index.ts post edit edit-test --title "Updated Title"
 **Verify:**
 
 ```bash
-bun run src/index.ts post show edit-test
+bun src/index.ts --config dev-config.yaml post show edit-test
 ```
 
 ## Edit Content
 
 ```bash
-bun run src/index.ts post edit edit-test --content "New content here"
+bun src/index.ts --config dev-config.yaml post edit edit-test --content "New content here"
 ```
 
 **Expected:** Success message, content updated.
@@ -43,7 +43,7 @@ bun run src/index.ts post edit edit-test --content "New content here"
 ## Edit Tags
 
 ```bash
-bun run src/index.ts post edit edit-test --tags new,tags
+bun src/index.ts --config dev-config.yaml post edit edit-test --tags new,tags
 ```
 
 **Expected:** Tags replaced with `new, tags`.
@@ -51,7 +51,7 @@ bun run src/index.ts post edit edit-test --tags new,tags
 ## Edit Multiple Fields
 
 ```bash
-bun run src/index.ts post edit edit-test \
+bun src/index.ts --config dev-config.yaml post edit edit-test \
   --title "Final Title" \
   --excerpt "New excerpt"
 ```
@@ -61,7 +61,7 @@ bun run src/index.ts post edit edit-test \
 ## Edit Non-Existent
 
 ```bash
-bun run src/index.ts post edit does-not-exist --title "Fail"
+bun src/index.ts --config dev-config.yaml post edit does-not-exist --title "Fail"
 ```
 
 **Expected:**
@@ -73,5 +73,5 @@ bun run src/index.ts post edit does-not-exist --title "Fail"
 ## Cleanup
 
 ```bash
-bun run src/index.ts post delete edit-test --force
+bun src/index.ts --config dev-config.yaml post delete edit-test --force
 ```

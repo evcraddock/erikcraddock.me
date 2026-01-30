@@ -6,7 +6,7 @@ Test error handling for invalid inputs.
 
 ```bash
 cd cli
-bun run src/index.ts link create --slug test --content "Test"
+bun src/index.ts --config dev-config.yaml link create --slug test --content "Test"
 ```
 
 **Expected:**
@@ -19,7 +19,7 @@ bun run src/index.ts link create --slug test --content "Test"
 ## Missing Slug
 
 ```bash
-bun run src/index.ts link create --url "https://example.com" --content "Test"
+bun src/index.ts --config dev-config.yaml link create --url "https://example.com" --content "Test"
 ```
 
 **Expected:**
@@ -32,7 +32,7 @@ bun run src/index.ts link create --url "https://example.com" --content "Test"
 ## Missing Content
 
 ```bash
-bun run src/index.ts link create --url "https://example.com" --slug test
+bun src/index.ts --config dev-config.yaml link create --url "https://example.com" --slug test
 ```
 
 **Expected:**
@@ -45,7 +45,7 @@ bun run src/index.ts link create --url "https://example.com" --slug test
 ## Invalid Source ID
 
 ```bash
-bun run src/index.ts link create \
+bun src/index.ts --config dev-config.yaml link create \
   --url "https://example.com" \
   --slug test \
   --content "Test" \
@@ -61,7 +61,7 @@ bun run src/index.ts link create \
 ## File Not Found
 
 ```bash
-bun run src/index.ts link create --file /nonexistent/file.md
+bun src/index.ts --config dev-config.yaml link create --file /nonexistent/file.md
 ```
 
 **Expected:**

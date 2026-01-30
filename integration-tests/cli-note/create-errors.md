@@ -6,7 +6,7 @@ Test error handling for invalid inputs.
 
 ```bash
 cd cli
-bun run src/index.ts note create --content "Test content"
+bun src/index.ts --config dev-config.yaml note create --content "Test content"
 ```
 
 **Expected:**
@@ -19,7 +19,7 @@ bun run src/index.ts note create --content "Test content"
 ## Missing Content
 
 ```bash
-bun run src/index.ts note create --slug test
+bun src/index.ts --config dev-config.yaml note create --slug test
 ```
 
 **Expected:**
@@ -32,7 +32,7 @@ bun run src/index.ts note create --slug test
 ## File Not Found
 
 ```bash
-bun run src/index.ts note create --file /nonexistent/file.md
+bun src/index.ts --config dev-config.yaml note create --file /nonexistent/file.md
 ```
 
 **Expected:**
@@ -50,7 +50,7 @@ slug: empty-test
 ---
 EOF
 
-bun run src/index.ts note create --file /tmp/empty-note.md
+bun src/index.ts --config dev-config.yaml note create --file /tmp/empty-note.md
 ```
 
 **Expected:**

@@ -6,7 +6,7 @@ Create a simple note with required fields only.
 
 ```bash
 cd cli
-bun run src/index.ts note create \
+bun src/index.ts --config dev-config.yaml note create \
   --slug test-note \
   --content "Just shipped a new feature! 🚀"
 ```
@@ -21,7 +21,7 @@ bun run src/index.ts note create \
 ## Verify
 
 ```bash
-bun run src/index.ts note show test-note
+bun src/index.ts --config dev-config.yaml note show test-note
 ```
 
 **Expected:**
@@ -39,5 +39,5 @@ Just shipped a new feature! 🚀
 ## Cleanup
 
 ```bash
-bun run src/index.ts note delete test-note --force
+bun src/index.ts --config dev-config.yaml note delete test-note --force
 ```

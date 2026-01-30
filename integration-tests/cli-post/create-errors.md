@@ -6,7 +6,7 @@ Test validation and error handling for post creation.
 
 ```bash
 cd cli
-bun run src/index.ts post create \
+bun src/index.ts --config dev-config.yaml post create \
   --title "No Slug Post" \
   --content "This should fail"
 ```
@@ -21,7 +21,7 @@ Run 'ec post create --help' for usage.
 ## Missing Content
 
 ```bash
-bun run src/index.ts post create \
+bun src/index.ts --config dev-config.yaml post create \
   --title "No Content Post" \
   --slug no-content-post
 ```
@@ -36,7 +36,7 @@ Run 'ec post create --help' for usage.
 ## Article Without Title
 
 ```bash
-bun run src/index.ts post create \
+bun src/index.ts --config dev-config.yaml post create \
   --slug no-title-article \
   --content "Article needs a title"
 ```
@@ -50,7 +50,7 @@ bun run src/index.ts post create \
 ## Invalid Slug Format
 
 ```bash
-bun run src/index.ts post create \
+bun src/index.ts --config dev-config.yaml post create \
   --title "Bad Slug" \
   --slug "Invalid Slug With Spaces" \
   --content "This should fail"
@@ -62,13 +62,13 @@ bun run src/index.ts post create \
 
 ```bash
 # Create first post
-bun run src/index.ts post create \
+bun src/index.ts --config dev-config.yaml post create \
   --title "First" \
   --slug duplicate-test \
   --content "First post"
 
 # Try to create with same slug
-bun run src/index.ts post create \
+bun src/index.ts --config dev-config.yaml post create \
   --title "Second" \
   --slug duplicate-test \
   --content "Should fail"
@@ -79,5 +79,5 @@ bun run src/index.ts post create \
 **Cleanup:**
 
 ```bash
-bun run src/index.ts post delete duplicate-test --force
+bun src/index.ts --config dev-config.yaml post delete duplicate-test --force
 ```
