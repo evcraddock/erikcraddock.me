@@ -14,7 +14,14 @@ import {
   PostStatus,
 } from "@/services/posts";
 import { createMedia, deleteMedia, getMedia, isAllowedMimeType } from "@/services/media";
-import { listSources, getSource, createSource } from "@/services/sources";
+import {
+  listSources,
+  getSource,
+  createSource,
+  updateSource,
+  deleteSource,
+} from "@/services/sources";
+import { listTags } from "@/services/tags";
 import { federatePost } from "@/federation/publish";
 
 export const api = new Hono();
@@ -491,6 +498,73 @@ api.post("/sources", async (c) => {
   } catch (error) {
     return c.json({ error: String(error) }, 400);
   }
+});
+
+/**
+ * PUT /api/sources/:id - Update source
+ */
+api.put("/sources/:id", async (c) => {
+  const id = parseInt(c.req.param("id"), 10);
+
+  if (isNaN(id)) {
+    return c.json({ error: "Invalid source ID" }, 400);
+  }
+
+  const body = await c.req.json();
+  const { name, url, feed_url } = body;
+
+  // Validate name if provided
+  if (name !== undefined && (typeof name !== "string" || name.trim().length === 0)) {
+    return c.json({ error: "Name cannot be empty" }, 400);
+  }
+
+  // Validate url if provided
+  if (url !== undefined && (typeof url !== "string" || url.trim().length === 0)) {
+    return c.json({ error: "URL cannot be empty" }, 400);
+  }
+
+  try {
+    const source = updateSource(id, {
+      name: name?.trim(),
+      url: url?.trim(),
+      feed_url: feed_url !== undefined ? feed_url?.trim() || null : undefined,
+    });
+
+    if (!source) {
+      return c.json({ error: "Source not found" }, 404);
+    }
+
+    return c.json({ data: source });
+  } catch (error) {
+    return c.json({ error: String(error) }, 400);
+  }
+});
+
+/**
+ * DELETE /api/sources/:id - Delete source
+ */
+api.delete("/sources/:id", (c) => {
+  const id = parseInt(c.req.param("id"), 10);
+
+  if (isNaN(id)) {
+    return c.json({ error: "Invalid source ID" }, 400);
+  }
+
+  const deleted = deleteSource(id);
+
+  if (!deleted) {
+    return c.json({ error: "Source not found" }, 404);
+  }
+
+  return c.body(null, 204);
+});
+
+/**
+ * GET /api/tags - List all tags with counts
+ */
+api.get("/tags", (c) => {
+  const tags = listTags();
+  return c.json({ data: tags });
 });
 
 /**
