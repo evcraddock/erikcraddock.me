@@ -64,9 +64,32 @@ If any prerequisite fails, mark ALL tests in this file as FAIL and move on.
 ### Invalid Email Handling (Security)
 
 1. Navigate to http://localhost:5000/login
-2. Submit with email "notallowed@example.com" (not in authors table)
-3. **PASS**: Same "Check your email" success message (no enumeration)
-4. **FAIL**: Different message revealing email is invalid
+2. Fill email field with unauthorized email:
+   ```javascript
+   (function () {
+     var input = document.querySelector("input[type=email]");
+     var setter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, "value").set;
+     setter.call(input, "notauthorized@example.com");
+     input.dispatchEvent(new Event("input", { bubbles: true }));
+   })();
+   ```
+3. Click submit button:
+   ```javascript
+   document.querySelector("button[type=submit]").click();
+   ```
+4. **PASS**: Same "Check your email" success message (no enumeration)
+5. **FAIL**: Different message revealing email is invalid
+
+### No Magic Link for Invalid Email
+
+1. After submitting invalid email above, check server logs (`make dev-tail`)
+2. Look for log lines:
+   ```
+   [HH:MM:SS] DEBUG auth Login attempt {"email":"notauthorized@example.com"}
+   [HH:MM:SS] DEBUG auth Magic link requested for unauthorized email
+   ```
+3. **PASS**: No magic link URL in logs (only "unauthorized email" debug message)
+4. **FAIL**: Magic link URL visible for unauthorized email
 
 ### Expired Magic Link
 
