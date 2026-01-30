@@ -131,7 +131,7 @@ async function uploadImage(
   const filename = path.basename(filePath);
   const key = `posts/${slug}/${filename}`;
 
-  const result = await client.uploadMedia(filePath, key);
+  const result = await client.uploadMedia(filePath, { key });
   if (result.error || !result.data) {
     throw new Error(`Failed to upload ${filename}: ${result.error || "Unknown error"}`);
   }
