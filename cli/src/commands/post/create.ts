@@ -106,7 +106,7 @@ export async function create(args: string[], globalOptions: GlobalOptions): Prom
     return;
   }
 
-  const config = await loadConfig();
+  const config = await loadConfig(globalOptions.configPath);
   const apiUrl = globalOptions.apiUrl || config.api_url;
   const apiKey = globalOptions.apiKey || config.api_key;
 

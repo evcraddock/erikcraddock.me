@@ -6,7 +6,7 @@ Test publishing and unpublishing notes.
 
 ```bash
 cd cli
-bun run src/index.ts note create \
+bun src/index.ts --config dev-config.yaml note create \
   --slug publish-test-note \
   --content "Note to publish"
 ```
@@ -14,7 +14,7 @@ bun run src/index.ts note create \
 ## Verify Initial State (Draft)
 
 ```bash
-bun run src/index.ts note show publish-test-note | grep "Status:"
+bun src/index.ts --config dev-config.yaml note show publish-test-note | grep "Status:"
 ```
 
 **Expected:** `Status:    draft`
@@ -22,7 +22,7 @@ bun run src/index.ts note show publish-test-note | grep "Status:"
 ## Publish Note
 
 ```bash
-bun run src/index.ts note publish publish-test-note
+bun src/index.ts --config dev-config.yaml note publish publish-test-note
 ```
 
 **Expected:**
@@ -34,7 +34,7 @@ bun run src/index.ts note publish publish-test-note
 ## Verify Published
 
 ```bash
-bun run src/index.ts note show publish-test-note | grep -E "(Status:|Published:)"
+bun src/index.ts --config dev-config.yaml note show publish-test-note | grep -E "(Status:|Published:)"
 ```
 
 **Expected:**
@@ -57,7 +57,7 @@ sleep 1
 ## Unpublish Note
 
 ```bash
-bun run src/index.ts note unpublish publish-test-note
+bun src/index.ts --config dev-config.yaml note unpublish publish-test-note
 ```
 
 **Expected:**
@@ -69,7 +69,7 @@ bun run src/index.ts note unpublish publish-test-note
 ## Verify Unpublished
 
 ```bash
-bun run src/index.ts note show publish-test-note | grep "Status:"
+bun src/index.ts --config dev-config.yaml note show publish-test-note | grep "Status:"
 ```
 
 **Expected:** `Status:    draft`
@@ -77,5 +77,5 @@ bun run src/index.ts note show publish-test-note | grep "Status:"
 ## Cleanup
 
 ```bash
-bun run src/index.ts note delete publish-test-note --force
+bun src/index.ts --config dev-config.yaml note delete publish-test-note --force
 ```

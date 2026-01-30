@@ -6,7 +6,7 @@ Create a simple article with required fields only.
 
 ```bash
 cd cli
-bun run src/index.ts post create \
+bun src/index.ts --config dev-config.yaml post create \
   --title "Integration Test Post" \
   --slug integration-test-post \
   --content $'# Hello World\n\nThis is a test post created via CLI.'
@@ -26,7 +26,7 @@ bun run src/index.ts post create \
 ## Verify
 
 ```bash
-bun run src/index.ts post show integration-test-post
+bun src/index.ts --config dev-config.yaml post show integration-test-post
 ```
 
 Should display the post with correct title, slug, type, and content.
@@ -34,5 +34,5 @@ Should display the post with correct title, slug, type, and content.
 ## Cleanup
 
 ```bash
-bun run src/index.ts post delete integration-test-post --force
+bun src/index.ts --config dev-config.yaml post delete integration-test-post --force
 ```

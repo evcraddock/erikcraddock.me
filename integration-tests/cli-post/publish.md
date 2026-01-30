@@ -6,7 +6,7 @@ Test publishing and unpublishing posts, verifying visibility on the website.
 
 ```bash
 cd cli
-bun run src/index.ts post create \
+bun src/index.ts --config dev-config.yaml post create \
   --title "Publish Test" \
   --slug publish-test \
   --content $'# Hello\n\nThis is a published post.'
@@ -29,7 +29,7 @@ sleep 1
 ## Publish
 
 ```bash
-bun run src/index.ts post publish publish-test
+bun src/index.ts --config dev-config.yaml post publish publish-test
 ```
 
 **Expected:**
@@ -62,7 +62,7 @@ sleep 1
 ## Unpublish
 
 ```bash
-bun run src/index.ts post unpublish publish-test
+bun src/index.ts --config dev-config.yaml post unpublish publish-test
 ```
 
 **Expected:**
@@ -86,13 +86,13 @@ sleep 1
 ## Re-publish and Delete
 
 ```bash
-bun run src/index.ts post publish publish-test
+bun src/index.ts --config dev-config.yaml post publish publish-test
 ```
 
 Verify it's back on home page, then delete:
 
 ```bash
-bun run src/index.ts post delete publish-test --force
+bun src/index.ts --config dev-config.yaml post delete publish-test --force
 ```
 
 ## Verify Deleted Not on Home Page

@@ -14,7 +14,7 @@ convert -size 100x100 xc:blue /tmp/test-upload.jpg
 ## Basic Upload
 
 ```bash
-bun run src/index.ts image upload /tmp/test-upload.jpg
+bun src/index.ts --config dev-config.yaml image upload /tmp/test-upload.jpg
 ```
 
 **Expected:**
@@ -29,7 +29,7 @@ bun run src/index.ts image upload /tmp/test-upload.jpg
 ## Upload with Alt Text
 
 ```bash
-bun run src/index.ts image upload /tmp/test-upload.jpg --alt "A blue square"
+bun src/index.ts --config dev-config.yaml image upload /tmp/test-upload.jpg --alt "A blue square"
 ```
 
 **Expected:** Success message with ID and URL.
@@ -37,7 +37,7 @@ bun run src/index.ts image upload /tmp/test-upload.jpg --alt "A blue square"
 ## Upload with Custom Key
 
 ```bash
-bun run src/index.ts image upload /tmp/test-upload.jpg --key "test/custom-key.jpg"
+bun src/index.ts --config dev-config.yaml image upload /tmp/test-upload.jpg --key "test/custom-key.jpg"
 ```
 
 **Expected:** Key shows `test/custom-key.jpg`.
@@ -46,10 +46,10 @@ bun run src/index.ts image upload /tmp/test-upload.jpg --key "test/custom-key.jp
 
 ```bash
 # First create a test post
-bun run src/index.ts post create --title "Image Test" --slug image-test --content "Test"
+bun src/index.ts --config dev-config.yaml post create --title "Image Test" --slug image-test --content "Test"
 
 # Upload with --post
-bun run src/index.ts image upload /tmp/test-upload.jpg --post image-test
+bun src/index.ts --config dev-config.yaml image upload /tmp/test-upload.jpg --post image-test
 ```
 
 **Expected:** Key shows `posts/image-test/test-upload.jpg`.
@@ -57,7 +57,7 @@ bun run src/index.ts image upload /tmp/test-upload.jpg --post image-test
 ## Upload with Post and Custom Key
 
 ```bash
-bun run src/index.ts image upload /tmp/test-upload.jpg --post image-test --key banner.jpg
+bun src/index.ts --config dev-config.yaml image upload /tmp/test-upload.jpg --post image-test --key banner.jpg
 ```
 
 **Expected:** Key shows `posts/image-test/banner.jpg`.
@@ -65,7 +65,7 @@ bun run src/index.ts image upload /tmp/test-upload.jpg --post image-test --key b
 ## Upload with JSON Output
 
 ```bash
-bun run src/index.ts image upload /tmp/test-upload.jpg --json
+bun src/index.ts --config dev-config.yaml image upload /tmp/test-upload.jpg --json
 ```
 
 **Expected:** JSON object with id, url, key, filename, mime_type fields.
@@ -73,7 +73,7 @@ bun run src/index.ts image upload /tmp/test-upload.jpg --json
 ## Error: File Not Found
 
 ```bash
-bun run src/index.ts image upload /nonexistent/file.jpg 2>&1; echo "Exit: $?"
+bun src/index.ts --config dev-config.yaml image upload /nonexistent/file.jpg 2>&1; echo "Exit: $?"
 ```
 
 **Expected:** Error message "File not found" and exit code 1.
@@ -82,7 +82,7 @@ bun run src/index.ts image upload /nonexistent/file.jpg 2>&1; echo "Exit: $?"
 
 ```bash
 echo "test" > /tmp/test.txt
-bun run src/index.ts image upload /tmp/test.txt 2>&1; echo "Exit: $?"
+bun src/index.ts --config dev-config.yaml image upload /tmp/test.txt 2>&1; echo "Exit: $?"
 ```
 
 **Expected:** Error message about unsupported format and exit code 1.
@@ -90,7 +90,7 @@ bun run src/index.ts image upload /tmp/test.txt 2>&1; echo "Exit: $?"
 ## Error: Missing File Argument
 
 ```bash
-bun run src/index.ts image upload 2>&1; echo "Exit: $?"
+bun src/index.ts --config dev-config.yaml image upload 2>&1; echo "Exit: $?"
 ```
 
 **Expected:** Error message "File path is required" and exit code 1.
@@ -109,8 +109,8 @@ curl -I <url>
 
 ```bash
 # Delete test post
-bun run src/index.ts post delete image-test --force
+bun src/index.ts --config dev-config.yaml post delete image-test --force
 
 # Note image IDs from uploads and delete them
-bun run src/index.ts image delete <id> --yes
+bun src/index.ts --config dev-config.yaml image delete <id> --yes
 ```

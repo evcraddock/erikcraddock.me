@@ -43,3 +43,6 @@ data/
 # S3/MinIO local data
 .minio/
 cli/dist/
+
+# CLI dev config (contains API key)
+cli/dev-config.yaml

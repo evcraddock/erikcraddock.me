@@ -6,7 +6,7 @@ Create an article with tags, excerpt, and JSON output.
 
 ```bash
 cd cli
-bun run src/index.ts post create \
+bun src/index.ts --config dev-config.yaml post create \
   --title "Tagged Test Post" \
   --slug tagged-test-post \
   --content "Content with tags" \
@@ -27,7 +27,7 @@ bun run src/index.ts post create \
 ## Verify with JSON
 
 ```bash
-bun run src/index.ts post show tagged-test-post --json
+bun src/index.ts --config dev-config.yaml post show tagged-test-post --json
 ```
 
 Should include `"tags": ["tech", "testing"]` and `"excerpt": "A short summary"`.
@@ -35,5 +35,5 @@ Should include `"tags": ["tech", "testing"]` and `"excerpt": "A short summary"`.
 ## Cleanup
 
 ```bash
-bun run src/index.ts post delete tagged-test-post --force
+bun src/index.ts --config dev-config.yaml post delete tagged-test-post --force
 ```

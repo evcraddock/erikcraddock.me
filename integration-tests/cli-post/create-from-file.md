@@ -32,7 +32,7 @@ EOF
 ## Create from File
 
 ```bash
-bun run src/index.ts post create --file /tmp/test-post.md
+bun src/index.ts --config dev-config.yaml post create --file /tmp/test-post.md
 ```
 
 **Expected:**
@@ -49,7 +49,7 @@ bun run src/index.ts post create --file /tmp/test-post.md
 ## Verify Post Created
 
 ```bash
-bun run src/index.ts post show file-created-post
+bun src/index.ts --config dev-config.yaml post show file-created-post
 ```
 
 **Expected:** Shows title "File Created Post", tags "Test, File Based", and content starting with "# Hello from File".
@@ -57,7 +57,7 @@ bun run src/index.ts post show file-created-post
 ## Publish and Verify on Home Page
 
 ```bash
-bun run src/index.ts post publish file-created-post
+bun src/index.ts --config dev-config.yaml post publish file-created-post
 
 ~/.local/share/pi-skills/browser-tools/browser-nav.js http://localhost:5000
 sleep 1
@@ -83,7 +83,7 @@ sleep 1
 ## Pull Back and Verify Roundtrip
 
 ```bash
-bun run src/index.ts post pull file-created-post --output /tmp/pulled.md
+bun src/index.ts --config dev-config.yaml post pull file-created-post --output /tmp/pulled.md
 cat /tmp/pulled.md
 ```
 
@@ -109,7 +109,7 @@ excerpt: This post was updated from a file.
 The content has been changed via file-based editing.
 EOF
 
-bun run src/index.ts post edit file-created-post --file /tmp/updated-post.md
+bun src/index.ts --config dev-config.yaml post edit file-created-post --file /tmp/updated-post.md
 ```
 
 **Expected:**
@@ -126,7 +126,7 @@ bun run src/index.ts post edit file-created-post --file /tmp/updated-post.md
 ## Verify Update
 
 ```bash
-bun run src/index.ts post show file-created-post
+bun src/index.ts --config dev-config.yaml post show file-created-post
 ```
 
 **Expected:** Title is "Updated via File", tags are "Updated, Roundtrip".
@@ -134,7 +134,7 @@ bun run src/index.ts post show file-created-post
 ## CLI Override of Frontmatter
 
 ```bash
-bun run src/index.ts post edit file-created-post --file /tmp/updated-post.md --tags cli,override
+bun src/index.ts --config dev-config.yaml post edit file-created-post --file /tmp/updated-post.md --tags cli,override
 ```
 
 **Expected:** Tags are "Cli, Override" (CLI flag overrides frontmatter).
@@ -142,6 +142,6 @@ bun run src/index.ts post edit file-created-post --file /tmp/updated-post.md --t
 ## Cleanup
 
 ```bash
-bun run src/index.ts post delete file-created-post --force
+bun src/index.ts --config dev-config.yaml post delete file-created-post --force
 rm /tmp/test-post.md /tmp/updated-post.md /tmp/pulled.md
 ```

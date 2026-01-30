@@ -6,7 +6,7 @@ Test downloading notes as markdown files.
 
 ```bash
 cd cli
-bun run src/index.ts note create \
+bun src/index.ts --config dev-config.yaml note create \
   --slug pull-test-note \
   --content "This is a note to pull."
 ```
@@ -14,7 +14,7 @@ bun run src/index.ts note create \
 ## Pull to Default Filename
 
 ```bash
-bun run src/index.ts note pull pull-test-note
+bun src/index.ts --config dev-config.yaml note pull pull-test-note
 ```
 
 **Expected:**
@@ -47,7 +47,7 @@ Note: Notes have minimal frontmatter - no title, tags, or excerpt.
 ## Pull to Custom Path
 
 ```bash
-bun run src/index.ts note pull pull-test-note -o /tmp/custom-note.md
+bun src/index.ts --config dev-config.yaml note pull pull-test-note -o /tmp/custom-note.md
 cat /tmp/custom-note.md
 ```
 
@@ -56,7 +56,7 @@ cat /tmp/custom-note.md
 ## Pull as JSON
 
 ```bash
-bun run src/index.ts note pull pull-test-note --json
+bun src/index.ts --config dev-config.yaml note pull pull-test-note --json
 ```
 
 **Expected:** Full JSON object (not saved to file).
@@ -64,6 +64,6 @@ bun run src/index.ts note pull pull-test-note --json
 ## Cleanup
 
 ```bash
-bun run src/index.ts note delete pull-test-note --force
+bun src/index.ts --config dev-config.yaml note delete pull-test-note --force
 rm pull-test-note.md /tmp/custom-note.md
 ```

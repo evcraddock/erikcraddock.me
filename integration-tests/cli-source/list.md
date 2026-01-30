@@ -8,14 +8,14 @@ Test listing sources.
 cd cli
 
 # Create test sources
-bun run src/index.ts source create --name "Source One" --url "https://one.example.com"
-bun run src/index.ts source create --name "Source Two" --url "https://two.example.com" --feed-url "https://two.example.com/feed"
+bun src/index.ts --config dev-config.yaml source create --name "Source One" --url "https://one.example.com"
+bun src/index.ts --config dev-config.yaml source create --name "Source Two" --url "https://two.example.com" --feed-url "https://two.example.com/feed"
 ```
 
 ## List All Sources
 
 ```bash
-bun run src/index.ts source list
+bun src/index.ts --config dev-config.yaml source list
 ```
 
 **Expected:** Table with ID, NAME, URL columns showing both sources.
@@ -23,7 +23,7 @@ bun run src/index.ts source list
 ## List as JSON
 
 ```bash
-bun run src/index.ts source list --json
+bun src/index.ts --config dev-config.yaml source list --json
 ```
 
 **Expected:** JSON array of source objects with id, name, url, feed_url fields.
@@ -32,7 +32,7 @@ bun run src/index.ts source list --json
 
 ```bash
 # After cleanup, verify empty list
-bun run src/index.ts source list
+bun src/index.ts --config dev-config.yaml source list
 ```
 
 **Expected:** "No sources found." message.
@@ -40,5 +40,5 @@ bun run src/index.ts source list
 ## Cleanup
 
 ```bash
-bun run src/index.ts source list --json | jq -r '.[].id' | xargs -I {} bun run src/index.ts source delete {} --force
+bun src/index.ts --config dev-config.yaml source list --json | jq -r '.[].id' | xargs -I {} bun src/index.ts --config dev-config.yaml source delete {} --force
 ```

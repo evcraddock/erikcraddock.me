@@ -6,7 +6,7 @@ Test creating sources with various options.
 
 ```bash
 cd cli
-bun run src/index.ts source create --name "Test Source" --url "https://example.com"
+bun src/index.ts --config dev-config.yaml source create --name "Test Source" --url "https://example.com"
 ```
 
 **Expected:** Success message with source ID.
@@ -14,7 +14,7 @@ bun run src/index.ts source create --name "Test Source" --url "https://example.c
 ## Create with Feed URL
 
 ```bash
-bun run src/index.ts source create --name "Hacker News" --url "https://news.ycombinator.com" --feed-url "https://news.ycombinator.com/rss"
+bun src/index.ts --config dev-config.yaml source create --name "Hacker News" --url "https://news.ycombinator.com" --feed-url "https://news.ycombinator.com/rss"
 ```
 
 **Expected:** Success message with source ID.
@@ -22,7 +22,7 @@ bun run src/index.ts source create --name "Hacker News" --url "https://news.ycom
 ## Create with JSON Output
 
 ```bash
-bun run src/index.ts source create --name "JSON Test" --url "https://json.example.com" --json
+bun src/index.ts --config dev-config.yaml source create --name "JSON Test" --url "https://json.example.com" --json
 ```
 
 **Expected:** JSON object with id, name, url, feed_url fields.
@@ -30,7 +30,7 @@ bun run src/index.ts source create --name "JSON Test" --url "https://json.exampl
 ## Error: Missing Name
 
 ```bash
-bun run src/index.ts source create --url "https://example.com"
+bun src/index.ts --config dev-config.yaml source create --url "https://example.com"
 ```
 
 **Expected:** Error message about missing --name.
@@ -38,7 +38,7 @@ bun run src/index.ts source create --url "https://example.com"
 ## Error: Missing URL
 
 ```bash
-bun run src/index.ts source create --name "Test"
+bun src/index.ts --config dev-config.yaml source create --name "Test"
 ```
 
 **Expected:** Error message about missing --url.
@@ -47,8 +47,8 @@ bun run src/index.ts source create --name "Test"
 
 ```bash
 # List sources to get IDs
-bun run src/index.ts source list
+bun src/index.ts --config dev-config.yaml source list
 
 # Delete test sources (replace IDs as needed)
-bun run src/index.ts source delete <id> --force
+bun src/index.ts --config dev-config.yaml source delete <id> --force
 ```

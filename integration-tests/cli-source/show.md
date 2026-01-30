@@ -8,7 +8,7 @@ Test showing source details.
 cd cli
 
 # Create a test source and capture ID
-bun run src/index.ts source create --name "Show Test" --url "https://show.example.com" --feed-url "https://show.example.com/rss" --json
+bun src/index.ts --config dev-config.yaml source create --name "Show Test" --url "https://show.example.com" --feed-url "https://show.example.com/rss" --json
 ```
 
 Note the ID from the output.
@@ -16,7 +16,7 @@ Note the ID from the output.
 ## Show Source Details
 
 ```bash
-bun run src/index.ts source show <id>
+bun src/index.ts --config dev-config.yaml source show <id>
 ```
 
 **Expected:** Formatted output with:
@@ -29,7 +29,7 @@ bun run src/index.ts source show <id>
 ## Show as JSON
 
 ```bash
-bun run src/index.ts source show <id> --json
+bun src/index.ts --config dev-config.yaml source show <id> --json
 ```
 
 **Expected:** JSON object with all source fields.
@@ -37,7 +37,7 @@ bun run src/index.ts source show <id> --json
 ## Error: Non-existent ID
 
 ```bash
-bun run src/index.ts source show 99999
+bun src/index.ts --config dev-config.yaml source show 99999
 ```
 
 **Expected:** Error message "Source not found".
@@ -45,7 +45,7 @@ bun run src/index.ts source show 99999
 ## Error: Missing ID
 
 ```bash
-bun run src/index.ts source show
+bun src/index.ts --config dev-config.yaml source show
 ```
 
 **Expected:** Error message about missing source ID.
@@ -53,5 +53,5 @@ bun run src/index.ts source show
 ## Cleanup
 
 ```bash
-bun run src/index.ts source delete <id> --force
+bun src/index.ts --config dev-config.yaml source delete <id> --force
 ```

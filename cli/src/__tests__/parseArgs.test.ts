@@ -36,6 +36,17 @@ describe("parseArgs", () => {
     expect(result.command).toEqual(["post", "list"]);
   });
 
+  it("parses --config with space separator", () => {
+    const result = parseArgs(["--config", "./dev-config.yaml", "post", "list"]);
+    expect(result.options.configPath).toBe("./dev-config.yaml");
+    expect(result.command).toEqual(["post", "list"]);
+  });
+
+  it("parses --config with equals separator", () => {
+    const result = parseArgs(["--config=/path/to/config.yaml", "login"]);
+    expect(result.options.configPath).toBe("/path/to/config.yaml");
+  });
+
   it("parses --api-url with space separator", () => {
     const result = parseArgs(["--api-url", "https://example.com/api", "login"]);
     expect(result.options.apiUrl).toBe("https://example.com/api");

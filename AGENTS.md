@@ -138,6 +138,40 @@ For streaming logs (blocks terminal):
 make dev-logs      # Ctrl+C to stop
 ```
 
+## CLI Development
+
+The `ec` CLI is in the `cli/` directory. When running CLI commands against the local dev server, use the dev config file.
+
+### Setup
+
+```bash
+# Copy the example config
+cp cli/dev-config.yaml.example cli/dev-config.yaml
+
+# Login to get an API key
+bun cli/src/index.ts login --config cli/dev-config.yaml --api-url http://localhost:5000/api
+```
+
+### Running CLI Commands
+
+Always use `--config cli/dev-config.yaml` when testing against the local dev server:
+
+```bash
+bun cli/src/index.ts --config cli/dev-config.yaml post list
+bun cli/src/index.ts --config cli/dev-config.yaml post create --title "Test" --slug test
+```
+
+Or set the environment variable once per session:
+
+```bash
+export EC_CONFIG=cli/dev-config.yaml
+bun cli/src/index.ts post list
+```
+
+### Integration Tests
+
+CLI integration tests are in `integration-tests/cli-*/`. These tests assume `EC_CONFIG=cli/dev-config.yaml` is set or `--config cli/dev-config.yaml` is used.
+
 ## Task Lifecycle
 
 - **Starting**: ALWAYS run `task-start-preflight` skill first

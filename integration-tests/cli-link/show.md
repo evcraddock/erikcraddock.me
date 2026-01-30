@@ -6,7 +6,7 @@ Test showing link details.
 
 ```bash
 cd cli
-bun run src/index.ts link create \
+bun src/index.ts --config dev-config.yaml link create \
   --url "https://example.com/article" \
   --slug show-test-link \
   --content "Great article about testing" \
@@ -17,7 +17,7 @@ bun run src/index.ts link create \
 ## Show Link
 
 ```bash
-bun run src/index.ts link show show-test-link
+bun src/index.ts --config dev-config.yaml link show show-test-link
 ```
 
 **Expected:**
@@ -38,7 +38,7 @@ Great article about testing
 ## Show as JSON
 
 ```bash
-bun run src/index.ts link show show-test-link --json
+bun src/index.ts --config dev-config.yaml link show show-test-link --json
 ```
 
 **Expected:** Full JSON object with all fields including `url`, `type: "link"`.
@@ -46,7 +46,7 @@ bun run src/index.ts link show show-test-link --json
 ## Show Non-existent Link
 
 ```bash
-bun run src/index.ts link show nonexistent-link
+bun src/index.ts --config dev-config.yaml link show nonexistent-link
 ```
 
 **Expected:**
@@ -58,5 +58,5 @@ bun run src/index.ts link show nonexistent-link
 ## Cleanup
 
 ```bash
-bun run src/index.ts link delete show-test-link --force
+bun src/index.ts --config dev-config.yaml link delete show-test-link --force
 ```

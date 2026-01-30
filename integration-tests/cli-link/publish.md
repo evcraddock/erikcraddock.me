@@ -6,7 +6,7 @@ Test publishing and unpublishing links.
 
 ```bash
 cd cli
-bun run src/index.ts link create \
+bun src/index.ts --config dev-config.yaml link create \
   --url "https://example.com/article" \
   --slug publish-test-link \
   --content "Link to publish"
@@ -15,7 +15,7 @@ bun run src/index.ts link create \
 ## Verify Initial State (Draft)
 
 ```bash
-bun run src/index.ts link show publish-test-link | grep "Status:"
+bun src/index.ts --config dev-config.yaml link show publish-test-link | grep "Status:"
 ```
 
 **Expected:** `Status:    draft`
@@ -23,7 +23,7 @@ bun run src/index.ts link show publish-test-link | grep "Status:"
 ## Publish Link
 
 ```bash
-bun run src/index.ts link publish publish-test-link
+bun src/index.ts --config dev-config.yaml link publish publish-test-link
 ```
 
 **Expected:**
@@ -36,7 +36,7 @@ bun run src/index.ts link publish publish-test-link
 ## Verify Published
 
 ```bash
-bun run src/index.ts link show publish-test-link | grep -E "(Status:|Published:)"
+bun src/index.ts --config dev-config.yaml link show publish-test-link | grep -E "(Status:|Published:)"
 ```
 
 **Expected:**
@@ -59,7 +59,7 @@ sleep 1
 ## Unpublish Link
 
 ```bash
-bun run src/index.ts link unpublish publish-test-link
+bun src/index.ts --config dev-config.yaml link unpublish publish-test-link
 ```
 
 **Expected:**
@@ -71,7 +71,7 @@ bun run src/index.ts link unpublish publish-test-link
 ## Verify Unpublished
 
 ```bash
-bun run src/index.ts link show publish-test-link | grep "Status:"
+bun src/index.ts --config dev-config.yaml link show publish-test-link | grep "Status:"
 ```
 
 **Expected:** `Status:    draft`
@@ -79,5 +79,5 @@ bun run src/index.ts link show publish-test-link | grep "Status:"
 ## Cleanup
 
 ```bash
-bun run src/index.ts link delete publish-test-link --force
+bun src/index.ts --config dev-config.yaml link delete publish-test-link --force
 ```

@@ -6,7 +6,7 @@ Test editing link fields.
 
 ```bash
 cd cli
-bun run src/index.ts link create \
+bun src/index.ts --config dev-config.yaml link create \
   --url "https://example.com/original" \
   --slug edit-test-link \
   --content "Original content"
@@ -15,7 +15,7 @@ bun run src/index.ts link create \
 ## Edit URL
 
 ```bash
-bun run src/index.ts link edit edit-test-link --url "https://example.com/updated"
+bun src/index.ts --config dev-config.yaml link edit edit-test-link --url "https://example.com/updated"
 ```
 
 **Expected:**
@@ -28,7 +28,7 @@ bun run src/index.ts link edit edit-test-link --url "https://example.com/updated
 ## Verify URL Changed
 
 ```bash
-bun run src/index.ts link show edit-test-link | grep "URL:"
+bun src/index.ts --config dev-config.yaml link show edit-test-link | grep "URL:"
 ```
 
 **Expected:** `URL:       https://example.com/updated`
@@ -36,7 +36,7 @@ bun run src/index.ts link show edit-test-link | grep "URL:"
 ## Edit Content
 
 ```bash
-bun run src/index.ts link edit edit-test-link --content "Updated commentary"
+bun src/index.ts --config dev-config.yaml link edit edit-test-link --content "Updated commentary"
 ```
 
 **Expected:**
@@ -49,7 +49,7 @@ bun run src/index.ts link edit edit-test-link --content "Updated commentary"
 ## Edit Tags
 
 ```bash
-bun run src/index.ts link edit edit-test-link --tags tech,updated
+bun src/index.ts --config dev-config.yaml link edit edit-test-link --tags tech,updated
 ```
 
 **Expected:**
@@ -72,7 +72,7 @@ tags: [file, updated]
 Content updated from file.
 EOF
 
-bun run src/index.ts link edit edit-test-link --file /tmp/updated-link.md
+bun src/index.ts --config dev-config.yaml link edit edit-test-link --file /tmp/updated-link.md
 ```
 
 **Expected:**
@@ -89,6 +89,6 @@ bun run src/index.ts link edit edit-test-link --file /tmp/updated-link.md
 ## Cleanup
 
 ```bash
-bun run src/index.ts link delete edit-test-link --force
+bun src/index.ts --config dev-config.yaml link delete edit-test-link --force
 rm /tmp/updated-link.md
 ```

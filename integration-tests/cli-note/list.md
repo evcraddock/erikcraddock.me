@@ -8,15 +8,15 @@ Test listing notes with various filters.
 cd cli
 
 # Create test notes
-bun run src/index.ts note create --slug note-draft --content "Draft note"
-bun run src/index.ts note create --slug note-published --content "Published note"
-bun run src/index.ts note publish note-published
+bun src/index.ts --config dev-config.yaml note create --slug note-draft --content "Draft note"
+bun src/index.ts --config dev-config.yaml note create --slug note-published --content "Published note"
+bun src/index.ts --config dev-config.yaml note publish note-published
 ```
 
 ## List All (Default)
 
 ```bash
-bun run src/index.ts note list
+bun src/index.ts --config dev-config.yaml note list
 ```
 
 **Expected:** Shows both notes in table format with slug, excerpt, status, date.
@@ -24,7 +24,7 @@ bun run src/index.ts note list
 ## List Drafts Only
 
 ```bash
-bun run src/index.ts note list --status draft
+bun src/index.ts --config dev-config.yaml note list --status draft
 ```
 
 **Expected:** Shows only `note-draft`.
@@ -32,7 +32,7 @@ bun run src/index.ts note list --status draft
 ## List Published Only
 
 ```bash
-bun run src/index.ts note list --status published
+bun src/index.ts --config dev-config.yaml note list --status published
 ```
 
 **Expected:** Shows only `note-published`.
@@ -40,7 +40,7 @@ bun run src/index.ts note list --status published
 ## List with Limit
 
 ```bash
-bun run src/index.ts note list --limit 1
+bun src/index.ts --config dev-config.yaml note list --limit 1
 ```
 
 **Expected:** Shows only 1 note.
@@ -48,7 +48,7 @@ bun run src/index.ts note list --limit 1
 ## List as JSON
 
 ```bash
-bun run src/index.ts note list --json
+bun src/index.ts --config dev-config.yaml note list --json
 ```
 
 **Expected:** JSON array of note objects.
@@ -56,6 +56,6 @@ bun run src/index.ts note list --json
 ## Cleanup
 
 ```bash
-bun run src/index.ts note delete note-draft --force
-bun run src/index.ts note delete note-published --force
+bun src/index.ts --config dev-config.yaml note delete note-draft --force
+bun src/index.ts --config dev-config.yaml note delete note-published --force
 ```

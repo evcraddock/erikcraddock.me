@@ -30,7 +30,7 @@ EOF
 
 ```bash
 cd cli
-bun run src/index.ts link create --file /tmp/test-link.md
+bun src/index.ts --config dev-config.yaml link create --file /tmp/test-link.md
 ```
 
 ## Expected Output
@@ -47,7 +47,7 @@ bun run src/index.ts link create --file /tmp/test-link.md
 ## Verify
 
 ```bash
-bun run src/index.ts link show hn-discussion
+bun src/index.ts --config dev-config.yaml link show hn-discussion
 ```
 
 **Expected:** Shows URL, title, tags, and content from the file.
@@ -55,7 +55,7 @@ bun run src/index.ts link show hn-discussion
 ## Pull and Verify Roundtrip
 
 ```bash
-bun run src/index.ts link pull hn-discussion -o /tmp/pulled-link.md
+bun src/index.ts --config dev-config.yaml link pull hn-discussion -o /tmp/pulled-link.md
 cat /tmp/pulled-link.md
 ```
 
@@ -64,6 +64,6 @@ cat /tmp/pulled-link.md
 ## Cleanup
 
 ```bash
-bun run src/index.ts link delete hn-discussion --force
+bun src/index.ts --config dev-config.yaml link delete hn-discussion --force
 rm /tmp/test-link.md /tmp/pulled-link.md
 ```
