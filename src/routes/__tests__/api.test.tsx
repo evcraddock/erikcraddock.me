@@ -17,6 +17,15 @@ vi.mock("@/db", async () => {
   };
 });
 
+// Mock federation setup to avoid bun:sqlite import in tests
+vi.mock("@/federation/setup", () => ({
+  federation: {
+    createContext: vi.fn(),
+    sendActivity: vi.fn(),
+  },
+  createFedifyFederation: vi.fn(),
+}));
+
 // Mock API key middleware to bypass auth in tests
 vi.mock("@/auth/api-key", async () => {
   const actual = await vi.importActual("@/auth/api-key");
