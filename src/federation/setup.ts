@@ -10,6 +10,7 @@ import {
 import { getOrCreateKeyPair } from "./keys";
 import { addFollower, removeFollower, getAllFollowers } from "./followers";
 import { getOutboxActivities, getPublishedPostCount } from "./outbox";
+import { getOrigin } from "./utils";
 import { logger } from "@/utils/logger";
 
 // Context type for federation - we use void since we don't need request-specific data
@@ -62,10 +63,14 @@ function getKvStore(): KvStore {
  * - Inbox, outbox, and followers collection dispatchers
  */
 export function createFedifyFederation() {
-  logger.info("federation", `Creating federation for domain: ${domain}`);
+  // Build canonical origin - ensures correct protocol (https) behind reverse proxy
+  const origin = getOrigin(domain);
+  logger.info("federation", `Creating federation for origin: ${origin}`);
 
   const federation = createFederation<FederationContext>({
     kv: getKvStore(),
+    // Explicitly set origin to ensure correct URLs behind reverse proxy
+    origin,
   });
 
   // Set up actor dispatcher - handles requests for /users/{identifier}
