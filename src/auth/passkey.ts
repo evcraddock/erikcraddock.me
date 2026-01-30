@@ -5,7 +5,7 @@ import {
   verifyAuthenticationResponse,
 } from "@simplewebauthn/server";
 import type { RegistrationResponseJSON, AuthenticationResponseJSON } from "@simplewebauthn/server";
-import { eq } from "drizzle-orm";
+import { eq, isNull } from "drizzle-orm";
 import { db, passkeys, authors } from "@/db";
 import { logger } from "@/utils/logger";
 
@@ -19,8 +19,9 @@ const challengeStore = new Map<string, string>();
 
 /**
  * Get passkeys for an author
+ * Pass null for admin passkeys
  */
-export function listPasskeys(authorId: number) {
+export function listPasskeys(authorId: number | null) {
   return db
     .select({
       id: passkeys.id,
@@ -29,19 +30,20 @@ export function listPasskeys(authorId: number) {
       last_used_at: passkeys.last_used_at,
     })
     .from(passkeys)
-    .where(eq(passkeys.author_id, authorId))
+    .where(authorId === null ? isNull(passkeys.author_id) : eq(passkeys.author_id, authorId))
     .all();
 }
 
 /**
  * Generate registration options for a new passkey
+ * Pass null for admin passkeys
  */
-export async function generatePasskeyRegistrationOptions(authorId: number, email: string) {
+export async function generatePasskeyRegistrationOptions(authorId: number | null, email: string) {
   // Get existing passkeys to exclude
   const existingPasskeys = db
     .select({ credential_id: passkeys.credential_id })
     .from(passkeys)
-    .where(eq(passkeys.author_id, authorId))
+    .where(authorId === null ? isNull(passkeys.author_id) : eq(passkeys.author_id, authorId))
     .all();
 
   const options = await generateRegistrationOptions({
@@ -69,9 +71,10 @@ export async function generatePasskeyRegistrationOptions(authorId: number, email
 
 /**
  * Verify and store a new passkey
+ * Pass null for admin passkeys
  */
 export async function verifyAndStorePasskey(
-  authorId: number,
+  authorId: number | null,
   email: string,
   name: string,
   response: RegistrationResponseJSON
@@ -184,12 +187,22 @@ export async function verifyPasskeyAuth(
     return { success: false, error: "Passkey not found" };
   }
 
-  // Get author
-  const author = db.select().from(authors).where(eq(authors.id, passkey.author_id)).get();
-
-  if (!author) {
-    logger.error("passkey", "Author not found for passkey", { passkeyId: passkey.id });
-    return { success: false, error: "Author not found" };
+  // Get email: admin passkeys have null author_id, use ADMIN_EMAIL
+  let userEmail: string;
+  if (passkey.author_id === null) {
+    const adminEmail = process.env.ADMIN_EMAIL;
+    if (!adminEmail) {
+      logger.error("passkey", "Admin passkey but ADMIN_EMAIL not set", { passkeyId: passkey.id });
+      return { success: false, error: "Configuration error" };
+    }
+    userEmail = adminEmail;
+  } else {
+    const author = db.select().from(authors).where(eq(authors.id, passkey.author_id)).get();
+    if (!author) {
+      logger.error("passkey", "Author not found for passkey", { passkeyId: passkey.id });
+      return { success: false, error: "Author not found" };
+    }
+    userEmail = author.email;
   }
 
   try {
@@ -206,7 +219,7 @@ export async function verifyPasskeyAuth(
     });
 
     if (!verification.verified) {
-      logger.warn("passkey", "Authentication verification failed", { email: author.email });
+      logger.warn("passkey", "Authentication verification failed", { email: userEmail });
       return { success: false, error: "Verification failed" };
     }
 
@@ -216,9 +229,9 @@ export async function verifyPasskeyAuth(
     // Clear challenge
     challengeStore.delete(`auth:${challengeKey}`);
 
-    logger.info("passkey", "Passkey authentication successful", { email: author.email });
+    logger.info("passkey", "Passkey authentication successful", { email: userEmail });
 
-    return { success: true, email: author.email };
+    return { success: true, email: userEmail };
   } catch (error) {
     logger.error("passkey", "Authentication error", { error });
     return { success: false, error: "Authentication failed" };
@@ -227,12 +240,20 @@ export async function verifyPasskeyAuth(
 
 /**
  * Delete a passkey
+ * Pass null for admin passkeys
  */
-export function deletePasskey(passkeyId: number, authorId: number): boolean {
+export function deletePasskey(passkeyId: number, authorId: number | null): boolean {
   const passkey = db.select().from(passkeys).where(eq(passkeys.id, passkeyId)).get();
 
-  if (!passkey || passkey.author_id !== authorId) {
+  if (!passkey) {
     return false;
+  }
+
+  // Check ownership: admin keys have null author_id, others have specific id
+  if (authorId === null) {
+    if (passkey.author_id !== null) return false;
+  } else {
+    if (passkey.author_id !== authorId) return false;
   }
 
   db.delete(passkeys).where(eq(passkeys.id, passkeyId)).run();

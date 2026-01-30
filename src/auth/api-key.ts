@@ -1,4 +1,4 @@
-import { eq, and } from "drizzle-orm";
+import { eq, and, isNull } from "drizzle-orm";
 import { Context, Next } from "hono";
 import { db, apiKeys, authors } from "@/db";
 import { logger } from "@/utils/logger";
@@ -42,8 +42,9 @@ export async function createApiKey(
 
 /**
  * List API keys for an author (without the actual keys)
+ * Pass null for admin keys
  */
-export function listApiKeys(authorId: number) {
+export function listApiKeys(authorId: number | null) {
   return db
     .select({
       id: apiKeys.id,
@@ -53,19 +54,25 @@ export function listApiKeys(authorId: number) {
       revoked_at: apiKeys.revoked_at,
     })
     .from(apiKeys)
-    .where(eq(apiKeys.author_id, authorId))
+    .where(authorId === null ? isNull(apiKeys.author_id) : eq(apiKeys.author_id, authorId))
     .orderBy(apiKeys.created_at)
     .all();
 }
 
 /**
  * Revoke an API key
+ * Pass null for authorId to revoke admin keys
  */
-export async function revokeApiKey(keyId: number, authorId: number): Promise<boolean> {
+export async function revokeApiKey(keyId: number, authorId: number | null): Promise<boolean> {
   const key = db
     .select()
     .from(apiKeys)
-    .where(and(eq(apiKeys.id, keyId), eq(apiKeys.author_id, authorId)))
+    .where(
+      and(
+        eq(apiKeys.id, keyId),
+        authorId === null ? isNull(apiKeys.author_id) : eq(apiKeys.author_id, authorId)
+      )
+    )
     .get();
 
   if (!key) {

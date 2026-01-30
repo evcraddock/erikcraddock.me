@@ -137,11 +137,13 @@ admin.get("/keys", (c) => {
   const auth = c.get("auth");
   const author = getAuthorByEmail(auth.email);
 
-  if (!author) {
+  // Admin uses null author_id, regular authors use their id
+  if (!author && !auth.isAdmin) {
     return c.redirect("/login");
   }
 
-  const keys = listApiKeys(author.id);
+  const authorId = author?.id ?? null;
+  const keys = listApiKeys(authorId);
   const newKey = c.req.query("newKey");
   const error = c.req.query("error");
 
@@ -255,9 +257,12 @@ admin.post("/keys", async (c) => {
   const auth = c.get("auth");
   const author = getAuthorByEmail(auth.email);
 
-  if (!author) {
+  // Admin uses null author_id, regular authors use their id
+  if (!author && !auth.isAdmin) {
     return c.redirect("/login");
   }
+
+  const authorId = author?.id ?? null;
 
   const body = await c.req.parseBody();
   const name = body.name as string;
@@ -266,7 +271,7 @@ admin.post("/keys", async (c) => {
     return c.redirect("/admin/keys?error=Name is required");
   }
 
-  const { key } = await createApiKey(author.id, name.trim());
+  const { key } = await createApiKey(authorId, name.trim());
 
   // Redirect with the new key in query param (shown once)
   return c.redirect(`/admin/keys?newKey=${encodeURIComponent(key)}`);
@@ -279,17 +284,19 @@ admin.post("/keys/:id/revoke", async (c) => {
   const auth = c.get("auth");
   const author = getAuthorByEmail(auth.email);
 
-  if (!author) {
+  // Admin uses null author_id, regular authors use their id
+  if (!author && !auth.isAdmin) {
     return c.redirect("/login");
   }
 
+  const authorId = author?.id ?? null;
   const keyId = parseInt(c.req.param("id"), 10);
 
   if (isNaN(keyId)) {
     return c.redirect("/admin/keys?error=Invalid key ID");
   }
 
-  const success = await revokeApiKey(keyId, author.id);
+  const success = await revokeApiKey(keyId, authorId);
 
   if (!success) {
     return c.redirect("/admin/keys?error=Could not revoke key");
@@ -305,11 +312,13 @@ admin.get("/passkeys", (c) => {
   const auth = c.get("auth");
   const author = getAuthorByEmail(auth.email);
 
-  if (!author) {
+  // Admin uses null author_id, regular authors use their id
+  if (!author && !auth.isAdmin) {
     return c.redirect("/login");
   }
 
-  const userPasskeys = listPasskeys(author.id);
+  const authorId = author?.id ?? null;
+  const userPasskeys = listPasskeys(authorId);
   const error = c.req.query("error");
   const success = c.req.query("success");
 
@@ -437,11 +446,13 @@ admin.post("/passkeys/register/options", async (c) => {
   const auth = c.get("auth");
   const author = getAuthorByEmail(auth.email);
 
-  if (!author) {
+  // Admin uses null author_id, regular authors use their id
+  if (!author && !auth.isAdmin) {
     return c.json({ error: "Unauthorized" }, 401);
   }
 
-  const options = await generatePasskeyRegistrationOptions(author.id, auth.email);
+  const authorId = author?.id ?? null;
+  const options = await generatePasskeyRegistrationOptions(authorId, auth.email);
   return c.json(options);
 });
 
@@ -452,14 +463,16 @@ admin.post("/passkeys/register", async (c) => {
   const auth = c.get("auth");
   const author = getAuthorByEmail(auth.email);
 
-  if (!author) {
+  // Admin uses null author_id, regular authors use their id
+  if (!author && !auth.isAdmin) {
     return c.json({ error: "Unauthorized" }, 401);
   }
 
+  const authorId = author?.id ?? null;
   const body = await c.req.json();
   const { name, credential } = body;
 
-  const result = await verifyAndStorePasskey(author.id, auth.email, name, credential);
+  const result = await verifyAndStorePasskey(authorId, auth.email, name, credential);
   return c.json(result);
 });
 
@@ -470,17 +483,19 @@ admin.post("/passkeys/:id/delete", async (c) => {
   const auth = c.get("auth");
   const author = getAuthorByEmail(auth.email);
 
-  if (!author) {
+  // Admin uses null author_id, regular authors use their id
+  if (!author && !auth.isAdmin) {
     return c.redirect("/login");
   }
 
+  const authorId = author?.id ?? null;
   const passkeyId = parseInt(c.req.param("id"), 10);
 
   if (isNaN(passkeyId)) {
     return c.redirect("/admin/passkeys?error=Invalid passkey ID");
   }
 
-  const success = deletePasskey(passkeyId, author.id);
+  const success = deletePasskey(passkeyId, authorId);
 
   if (!success) {
     return c.redirect("/admin/passkeys?error=Could not delete passkey");
