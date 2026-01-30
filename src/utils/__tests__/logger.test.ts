@@ -1,18 +1,13 @@
-import { describe, it, expect, vi, beforeEach, afterEach, type MockInstance } from "vitest";
-
-// We need to test the logger functions, but they depend on process.env
-// So we'll test the exported helper functions and mock console.log
+import { describe, it, expect, beforeEach, afterEach, spyOn } from "bun:test";
 
 describe("logger", () => {
-  const originalEnv = process.env;
+  const originalEnv = { ...process.env };
   const originalStdoutIsTTY = process.stdout.isTTY;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  let consoleLogSpy: MockInstance<any[], any>;
+  let consoleLogSpy: ReturnType<typeof spyOn>;
 
   beforeEach(() => {
-    vi.resetModules();
     process.env = { ...originalEnv };
-    consoleLogSpy = vi.spyOn(console, "log").mockImplementation(() => {});
+    consoleLogSpy = spyOn(console, "log").mockImplementation(() => {});
   });
 
   afterEach(() => {
@@ -68,7 +63,6 @@ describe("logger", () => {
     it("returns timestamp in HH:mm:ss.SSS format", async () => {
       const { formatTimestamp } = await import("../logger");
       const timestamp = formatTimestamp();
-      // Match format like "12:34:56.789"
       expect(timestamp).toMatch(/^\d{2}:\d{2}:\d{2}\.\d{3}$/);
     });
   });
@@ -99,7 +93,7 @@ describe("logger", () => {
   describe("logger methods", () => {
     it("logs info messages when level permits", async () => {
       process.env.LOG_LEVEL = "info";
-      process.stdout.isTTY = false; // Use plain output for easier testing
+      process.stdout.isTTY = false;
       const { logger } = await import("../logger");
 
       logger.info("request", "GET /test", { status: 200 });

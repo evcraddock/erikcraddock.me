@@ -1,4 +1,4 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect } from "bun:test";
 import { dateToInstant, baseUrl } from "../utils";
 import { Temporal } from "@js-temporal/polyfill";
 
