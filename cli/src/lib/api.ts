@@ -124,7 +124,10 @@ export class ApiClient {
     return this.request<Media>("GET", `/media/${id}`);
   }
 
-  async uploadMedia(filePath: string, key?: string): Promise<ApiResponse<Media>> {
+  async uploadMedia(
+    filePath: string,
+    options?: { key?: string; alt?: string }
+  ): Promise<ApiResponse<Media>> {
     const url = `${this.baseUrl}/media`;
 
     try {
@@ -134,8 +137,11 @@ export class ApiClient {
 
       const formData = new FormData();
       formData.append("file", new Blob([fileBuffer], { type: mimeType }), filename);
-      if (key) {
-        formData.append("key", key);
+      if (options?.key) {
+        formData.append("key", options.key);
+      }
+      if (options?.alt) {
+        formData.append("alt", options.alt);
       }
 
       const response = await fetch(url, {
@@ -156,6 +162,10 @@ export class ApiClient {
     } catch (error) {
       return { error: String(error) };
     }
+  }
+
+  async deleteMedia(id: number): Promise<ApiResponse<{ success: boolean }>> {
+    return this.request<{ success: boolean }>("DELETE", `/media/${id}`);
   }
 
   // Source methods

@@ -7,6 +7,7 @@ import { linkCommand } from "./commands/link";
 import { noteCommand } from "./commands/note";
 import { sourceCommand, showSourceHelp } from "./commands/source";
 import { tagCommand, showTagHelp } from "./commands/tag";
+import { imageCommand, showImageHelp } from "./commands/image";
 import type { GlobalOptions } from "./types";
 
 export function parseArgs(args: string[]): {
@@ -60,6 +61,7 @@ Commands:
   note            Manage notes (list, show, create, edit, delete, publish)
   source          Manage sources (list, show, create, edit, delete)
   tag             Manage tags (list)
+  image           Manage images (upload, delete)
   version         Show CLI version
   help            Show this help message
 
@@ -79,6 +81,7 @@ Examples:
   ec note create --slug quick-thought --content "Just a thought"
   ec source list
   ec tag list
+  ec image upload ./photo.jpg
   ec version
 `);
 }
@@ -199,6 +202,14 @@ async function main(): Promise<void> {
         return;
       }
       await tagCommand(command.slice(1), options);
+      break;
+
+    case "image":
+      if (options.help && !subcmd) {
+        showImageHelp();
+        return;
+      }
+      await imageCommand(command.slice(1), options);
       break;
 
     default:
