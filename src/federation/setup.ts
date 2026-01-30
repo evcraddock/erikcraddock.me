@@ -18,21 +18,33 @@ export type FederationContext = void;
 // Domain from environment
 const domain = process.env.DOMAIN || "localhost:5000";
 
-// Lazy-initialized KV store (avoids bun:sqlite import at module load time for tests)
+// Lazy-initialized KV store (avoids sqlite import at module load time for tests)
 let kvStore: KvStore | null = null;
+
+// Detect runtime
+const isBun = typeof globalThis.Bun !== "undefined";
 
 function getKvStore(): KvStore {
   if (!kvStore) {
-    // Dynamic import to avoid breaking tests that run in Node
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
-    const { Database } = require("bun:sqlite");
     // eslint-disable-next-line @typescript-eslint/no-require-imports
     const { SqliteKvStore } = require("@fedify/sqlite");
-
     const kvPath = process.env.FEDIFY_KV_PATH || "./data/fedify-kv.db";
-    const kvDb = new Database(kvPath);
-    kvDb.exec("PRAGMA journal_mode = WAL;");
-    kvStore = new SqliteKvStore(kvDb);
+
+    if (isBun) {
+      // Use bun:sqlite for Bun runtime
+      // eslint-disable-next-line @typescript-eslint/no-require-imports
+      const { Database } = require("bun:sqlite");
+      const kvDb = new Database(kvPath);
+      kvDb.exec("PRAGMA journal_mode = WAL;");
+      kvStore = new SqliteKvStore(kvDb);
+    } else {
+      // Use better-sqlite3 for Node.js runtime
+      // eslint-disable-next-line @typescript-eslint/no-require-imports
+      const BetterSqlite3 = require("better-sqlite3");
+      const kvDb = new BetterSqlite3(kvPath);
+      kvDb.exec("PRAGMA journal_mode = WAL;");
+      kvStore = new SqliteKvStore(kvDb);
+    }
 
     logger.info("federation", `KV store initialized at ${kvPath}`);
   }
