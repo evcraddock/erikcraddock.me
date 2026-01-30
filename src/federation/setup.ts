@@ -62,10 +62,16 @@ function getKvStore(): KvStore {
  * - Inbox, outbox, and followers collection dispatchers
  */
 export function createFedifyFederation() {
-  logger.info("federation", `Creating federation for domain: ${domain}`);
+  // Determine the canonical origin (protocol + domain)
+  const protocol = domain.includes("localhost") ? "http" : "https";
+  const origin = `${protocol}://${domain}`;
+
+  logger.info("federation", `Creating federation for origin: ${origin}`);
 
   const federation = createFederation<FederationContext>({
     kv: getKvStore(),
+    // Explicitly set origin to ensure correct URLs behind reverse proxy
+    origin,
   });
 
   // Set up actor dispatcher - handles requests for /users/{identifier}
