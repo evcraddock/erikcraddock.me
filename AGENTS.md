@@ -152,6 +152,25 @@ make dev-logs      # Ctrl+C to stop
 5. Create PR with `gh pr create`
 6. **Wait for CI to pass** before requesting review (see below)
 7. Use the `request-review` skill to spawn a separate agent to review the PR
+8. **Wait for human approval before merging** (see below)
+
+### NEVER Merge Without Human Approval
+
+**Agent reviews do not replace human approval.** The agent review is a helper to catch issues early - it is NOT permission to merge.
+
+After an agent review completes:
+
+1. Show the review results to the user
+2. **Stop and wait for explicit human approval**
+3. Only merge when the user says "merge", "approved", "LGTM", or similar
+
+**DO NOT:**
+
+- Auto-merge after agent review
+- Assume approval because the review passed
+- Merge and then tell the user about it
+
+**The human decides when to merge. Always.**
 
 ### Check Logs Before PR
 
