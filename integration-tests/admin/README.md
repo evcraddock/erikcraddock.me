@@ -1,29 +1,29 @@
 # Admin Integration Tests
 
-Pass/fail tests for the /admin section of the site.
-
-## Structure
-
-- **auth/** - Magic link login, sessions, logout
-- **dashboard/** - Admin dashboard display
-- **api-keys/** - API key management
-- **passkeys/** - Passkey registration and management
-- **authors/** - Author management (admin-only)
+Manual integration tests for the `/admin` section of the site.
 
 ## Prerequisites
 
-- Dev server running (`make dev`)
-- Browser open via browser-tools skill
-- `ADMIN_EMAIL` set in `.env`
-- Logged in as admin (use web-login skill)
+1. Dev environment running: `make dev`
+2. Browser open via browser-tools skill
+3. `ADMIN_EMAIL` set in `.env`
 
-## Skills
+### Skills
 
 - **web-login**: Automated login via magic link (`.pi/skills/web-login/SKILL.md`)
 - **browser-tools**: Browser automation
 
-## Running Tests
+### Verify setup
 
-1. Start with auth tests to establish a session
-2. Run other test suites in any order
-3. Each file is independent (assumes fresh login if needed)
+```bash
+make dev-status
+grep ADMIN_EMAIL .env
+```
+
+## Tests
+
+- [auth.md](auth.md) - Magic link login, sessions, logout
+- [dashboard.md](dashboard.md) - Dashboard display and navigation
+- [api-keys.md](api-keys.md) - Create, list, revoke API keys
+- [passkeys.md](passkeys.md) - Register, list, delete passkeys
+- [authors.md](authors.md) - Add, list, remove authors (admin-only)
