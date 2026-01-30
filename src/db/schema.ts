@@ -72,9 +72,8 @@ export const authors = sqliteTable("authors", {
 // Passkeys for WebAuthn login
 export const passkeys = sqliteTable("passkeys", {
   id: integer("id").primaryKey({ autoIncrement: true }),
-  author_id: integer("author_id")
-    .notNull()
-    .references(() => authors.id, { onDelete: "cascade" }),
+  // Nullable for admin passkeys (admin may not have an author record)
+  author_id: integer("author_id").references(() => authors.id, { onDelete: "cascade" }),
   credential_id: text("credential_id").notNull().unique(),
   public_key: text("public_key").notNull(),
   name: text("name"),
