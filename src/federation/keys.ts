@@ -27,7 +27,7 @@ export async function getOrCreateKeyPair(): Promise<KeyPair> {
 
   // Generate new key pair
   logger.info("federation", "Generating new actor key pair");
-  const keyPair = await generateCryptoKeyPair("RSASSA-PKCS1-v1_5");
+  const keyPair = await generateCryptoKeyPair("Ed25519");
 
   // Store in database as JWK
   const privateJwk = await exportJwk(keyPair.privateKey);
