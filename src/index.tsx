@@ -69,42 +69,16 @@ function createProxyAwareFedifyMiddleware() {
   };
 }
 
-// Debug middleware - log incoming inbox POST requests to diagnose "Missing actor" errors
-app.use("*", async (c, next) => {
-  const path = c.req.path;
-  const method = c.req.method;
-
-  // Only log POST requests to inbox endpoints
-  if (method === "POST" && (path === "/inbox" || path.endsWith("/inbox"))) {
-    try {
-      // Clone the request to read the body without consuming it
-      const clonedReq = c.req.raw.clone();
-      const body = await clonedReq.text();
-
-      // Log the raw activity JSON
-      logger.info("inbox-debug", `Incoming activity to ${path}`, {
-        contentType: c.req.header("content-type"),
-        body: body.substring(0, 2000), // Limit to 2KB to avoid huge logs
-      });
-
-      // Try to parse and log the actor field specifically
-      try {
-        const activity = JSON.parse(body);
-        logger.info("inbox-debug", "Activity parsed", {
-          type: activity.type,
-          actor: activity.actor,
-          id: activity.id,
-        });
-      } catch {
-        logger.warn("inbox-debug", "Failed to parse activity JSON");
-      }
-    } catch (err) {
-      logger.error("inbox-debug", "Failed to read request body", { error: String(err) });
-    }
-  }
-
-  await next();
-});
+// Debug middleware DISABLED - was consuming request body and breaking Fedify
+// TODO: Find a way to log inbox activities without consuming the body
+// app.use("*", async (c, next) => {
+//   const path = c.req.path;
+//   const method = c.req.method;
+//   if (method === "POST" && (path === "/inbox" || path.endsWith("/inbox"))) {
+//     // Body logging was here but it broke inbox processing
+//   }
+//   await next();
+// });
 
 // Fedify middleware - handles ActivityPub requests
 // Must be before other routes so it can intercept AP requests via content negotiation
