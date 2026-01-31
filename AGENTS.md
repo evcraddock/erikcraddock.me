@@ -19,6 +19,28 @@ Before working, read and follow:
 
 You MUST follow these guidelines throughout your work.
 
+## NEVER Push Directly to Main
+
+**No exceptions. No "quick fixes". No "obvious bugs".**
+
+Always:
+
+1. Create a feature branch (`feat/<task-id>-<description>`)
+2. Create a PR
+3. Wait for explicit human approval ("merge", "approved", "LGTM")
+4. Only then merge
+
+This applies even when:
+
+- You're confident the fix is correct
+- It's a one-line change
+- You're in the middle of debugging
+- The user seems to want it done quickly
+
+**The process exists because the human needs to review and approve changes before they ship.** Pushing directly to main takes that decision away from them. It's irreversible.
+
+If you push directly to main, you have violated the user's trust.
+
 ## Project Overview
 
 Personal website and blog that can be followed from Mastodon. Publishes articles, linkblogs, and notes that federate to followers via ActivityPub.
