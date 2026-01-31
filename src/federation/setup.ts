@@ -4,9 +4,11 @@ import {
   Endpoints,
   Follow,
   Undo,
+  Accept,
   isActor,
   type KvStore,
 } from "@fedify/fedify";
+import { SqliteMessageQueue } from "./sqlite-mq";
 import { getOrCreateKeyPair } from "./keys";
 import { addFollower, removeFollower, getAllFollowers } from "./followers";
 import { getOutboxActivities, getPublishedPostCount } from "./outbox";
@@ -19,38 +21,66 @@ export type FederationContext = void;
 // Domain from environment
 const domain = process.env.DOMAIN || "localhost:5000";
 
-// Lazy-initialized KV store (avoids sqlite import at module load time for tests)
+// Database type - supports both better-sqlite3 and bun:sqlite
+interface SqliteDatabase {
+  exec(sql: string): void;
+  prepare(sql: string): {
+    run(...args: unknown[]): void;
+    get(...args: unknown[]): Record<string, unknown> | undefined;
+  };
+}
+
+// Lazy-initialized stores (avoids sqlite import at module load time for tests)
 let kvStore: KvStore | null = null;
+let messageQueue: SqliteMessageQueue | null = null;
+let sharedDb: SqliteDatabase | null = null;
 
 // Detect runtime
 const isBun = typeof globalThis.Bun !== "undefined";
+
+function getDatabase(): SqliteDatabase {
+  if (sharedDb) {
+    return sharedDb;
+  }
+
+  const dbPath = process.env.FEDIFY_KV_PATH || "./data/fedify-kv.db";
+  let db: SqliteDatabase;
+
+  if (isBun) {
+    // Use bun:sqlite for Bun runtime
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const { Database } = require("bun:sqlite");
+    db = new Database(dbPath);
+  } else {
+    // Use better-sqlite3 for Node.js runtime
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const BetterSqlite3 = require("better-sqlite3");
+    db = new BetterSqlite3(dbPath);
+  }
+
+  db.exec("PRAGMA journal_mode = WAL;");
+  sharedDb = db;
+  logger.info("federation", `Database initialized at ${dbPath}`);
+
+  return db;
+}
 
 function getKvStore(): KvStore {
   if (!kvStore) {
     // eslint-disable-next-line @typescript-eslint/no-require-imports
     const { SqliteKvStore } = require("@fedify/sqlite");
-    const kvPath = process.env.FEDIFY_KV_PATH || "./data/fedify-kv.db";
-
-    if (isBun) {
-      // Use bun:sqlite for Bun runtime
-      // eslint-disable-next-line @typescript-eslint/no-require-imports
-      const { Database } = require("bun:sqlite");
-      const kvDb = new Database(kvPath);
-      kvDb.exec("PRAGMA journal_mode = WAL;");
-      kvStore = new SqliteKvStore(kvDb);
-    } else {
-      // Use better-sqlite3 for Node.js runtime
-      // eslint-disable-next-line @typescript-eslint/no-require-imports
-      const BetterSqlite3 = require("better-sqlite3");
-      const kvDb = new BetterSqlite3(kvPath);
-      kvDb.exec("PRAGMA journal_mode = WAL;");
-      kvStore = new SqliteKvStore(kvDb);
-    }
-
-    logger.info("federation", `KV store initialized at ${kvPath}`);
+    kvStore = new SqliteKvStore(getDatabase());
+    logger.info("federation", "KV store initialized");
   }
-  // Non-null assertion: kvStore is assigned in the if block above
   return kvStore!;
+}
+
+function getMessageQueue(): SqliteMessageQueue {
+  if (!messageQueue) {
+    messageQueue = new SqliteMessageQueue(getDatabase());
+    logger.info("federation", "Message queue initialized");
+  }
+  return messageQueue!;
 }
 
 /**
@@ -69,6 +99,9 @@ export function createFedifyFederation() {
 
   const federation = createFederation<FederationContext>({
     kv: getKvStore(),
+    // Persistent message queue for sending outgoing activities (Accept, Create, etc.)
+    // Uses SQLite so messages survive process restarts
+    queue: getMessageQueue(),
     // Explicitly set origin to ensure correct URLs behind reverse proxy
     origin,
   });
@@ -136,14 +169,21 @@ export function createFedifyFederation() {
       const endpoints = followerActor.endpoints;
       const sharedInbox = endpoints?.sharedInbox;
 
+      // Store the follower
       addFollower({
         actor_uri: actorId.href,
         inbox_uri: inboxId.href,
         shared_inbox_uri: sharedInbox?.href ?? null,
       });
+      logger.info("federation", `New follower added: ${actorId.href}`);
 
-      // Fedify automatically sends Accept when we return without error
-      logger.info("federation", `Accepted follow from: ${actorId.href}`);
+      // Send Accept activity back to the follower
+      const accept = new Accept({
+        actor: ctx.getActorUri("erik"),
+        object: follow,
+      });
+      await ctx.sendActivity({ identifier: "erik" }, followerActor, accept);
+      logger.info("federation", `Sent Accept to: ${actorId.href}`);
     })
     .on(Undo, async (ctx, undo) => {
       // Check if this is an Undo of a Follow
