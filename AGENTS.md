@@ -297,6 +297,18 @@ Tests should catch bugs and prevent regressions. Testing that "a schema export e
 - [ ] `npm test` passes
 - [ ] Visual verification done for UI changes
 
+## DO NOT TOUCH - Critical Dependencies
+
+**NEVER remove or replace `better-sqlite3`.**
+
+The production Docker image runs on Node.js (not Bun) because Bun crashes on Raspberry Pi 4 ARM64. Node.js requires `better-sqlite3` for SQLite. There is NO alternative that works:
+
+- `node:sqlite` - drizzle-orm doesn't support it
+- `sql.js` - complex async initialization, not compatible
+- Removing better-sqlite3 breaks production
+
+If you even THINK about touching the SQLite dependencies, STOP and ask first.
+
 ## Conventions
 
 - Use TypeScript strict mode
