@@ -2,6 +2,7 @@ import { Hono } from "hono";
 import type { Context, Next } from "hono";
 import { pages } from "./routes/pages";
 import { feed } from "./routes/feed";
+import { health } from "./routes/health";
 import { auth } from "./routes/auth";
 import { admin } from "./routes/admin";
 import { api } from "./routes/api";
@@ -116,6 +117,7 @@ if (isBun) {
 // Mount routes
 app.route("/", pages);
 app.route("/", feed);
+app.route("/", health);
 app.route("/", auth);
 app.route("/admin", admin);
 app.route("/api", api);
