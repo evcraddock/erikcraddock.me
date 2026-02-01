@@ -22,7 +22,7 @@ import {
   deleteSource,
 } from "@/services/sources";
 import { listTags } from "@/services/tags";
-import { federatePost } from "@/federation/publish";
+import { federatePost, sendDeleteActivity, sendUpdateActivity } from "@/federation/publish";
 
 export const api = new Hono();
 
@@ -235,6 +235,11 @@ api.put("/posts/:id", async (c) => {
       return c.json({ error: "Post not found" }, 404);
     }
 
+    // Send Update activity if post is published
+    if (post.published_at) {
+      await sendUpdateActivity(post.id);
+    }
+
     return c.json({ data: post });
   } catch (error) {
     return c.json({ error: String(error) }, 400);
@@ -244,17 +249,26 @@ api.put("/posts/:id", async (c) => {
 /**
  * DELETE /api/posts/:id - Delete post
  */
-api.delete("/posts/:id", (c) => {
+api.delete("/posts/:id", async (c) => {
   const id = parseInt(c.req.param("id"), 10);
 
   if (isNaN(id)) {
     return c.json({ error: "Invalid post ID" }, 400);
   }
 
+  // Check if post was published before deleting
+  const existingPost = getPost(id);
+  const wasPublished = existingPost?.published_at;
+
   const deleted = deletePost(id);
 
   if (!deleted) {
     return c.json({ error: "Post not found" }, 404);
+  }
+
+  // Send Delete activity if post was previously published
+  if (wasPublished) {
+    await sendDeleteActivity(id);
   }
 
   return c.body(null, 204);
@@ -369,6 +383,11 @@ api.put("/posts/by-slug/:slug", async (c) => {
       return c.json({ error: "Post not found" }, 404);
     }
 
+    // Send Update activity if post is published
+    if (post.published_at) {
+      await sendUpdateActivity(post.id);
+    }
+
     return c.json({ data: post });
   } catch (error) {
     return c.json({ error: String(error) }, 400);
@@ -378,7 +397,7 @@ api.put("/posts/by-slug/:slug", async (c) => {
 /**
  * DELETE /api/posts/by-slug/:slug - Delete post by slug
  */
-api.delete("/posts/by-slug/:slug", (c) => {
+api.delete("/posts/by-slug/:slug", async (c) => {
   const slug = c.req.param("slug");
 
   const existingPost = getPostBySlug(slug);
@@ -387,10 +406,19 @@ api.delete("/posts/by-slug/:slug", (c) => {
     return c.json({ error: "Post not found" }, 404);
   }
 
-  const deleted = deletePost(existingPost.id);
+  // Remember if post was published for federation
+  const wasPublished = !!existingPost.published_at;
+  const postId = existingPost.id;
+
+  const deleted = deletePost(postId);
 
   if (!deleted) {
     return c.json({ error: "Post not found" }, 404);
+  }
+
+  // Send Delete activity if post was previously published
+  if (wasPublished) {
+    await sendDeleteActivity(postId);
   }
 
   return c.body(null, 204);
