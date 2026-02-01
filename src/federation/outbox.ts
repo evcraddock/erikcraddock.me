@@ -4,6 +4,9 @@ import { db, posts } from "@/db";
 import { logger } from "@/utils/logger";
 import { dateToInstant, baseUrl } from "./utils";
 
+// ActivityPub Public address
+const PUBLIC = new URL("https://www.w3.org/ns/activitystreams#Public");
+
 export interface PublishedPost {
   id: number;
   type: string;
@@ -52,7 +55,11 @@ export function getPublishedPostCount(): number {
 /**
  * Convert a post to an ActivityPub object (Note or Article).
  */
-export function postToObject(post: PublishedPost, actorUri: URL): Note | Article {
+export function postToObject(
+  post: PublishedPost,
+  actorUri: URL,
+  followersUri: URL
+): Note | Article {
   const postUri = new URL(`/posts/${post.id}`, baseUrl);
 
   // Use Article for posts with titles, Note for everything else (notes, links)
@@ -61,6 +68,9 @@ export function postToObject(post: PublishedPost, actorUri: URL): Note | Article
   return new ObjectClass({
     id: postUri,
     attribution: actorUri,
+    // Addressing: public posts visible to everyone, CC'd to followers
+    to: PUBLIC,
+    cc: followersUri,
     name: post.title ?? undefined,
     content: post.content,
     summary: post.excerpt ?? undefined,
@@ -72,15 +82,22 @@ export function postToObject(post: PublishedPost, actorUri: URL): Note | Article
 /**
  * Convert a post to a Create activity.
  */
-export function postToCreateActivity(post: PublishedPost, actorUri: URL): Create {
+export function postToCreateActivity(
+  post: PublishedPost,
+  actorUri: URL,
+  followersUri: URL
+): Create {
   const activityUri = new URL(`/posts/${post.id}#create`, baseUrl);
-  const object = postToObject(post, actorUri);
+  const object = postToObject(post, actorUri, followersUri);
 
   logger.debug("federation", `Converting post ${post.id} to Create activity`);
 
   return new Create({
     id: activityUri,
     actor: actorUri,
+    // Addressing: public posts visible to everyone, CC'd to followers
+    to: PUBLIC,
+    cc: followersUri,
     object: object,
     published: post.published_at ? dateToInstant(new Date(post.published_at)) : undefined,
   });
@@ -92,9 +109,10 @@ export function postToCreateActivity(post: PublishedPost, actorUri: URL): Create
  */
 export function getOutboxActivities(
   actorUri: URL,
+  followersUri: URL,
   limit: number = 20,
   offset: number = 0
 ): Create[] {
   const publishedPosts = getPublishedPosts(limit, offset);
-  return publishedPosts.map((post) => postToCreateActivity(post, actorUri));
+  return publishedPosts.map((post) => postToCreateActivity(post, actorUri, followersUri));
 }

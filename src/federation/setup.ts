@@ -185,8 +185,9 @@ export function createFedifyFederation() {
       }
 
       const actorUri = ctx.getActorUri(identifier);
+      const followersUri = ctx.getFollowersUri(identifier);
       const offset = cursor ? parseInt(cursor, 10) : 0;
-      const activities = getOutboxActivities(actorUri, OUTBOX_PAGE_SIZE, offset);
+      const activities = getOutboxActivities(actorUri, followersUri, OUTBOX_PAGE_SIZE, offset);
       const totalCount = getPublishedPostCount();
 
       // Calculate next cursor if there are more items
