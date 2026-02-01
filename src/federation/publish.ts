@@ -55,10 +55,17 @@ export function createImageAttachment(banner: BannerImage): Image {
   });
 }
 
+// ActivityPub Public address
+const PUBLIC = new URL("https://www.w3.org/ns/activitystreams#Public");
+
 /**
  * Convert a post to an ActivityPub object (Note or Article) with optional attachment.
  */
-export function postToObjectWithAttachment(post: PostWithBanner, actorUri: URL): Note | Article {
+export function postToObjectWithAttachment(
+  post: PostWithBanner,
+  actorUri: URL,
+  followersUri: URL
+): Note | Article {
   const postUri = new URL(`/posts/${post.id}`, baseUrl);
 
   // Use Article for posts with titles, Note for everything else
@@ -76,6 +83,9 @@ export function postToObjectWithAttachment(post: PostWithBanner, actorUri: URL):
   return new ObjectClass({
     id: postUri,
     attribution: actorUri,
+    // Addressing: public posts visible to everyone, CC'd to followers
+    to: PUBLIC,
+    cc: followersUri,
     name: post.title ?? undefined,
     content: post.content,
     summary: post.excerpt ?? undefined,
@@ -88,13 +98,16 @@ export function postToObjectWithAttachment(post: PostWithBanner, actorUri: URL):
 /**
  * Convert a post to a Create activity.
  */
-function postToCreateActivity(post: PostWithBanner, actorUri: URL): Create {
+function postToCreateActivity(post: PostWithBanner, actorUri: URL, followersUri: URL): Create {
   const activityUri = new URL(`/posts/${post.id}#create`, baseUrl);
-  const object = postToObjectWithAttachment(post, actorUri);
+  const object = postToObjectWithAttachment(post, actorUri, followersUri);
 
   return new Create({
     id: activityUri,
     actor: actorUri,
+    // Addressing: public posts visible to everyone, CC'd to followers
+    to: PUBLIC,
+    cc: followersUri,
     object: object,
     published: post.published_at ? dateToInstant(new Date(post.published_at)) : undefined,
   });
@@ -143,9 +156,10 @@ export async function federatePost(postId: number): Promise<boolean> {
   // Create context for sending
   const ctx = federation.createContext(new URL(baseUrl), undefined);
   const actorUri = ctx.getActorUri("erik");
+  const followersUri = ctx.getFollowersUri("erik");
 
   // Create the activity
-  const activity = postToCreateActivity(post as PostWithBanner, actorUri);
+  const activity = postToCreateActivity(post as PostWithBanner, actorUri, followersUri);
 
   logger.info(
     "federation",
