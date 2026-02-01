@@ -1,4 +1,4 @@
-import { Create, Note, Article, Image } from "@fedify/fedify";
+import { Create, Delete, Update, Note, Article, Image } from "@fedify/fedify";
 import { eq } from "drizzle-orm";
 import { db, posts, media } from "@/db";
 import { federation } from "./setup";
@@ -176,6 +176,120 @@ export async function federatePost(postId: number): Promise<boolean> {
     return true;
   } catch (error) {
     logger.error("federation", `Failed to send Create activity for post ${postId}`, { error });
+    return false;
+  }
+}
+
+/**
+ * Send a Delete activity for a post to all followers.
+ *
+ * Should be called when a previously published post is deleted.
+ * Remote servers should remove their cached copy.
+ *
+ * @param postId The ID of the deleted post
+ * @returns true if activity was sent, false if no followers
+ */
+export async function sendDeleteActivity(postId: number): Promise<boolean> {
+  const followers = getAllFollowers();
+  if (followers.length === 0) {
+    logger.debug("federation", `No followers to send Delete for post ${postId}`);
+    return true;
+  }
+
+  const ctx = federation.createContext(new URL(baseUrl), undefined);
+  const actorUri = ctx.getActorUri("erik");
+
+  // The object URI that was deleted
+  const objectUri = new URL(`/posts/${postId}`, baseUrl);
+  const activityUri = new URL(`/posts/${postId}#delete`, baseUrl);
+
+  const activity = new Delete({
+    id: activityUri,
+    actor: actorUri,
+    object: objectUri,
+  });
+
+  logger.info(
+    "federation",
+    `Sending Delete activity for post ${postId} to ${followers.length} followers`
+  );
+
+  try {
+    await ctx.sendActivity({ identifier: "erik" }, "followers", activity, {
+      preferSharedInbox: true,
+    });
+
+    logger.info("federation", `Successfully queued Delete activity for post ${postId}`);
+    return true;
+  } catch (error) {
+    logger.error("federation", `Failed to send Delete activity for post ${postId}`, { error });
+    return false;
+  }
+}
+
+/**
+ * Send an Update activity for a post to all followers.
+ *
+ * Should be called when a published post is edited.
+ * Remote servers should update their cached copy.
+ *
+ * @param postId The ID of the updated post
+ * @returns true if activity was sent, false if post not found or no followers
+ */
+export async function sendUpdateActivity(postId: number): Promise<boolean> {
+  // Get the post with banner info
+  const post = db
+    .select({
+      id: posts.id,
+      type: posts.type,
+      title: posts.title,
+      content: posts.content,
+      excerpt: posts.excerpt,
+      published_at: posts.published_at,
+      banner_image_id: posts.banner_image_id,
+    })
+    .from(posts)
+    .where(eq(posts.id, postId))
+    .get();
+
+  if (!post || !post.published_at) {
+    logger.warn("federation", `Cannot send Update for post ${postId}: not found or not published`);
+    return false;
+  }
+
+  const followers = getAllFollowers();
+  if (followers.length === 0) {
+    logger.debug("federation", `No followers to send Update for post ${postId}`);
+    return true;
+  }
+
+  const ctx = federation.createContext(new URL(baseUrl), undefined);
+  const actorUri = ctx.getActorUri("erik");
+  const followersUri = ctx.getFollowersUri("erik");
+
+  const activityUri = new URL(`/posts/${postId}#update-${Date.now()}`, baseUrl);
+  const object = postToObjectWithAttachment(post as PostWithBanner, actorUri, followersUri);
+
+  const activity = new Update({
+    id: activityUri,
+    actor: actorUri,
+    object: object,
+  });
+
+  logger.info(
+    "federation",
+    `Sending Update activity for post ${postId} to ${followers.length} followers`
+  );
+
+  try {
+    await ctx.sendActivity({ identifier: "erik" }, "followers", activity, {
+      preferSharedInbox: true,
+    });
+
+    logger.info("federation", `Successfully queued Update activity for post ${postId}`);
+    return true;
+  } catch (error) {
+    logger.error("federation", `Failed to send Update activity for post ${postId}`, { error });
     return false;
   }
 }
