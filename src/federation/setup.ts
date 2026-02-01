@@ -9,7 +9,7 @@ import {
   InProcessMessageQueue,
   type KvStore,
 } from "@fedify/fedify";
-import { getOrCreateKeyPair } from "./keys";
+import { getOrCreateKeyPairs } from "./keys";
 import { addFollower, removeFollower, getAllFollowers } from "./followers";
 import { getOutboxActivities, getPublishedPostCount } from "./outbox";
 import { getOrigin } from "./utils";
@@ -106,14 +106,15 @@ export function createFedifyFederation() {
         assertionMethods: keys.map((key) => key.multikey),
       });
     })
-    // Set up key pairs dispatcher - provides keys for HTTP signatures
+    // Set up key pairs dispatcher - provides keys for HTTP signatures and proofs
+    // Returns RSA key first (for HTTP Signatures) and Ed25519 (for Object Integrity Proofs)
     .setKeyPairsDispatcher(async (_ctx, identifier) => {
       if (identifier !== "erik") {
         return [];
       }
 
-      const keyPair = await getOrCreateKeyPair();
-      return [keyPair];
+      const keyPairs = await getOrCreateKeyPairs();
+      return keyPairs;
     });
 
   // Set up inbox listeners - handles incoming activities
