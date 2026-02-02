@@ -144,13 +144,14 @@ describe("pages routes", () => {
       expect(html).toContain("dark:border-gray-700");
     });
 
-    it("includes navigation links to About and Sources", async () => {
+    it("includes navigation link to Sources", async () => {
       const app = getApp();
       const res = await app.request("/");
       const html = await res.text();
 
-      expect(html).toContain('href="/about"');
       expect(html).toContain('href="/sources"');
+      // About link removed from nav but page still accessible
+      expect(html).not.toContain('href="/about"');
     });
   });
 

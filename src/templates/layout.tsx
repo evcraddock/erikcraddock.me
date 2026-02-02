@@ -49,6 +49,7 @@ export function Layout({ title, children, ogImage, description }: LayoutProps) {
           />
         )}
         <script>{raw(themeScript)}</script>
+        <link rel="icon" type="image/x-icon" href="/favicon.ico" />
         <link rel="stylesheet" href="/css/main.css" />
         <link
           rel="alternate"
@@ -59,7 +60,7 @@ export function Layout({ title, children, ogImage, description }: LayoutProps) {
       </head>
       <body class="min-h-screen flex flex-col bg-gray-50 text-gray-900 dark:bg-gray-900 dark:text-gray-100">
         <header class="bg-white shadow-sm dark:bg-gray-800 dark:shadow-gray-900/50">
-          <nav class="max-w-4xl mx-auto px-4 py-4 flex items-center justify-between">
+          <nav class="max-w-6xl mx-auto px-4 py-4 flex items-center justify-between">
             <a
               href="/"
               class="text-lg font-semibold text-gray-900 hover:text-gray-600 dark:text-gray-100 dark:hover:text-gray-300"
@@ -67,12 +68,6 @@ export function Layout({ title, children, ogImage, description }: LayoutProps) {
               erikcraddock.me
             </a>
             <div class="flex items-center gap-6">
-              <a
-                href="/about"
-                class="text-gray-600 hover:text-gray-900 dark:text-gray-400 dark:hover:text-gray-100"
-              >
-                About
-              </a>
               <a
                 href="/sources"
                 class="text-gray-600 hover:text-gray-900 dark:text-gray-400 dark:hover:text-gray-100"
@@ -83,9 +78,9 @@ export function Layout({ title, children, ogImage, description }: LayoutProps) {
             </div>
           </nav>
         </header>
-        <main class="flex-1 max-w-4xl mx-auto px-4 py-8 w-full">{children}</main>
+        <main class="flex-1 max-w-6xl mx-auto px-4 py-8 w-full">{children}</main>
         <footer class="bg-white border-t dark:bg-gray-800 dark:border-gray-700">
-          <div class="max-w-4xl mx-auto px-4 py-4 text-center text-gray-500 dark:text-gray-400 text-sm">
+          <div class="max-w-6xl mx-auto px-4 py-4 text-center text-gray-500 dark:text-gray-400 text-sm">
             &copy; {new Date().getFullYear()} Erik Craddock
           </div>
         </footer>

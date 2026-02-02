@@ -19,6 +19,121 @@ type PostWithSource = Post & { source?: Source | null };
 /** Max length for showing full note content inline */
 const NOTE_INLINE_MAX_LENGTH = 280;
 
+/** Social link icons */
+function GitHubIcon() {
+  return (
+    <svg class="w-6 h-6" fill="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+      <path
+        fill-rule="evenodd"
+        d="M12 2C6.477 2 2 6.484 2 12.017c0 4.425 2.865 8.18 6.839 9.504.5.092.682-.217.682-.483 0-.237-.008-.868-.013-1.703-2.782.605-3.369-1.343-3.369-1.343-.454-1.158-1.11-1.466-1.11-1.466-.908-.62.069-.608.069-.608 1.003.07 1.531 1.032 1.531 1.032.892 1.53 2.341 1.088 2.91.832.092-.647.35-1.088.636-1.338-2.22-.253-4.555-1.113-4.555-4.951 0-1.093.39-1.988 1.029-2.688-.103-.253-.446-1.272.098-2.65 0 0 .84-.27 2.75 1.026A9.564 9.564 0 0112 6.844c.85.004 1.705.115 2.504.337 1.909-1.296 2.747-1.027 2.747-1.027.546 1.379.202 2.398.1 2.651.64.7 1.028 1.595 1.028 2.688 0 3.848-2.339 4.695-4.566 4.943.359.309.678.92.678 1.855 0 1.338-.012 2.419-.012 2.747 0 .268.18.58.688.482A10.019 10.019 0 0022 12.017C22 6.484 17.522 2 12 2z"
+        clip-rule="evenodd"
+      />
+    </svg>
+  );
+}
+
+function LinkedInIcon() {
+  return (
+    <svg class="w-6 h-6" fill="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+      <path d="M20.447 20.452h-3.554v-5.569c0-1.328-.027-3.037-1.852-3.037-1.853 0-2.136 1.445-2.136 2.939v5.667H9.351V9h3.414v1.561h.046c.477-.9 1.637-1.85 3.37-1.85 3.601 0 4.267 2.37 4.267 5.455v6.286zM5.337 7.433c-1.144 0-2.063-.926-2.063-2.065 0-1.138.92-2.063 2.063-2.063 1.14 0 2.064.925 2.064 2.063 0 1.139-.925 2.065-2.064 2.065zm1.782 13.019H3.555V9h3.564v11.452zM22.225 0H1.771C.792 0 0 .774 0 1.729v20.542C0 23.227.792 24 1.771 24h20.451C23.2 24 24 23.227 24 22.271V1.729C24 .774 23.2 0 22.222 0h.003z" />
+    </svg>
+  );
+}
+
+function FacebookIcon() {
+  return (
+    <svg class="w-6 h-6" fill="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+      <path
+        fill-rule="evenodd"
+        d="M22 12c0-5.523-4.477-10-10-10S2 6.477 2 12c0 4.991 3.657 9.128 8.438 9.878v-6.987h-2.54V12h2.54V9.797c0-2.506 1.492-3.89 3.777-3.89 1.094 0 2.238.195 2.238.195v2.46h-1.26c-1.243 0-1.63.771-1.63 1.562V12h2.773l-.443 2.89h-2.33v6.988C18.343 21.128 22 16.991 22 12z"
+        clip-rule="evenodd"
+      />
+    </svg>
+  );
+}
+
+function YouTubeIcon() {
+  return (
+    <svg class="w-6 h-6" fill="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+      <path
+        fill-rule="evenodd"
+        d="M19.812 5.418c.861.23 1.538.907 1.768 1.768C21.998 8.746 22 12 22 12s0 3.255-.418 4.814a2.504 2.504 0 0 1-1.768 1.768c-1.56.419-7.814.419-7.814.419s-6.255 0-7.814-.419a2.505 2.505 0 0 1-1.768-1.768C2 15.255 2 12 2 12s0-3.255.417-4.814a2.507 2.507 0 0 1 1.768-1.768C5.744 5 11.998 5 11.998 5s6.255 0 7.814.418ZM15.194 12 10 15V9l5.194 3Z"
+        clip-rule="evenodd"
+      />
+    </svg>
+  );
+}
+
+function RssIcon() {
+  return (
+    <svg class="w-6 h-6" fill="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+      <path d="M6.503 20.752c0 1.794-1.456 3.248-3.251 3.248-1.796 0-3.252-1.454-3.252-3.248 0-1.794 1.456-3.248 3.252-3.248 1.795.001 3.251 1.454 3.251 3.248zm-6.503-12.572v4.811c6.05.062 10.96 4.966 11.022 11.009h4.817c-.062-8.71-7.118-15.758-15.839-15.82zm0-3.368c10.58.046 19.152 8.594 19.183 19.188h4.817c-.03-13.231-10.755-23.954-24-24v4.812z" />
+    </svg>
+  );
+}
+
+/** Hero section with bio, social links, and logo */
+function HeroSection() {
+  const socialLinks = [
+    { name: "GitHub", url: "https://github.com/evcraddock", icon: <GitHubIcon /> },
+    { name: "LinkedIn", url: "https://linkedin.com/in/erikvancraddock", icon: <LinkedInIcon /> },
+    { name: "Facebook", url: "https://facebook.com/erikvancraddock", icon: <FacebookIcon /> },
+    { name: "YouTube", url: "https://youtube.com/@erikvancraddock", icon: <YouTubeIcon /> },
+    { name: "RSS", url: "/feed.xml", icon: <RssIcon /> },
+  ];
+
+  return (
+    <section class="mb-12 py-8 bg-gray-100 dark:bg-gray-800 -mx-4 px-4 rounded-lg">
+      <div class="flex flex-col md:flex-row items-stretch gap-8">
+        {/* Logo - shown first on mobile, second on desktop */}
+        <div class="order-first md:order-last flex-shrink-0">
+          <div class="w-64 h-64 md:w-80 md:h-80 rounded-full overflow-hidden bg-gray-200 dark:bg-gray-700 border-4 border-gray-300 dark:border-gray-600 shadow-lg">
+            <img
+              src="/images/erik-logo.png"
+              alt="Erik Craddock"
+              class="w-full h-full object-cover"
+            />
+          </div>
+        </div>
+
+        {/* Bio and social links */}
+        <div class="flex-1 flex flex-col justify-center items-center">
+          <div class="text-left">
+            <p class="text-xl md:text-2xl text-gray-600 dark:text-gray-300 mb-2 leading-relaxed">
+              I am a <span class="text-blue-600 dark:text-blue-400 font-medium">writer</span>,{" "}
+              <span class="text-green-600 dark:text-green-400 font-medium">coder</span>, and{" "}
+              <span class="text-purple-600 dark:text-purple-400 font-medium">musician</span>
+            </p>
+            <p class="text-lg text-gray-500 dark:text-gray-400 mb-2 italic">
+              — not always in that order.
+            </p>
+            <p class="text-base text-gray-400 dark:text-gray-500 mb-8">
+              This is my haphazard living autobiography.
+            </p>
+
+            {/* Social links */}
+            <div class="flex justify-start gap-4">
+              {socialLinks.map((link) => (
+                <a
+                  key={link.name}
+                  href={link.url}
+                  target={link.url.startsWith("/") ? undefined : "_blank"}
+                  rel={link.url.startsWith("/") ? undefined : "noopener noreferrer"}
+                  class="text-gray-600 hover:text-gray-900 dark:text-gray-400 dark:hover:text-gray-100 transition-colors"
+                  aria-label={link.name}
+                  title={link.name}
+                >
+                  {link.icon}
+                </a>
+              ))}
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+  );
+}
+
 /** Reusable post card component */
 function PostCard({ post }: { post: PostWithSource }) {
   const isLink = post.type === "link";
@@ -151,6 +266,7 @@ export function createPagesRoutes(db: Database): Hono {
 
     return c.html(
       <Layout title="Home | erikcraddock.me">
+        <HeroSection />
         <PostList posts={allPosts} />
       </Layout>
     );
