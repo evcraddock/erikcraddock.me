@@ -65,12 +65,25 @@ Create a new web release tag (`web-v*`) based on conventional commits since the 
    - Alternative versions if applicable, such as web-v2.0.0 - Major release or web-v1.1.1 - Patch release
    - Cancel - Do not create a release
 
-7. **Create the tag** (if user approves):
-   - Create an annotated tag: `git tag -a <new-version> -m "Release <new-version>"`
-   - Ask if the user wants to push the tag to origin
+7. **Update package.json** (if user approves):
+   - Extract the semver from the tag (e.g., `web-v1.2.0` → `1.2.0`)
+   - Update the `version` field in `package.json` using jq or sed:
+     ```bash
+     # Using jq
+     jq --arg v "1.2.0" '.version = $v' package.json > package.json.tmp && mv package.json.tmp package.json
+     ```
+   - Commit the version bump:
+     ```bash
+     git add package.json
+     git commit -m "chore: bump version to 1.2.0"
+     ```
 
-8. **Push the tag** (if requested):
-   - Run `git push origin <new-version>` to push the tag
+8. **Create the tag**:
+   - Create an annotated tag on the version bump commit: `git tag -a <new-version> -m "Release <new-version>"`
+   - Ask if the user wants to push the commit and tag to origin
+
+9. **Push the commit and tag** (if requested):
+   - Push both together: `git push origin main --follow-tags`
    - Confirm success to the user
    - Note: Pushing the tag will trigger the deploy workflow which builds and pushes the Docker image to Docker Hub
 
