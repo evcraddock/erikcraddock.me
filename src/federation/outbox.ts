@@ -9,7 +9,8 @@ import { postToObject, PublishedPost } from "./post-object";
 const PUBLIC = new URL("https://www.w3.org/ns/activitystreams#Public");
 
 // Re-export for backward compatibility
-export { postToObject, PublishedPost } from "./post-object";
+export { postToObject } from "./post-object";
+export type { PublishedPost } from "./post-object";
 
 /**
  * Get published posts for the outbox, ordered by published_at descending.

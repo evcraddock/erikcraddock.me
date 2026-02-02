@@ -952,12 +952,14 @@ export function createPagesRoutes(db: Database): Hono {
 
     const title = post.title || (isNote ? "Note" : "Post");
     const description = post.excerpt || truncate(post.content, 160);
+    const canonicalUrl = `/posts/${slug}`;
 
     return c.html(
       <Layout
         title={`${title} | erikcraddock.me`}
         ogImage={bannerUrl ?? undefined}
         description={description}
+        canonicalUrl={canonicalUrl}
       >
         <article
           class={`max-w-none ${isNote ? "pl-4 border-l-4 border-l-gray-300 dark:border-l-gray-600" : ""}`}
