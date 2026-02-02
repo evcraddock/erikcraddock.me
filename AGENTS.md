@@ -106,6 +106,10 @@ Use the `browser-tools` skill to open pages and take screenshots when verifying:
 
 ### Rules
 
+- **NEVER access the database directly using SQL commands** (sqlite3, SQL queries, etc.)
+  - Use the `ec` CLI for creating/managing content
+  - Use `make db-studio` for browsing data (Drizzle Studio)
+  - Use the application's API endpoints for data operations
 - Every schema change MUST have a corresponding migration file
 - Migration files are immutable once committed - never edit them
 - The `drizzle/` folder must be committed to git

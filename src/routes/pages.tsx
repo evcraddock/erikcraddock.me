@@ -134,6 +134,106 @@ function HeroSection() {
   );
 }
 
+/** Article card for grid display */
+function ArticleCard({
+  post,
+  getBannerUrl,
+}: {
+  post: Post;
+  getBannerUrl: (id: number) => string | null;
+}) {
+  const bannerUrl = post.banner_image_id ? getBannerUrl(post.banner_image_id) : null;
+
+  const formattedDate = post.published_at
+    ? new Date(post.published_at).toLocaleDateString("en-US", {
+        month: "short",
+        day: "numeric",
+        year: "numeric",
+      })
+    : null;
+
+  return (
+    <article class="bg-white dark:bg-gray-800 rounded-lg overflow-hidden shadow-md hover:shadow-lg transition-shadow">
+      <a href={`/posts/${post.slug}`} class="block">
+        {/* Banner image with date badge */}
+        <div class="relative aspect-video bg-gray-200 dark:bg-gray-700">
+          {bannerUrl ? (
+            <img
+              src={bannerUrl}
+              alt={post.title || "Article banner"}
+              class="w-full h-full object-cover"
+            />
+          ) : (
+            <div class="w-full h-full flex items-center justify-center">
+              <span class="text-gray-400 dark:text-gray-500 text-4xl">📝</span>
+            </div>
+          )}
+          {/* Date badge */}
+          {formattedDate && (
+            <div class="absolute top-3 right-3 bg-black/70 text-white text-xs px-2 py-1 rounded">
+              {formattedDate}
+            </div>
+          )}
+        </div>
+
+        {/* Content */}
+        <div class="p-4">
+          <h3 class="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-2 line-clamp-2 group-hover:text-blue-600">
+            {post.title}
+          </h3>
+          <p class="text-gray-600 dark:text-gray-400 text-sm line-clamp-3">
+            {post.excerpt || truncate(post.content, 150)}
+          </p>
+        </div>
+      </a>
+    </article>
+  );
+}
+
+/** Article cards grid section */
+function ArticleCardsSection({
+  articles,
+  getBannerUrl,
+}: {
+  articles: Post[];
+  getBannerUrl: (id: number) => string | null;
+}) {
+  if (articles.length === 0) {
+    return null;
+  }
+
+  return (
+    <section class="mb-12">
+      <h2 class="text-2xl font-bold text-gray-900 dark:text-gray-100 mb-6">Recent Articles</h2>
+
+      {/* Responsive grid: 1 col mobile, 2 tablet, 3 desktop */}
+      <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        {articles.map((article) => (
+          <ArticleCard key={article.id} post={article} getBannerUrl={getBannerUrl} />
+        ))}
+      </div>
+
+      {/* More Articles button */}
+      <div class="mt-8 text-center">
+        <a
+          href="/articles"
+          class="inline-flex items-center gap-2 px-6 py-3 bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-lg transition-colors"
+        >
+          More Articles
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              stroke-width="2"
+              d="M9 5l7 7-7 7"
+            />
+          </svg>
+        </a>
+      </div>
+    </section>
+  );
+}
+
 /** Reusable post card component */
 function PostCard({ post }: { post: PostWithSource }) {
   const isLink = post.type === "link";
@@ -246,28 +346,50 @@ export function createPagesRoutes(db: Database): Hono {
 
   // Home page
   pages.get("/", (c) => {
-    // Fetch posts with source info via left join
-    const results = db
-      .select({
-        post: posts,
-        source: sources,
-      })
+    // Fetch recent articles (type=article, published, limit 6)
+    const recentArticles = db
+      .select()
       .from(posts)
-      .leftJoin(sources, eq(posts.source_id, sources.id))
-      .where(isNotNull(posts.published_at))
+      .where(and(eq(posts.type, "article"), isNotNull(posts.published_at)))
       .orderBy(desc(posts.published_at))
+      .limit(6)
       .all();
 
-    // Transform to PostWithSource
-    const allPosts: PostWithSource[] = results.map((row) => ({
-      ...row.post,
-      source: row.source,
-    }));
+    // Get all banner IDs for the articles
+    const bannerIds = recentArticles
+      .map((a) => a.banner_image_id)
+      .filter((id): id is number => id !== null);
+
+    // Fetch media for banners
+    const bannerMedia =
+      bannerIds.length > 0
+        ? db
+            .select()
+            .from(media)
+            .where(
+              bannerIds.length === 1
+                ? eq(media.id, bannerIds[0])
+                : // For multiple IDs, we need to check each one
+                  // Using a simple approach: fetch all and filter
+                  isNotNull(media.id)
+            )
+            .all()
+            .filter((m) => bannerIds.includes(m.id))
+        : [];
+
+    // Create a map of banner_id -> URL
+    const bannerUrlMap = new Map<number, string>();
+    for (const m of bannerMedia) {
+      bannerUrlMap.set(m.id, mediaUrl(m.s3_key));
+    }
+
+    // Helper function to get banner URL
+    const getBannerUrl = (id: number) => bannerUrlMap.get(id) || null;
 
     return c.html(
       <Layout title="Home | erikcraddock.me">
         <HeroSection />
-        <PostList posts={allPosts} />
+        <ArticleCardsSection articles={recentArticles} getBannerUrl={getBannerUrl} />
       </Layout>
     );
   });
