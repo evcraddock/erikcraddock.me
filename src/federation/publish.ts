@@ -1,107 +1,63 @@
-import { Create, Delete, Update, Note, Article, Image, Person, Endpoints } from "@fedify/fedify";
+import { Create, Delete, Update, Image, Person, Endpoints } from "@fedify/fedify";
 import { eq } from "drizzle-orm";
 import { db, posts, media } from "@/db";
 import { federation } from "./setup";
 import { getAllFollowers } from "./followers";
 import { logger } from "@/utils/logger";
 import { dateToInstant, baseUrl } from "./utils";
-
-/**
- * Post with banner image info for federation.
- */
-interface PostWithBanner {
-  id: number;
-  slug: string;
-  type: string;
-  title: string | null;
-  content: string;
-  excerpt: string | null;
-  published_at: Date;
-  banner_image_id: number | null;
-}
-
-/**
- * Banner image info.
- */
-export interface BannerImage {
-  s3_key: string;
-  mime_type: string;
-  alt_text: string | null;
-}
-
-/**
- * Get banner image info for a post.
- */
-export function getBannerImage(bannerImageId: number): BannerImage | null {
-  const banner = db.select().from(media).where(eq(media.id, bannerImageId)).get();
-  if (!banner) return null;
-
-  return {
-    s3_key: banner.s3_key,
-    mime_type: banner.mime_type,
-    alt_text: banner.alt_text,
-  };
-}
-
-/**
- * Create an ActivityPub Image attachment for a banner.
- */
-export function createImageAttachment(banner: BannerImage): Image {
-  const imageUrl = new URL(`/media/${banner.s3_key}`, baseUrl);
-
-  return new Image({
-    url: imageUrl,
-    mediaType: banner.mime_type,
-    name: banner.alt_text ?? undefined,
-  });
-}
+import { postToObject, PublishedPost } from "./post-object";
+import { mediaUrl } from "@/services/media";
 
 // ActivityPub Public address
 const PUBLIC = new URL("https://www.w3.org/ns/activitystreams#Public");
 
 /**
- * Convert a post to an ActivityPub object (Note or Article) with optional attachment.
+ * Get a published post by ID with all fields needed for federation.
+ * Returns null if post not found or not published.
  */
-export function postToObjectWithAttachment(
-  post: PostWithBanner,
-  actorUri: URL,
-  followersUri: URL
-): Note | Article {
-  const postUri = new URL(`/posts/${post.slug}`, baseUrl);
+function getPublishedPostById(postId: number): PublishedPost | null {
+  const result = db
+    .select({
+      id: posts.id,
+      slug: posts.slug,
+      type: posts.type,
+      title: posts.title,
+      content: posts.content,
+      excerpt: posts.excerpt,
+      url: posts.url,
+      published_at: posts.published_at,
+      banner_s3_key: media.s3_key,
+      banner_alt: media.alt_text,
+    })
+    .from(posts)
+    .leftJoin(media, eq(posts.banner_image_id, media.id))
+    .where(eq(posts.id, postId))
+    .get();
 
-  // Use Article for posts with titles, Note for everything else
-  const ObjectClass = post.title ? Article : Note;
-
-  // Get banner image if present
-  let attachments: Image[] | undefined;
-  if (post.banner_image_id) {
-    const banner = getBannerImage(post.banner_image_id);
-    if (banner) {
-      attachments = [createImageAttachment(banner)];
-    }
+  if (!result || !result.published_at) {
+    return null;
   }
 
-  return new ObjectClass({
-    id: postUri,
-    attribution: actorUri,
-    // Addressing: public posts visible to everyone, CC'd to followers
-    to: PUBLIC,
-    cc: followersUri,
-    name: post.title ?? undefined,
-    content: post.content,
-    summary: post.excerpt ?? undefined,
-    published: post.published_at ? dateToInstant(new Date(post.published_at)) : undefined,
-    url: postUri,
-    attachments: attachments,
-  });
+  return {
+    id: result.id,
+    slug: result.slug,
+    type: result.type,
+    title: result.title,
+    content: result.content,
+    excerpt: result.excerpt,
+    url: result.url,
+    published_at: result.published_at,
+    banner_url: result.banner_s3_key ? new URL(mediaUrl(result.banner_s3_key), baseUrl).href : null,
+    banner_alt: result.banner_alt,
+  };
 }
 
 /**
  * Convert a post to a Create activity.
  */
-function postToCreateActivity(post: PostWithBanner, actorUri: URL, followersUri: URL): Create {
+function postToCreateActivity(post: PublishedPost, actorUri: URL, followersUri: URL): Create {
   const activityUri = new URL(`/posts/${post.slug}#create`, baseUrl);
-  const object = postToObjectWithAttachment(post, actorUri, followersUri);
+  const object = postToObject(post, actorUri, followersUri);
 
   return new Create({
     id: activityUri,
@@ -127,23 +83,9 @@ function postToCreateActivity(post: PostWithBanner, actorUri: URL, followersUri:
  * @returns true if activity was sent, false if post not found or no followers
  */
 export async function federatePost(postId: number): Promise<boolean> {
-  // Get the post with banner info
-  const post = db
-    .select({
-      id: posts.id,
-      slug: posts.slug,
-      type: posts.type,
-      title: posts.title,
-      content: posts.content,
-      excerpt: posts.excerpt,
-      published_at: posts.published_at,
-      banner_image_id: posts.banner_image_id,
-    })
-    .from(posts)
-    .where(eq(posts.id, postId))
-    .get();
+  const post = getPublishedPostById(postId);
 
-  if (!post || !post.published_at) {
+  if (!post) {
     logger.warn("federation", `Cannot federate post ${postId}: not found or not published`);
     return false;
   }
@@ -161,7 +103,7 @@ export async function federatePost(postId: number): Promise<boolean> {
   const followersUri = ctx.getFollowersUri("erik");
 
   // Create the activity
-  const activity = postToCreateActivity(post as PostWithBanner, actorUri, followersUri);
+  const activity = postToCreateActivity(post, actorUri, followersUri);
 
   logger.info(
     "federation",
@@ -291,23 +233,9 @@ export async function sendDeleteActivityForUri(uri: string): Promise<boolean> {
  * @returns true if activity was sent, false if post not found or no followers
  */
 export async function sendUpdateActivity(postId: number): Promise<boolean> {
-  // Get the post with banner info
-  const post = db
-    .select({
-      id: posts.id,
-      slug: posts.slug,
-      type: posts.type,
-      title: posts.title,
-      content: posts.content,
-      excerpt: posts.excerpt,
-      published_at: posts.published_at,
-      banner_image_id: posts.banner_image_id,
-    })
-    .from(posts)
-    .where(eq(posts.id, postId))
-    .get();
+  const post = getPublishedPostById(postId);
 
-  if (!post || !post.published_at) {
+  if (!post) {
     logger.warn("federation", `Cannot send Update for post ${postId}: not found or not published`);
     return false;
   }
@@ -323,7 +251,7 @@ export async function sendUpdateActivity(postId: number): Promise<boolean> {
   const followersUri = ctx.getFollowersUri("erik");
 
   const activityUri = new URL(`/posts/${post.slug}#update-${Date.now()}`, baseUrl);
-  const object = postToObjectWithAttachment(post as PostWithBanner, actorUri, followersUri);
+  const object = postToObject(post, actorUri, followersUri);
 
   const activity = new Update({
     id: activityUri,
