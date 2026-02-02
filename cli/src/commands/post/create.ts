@@ -14,6 +14,7 @@ interface CreateOptions {
   excerpt?: string;
   tags?: string[];
   type?: string;
+  url?: string;
 }
 
 function parseCreateArgs(args: string[]): { options: CreateOptions; help: boolean } {
@@ -59,6 +60,10 @@ function parseCreateArgs(args: string[]): { options: CreateOptions; help: boolea
       options.type = args[++i];
     } else if (arg.startsWith("--type=")) {
       options.type = arg.split("=").slice(1).join("=");
+    } else if (arg === "--url" && args[i + 1]) {
+      options.url = args[++i];
+    } else if (arg.startsWith("--url=")) {
+      options.url = arg.split("=").slice(1).join("=");
     }
 
     i++;
@@ -81,11 +86,12 @@ Options:
   --excerpt <text>    Short excerpt/summary
   --tags <tags>       Comma-separated list of tags
   --type <type>       Post type: article, link, note (default: article)
+  --url <url>         URL for link posts (required for links)
   --json              Output as JSON
   --help, -h          Show this help message
 
 File-based creation:
-  When using --file, frontmatter fields (title, slug, tags, excerpt, type, banner)
+  When using --file, frontmatter fields (title, slug, tags, excerpt, type, banner, url)
   are extracted from the markdown file. Command-line options override frontmatter.
 
   Local images (./path.jpg) are uploaded automatically.
@@ -124,6 +130,7 @@ export async function create(args: string[], globalOptions: GlobalOptions): Prom
   let excerpt = options.excerpt;
   let tags = options.tags;
   let type = options.type;
+  let url = options.url;
   let banner: string | undefined;
   let bannerImageId: number | undefined;
 
@@ -145,6 +152,7 @@ export async function create(args: string[], globalOptions: GlobalOptions): Prom
     slug = options.slug ?? frontmatter.slug;
     excerpt = options.excerpt ?? frontmatter.excerpt;
     type = options.type ?? frontmatter.type;
+    url = options.url ?? frontmatter.url;
     banner = frontmatter.banner;
 
     // Merge tags: CLI tags override, or use frontmatter
@@ -208,6 +216,12 @@ export async function create(args: string[], globalOptions: GlobalOptions): Prom
     process.exit(1);
   }
 
+  if (postType === "link" && !url) {
+    console.error("❌ Links require a URL.");
+    console.error("   Use --url option or add 'url:' to frontmatter.");
+    process.exit(1);
+  }
+
   const result = await client.createPost({
     type: postType,
     slug,
@@ -215,6 +229,7 @@ export async function create(args: string[], globalOptions: GlobalOptions): Prom
     content,
     excerpt,
     tags,
+    url,
     banner_image_id: bannerImageId,
   });
 

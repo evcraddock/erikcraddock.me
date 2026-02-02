@@ -296,6 +296,128 @@ function Pagination({
   );
 }
 
+/** Feed post component - renders differently based on post type */
+function FeedPost({ post }: { post: PostWithSource }) {
+  const formattedDate = post.published_at
+    ? new Date(post.published_at).toLocaleDateString("en-US", {
+        year: "numeric",
+        month: "long",
+        day: "numeric",
+      })
+    : null;
+
+  // Note: full content, left border
+  if (post.type === "note") {
+    return (
+      <article class="bg-gray-50 dark:bg-transparent border-l-4 border-gray-400 dark:border-gray-600 pl-4 py-4 pr-4 rounded-r-lg">
+        <div class="prose prose-gray dark:prose-invert max-w-none mb-3">
+          {raw(renderMarkdown(post.content))}
+        </div>
+        <div class="flex items-center gap-3 text-sm text-gray-500 dark:text-gray-400">
+          <time>{formattedDate}</time>
+          <span class="text-gray-300 dark:text-gray-600">•</span>
+          <span class="text-gray-400 dark:text-gray-500">Note</span>
+        </div>
+      </article>
+    );
+  }
+
+  // Link: full content, source attribution (similar to articles but with full content)
+  if (post.type === "link") {
+    return (
+      <article class="bg-white dark:bg-transparent border border-gray-200 dark:border-gray-700 rounded-lg p-6">
+        {/* Title if present */}
+        {post.title && (
+          <h2 class="text-xl font-semibold text-gray-900 dark:text-gray-100 mb-2">
+            <a href={`/posts/${post.slug}`} class="hover:text-blue-600 dark:hover:text-blue-400">
+              {post.title}
+            </a>
+          </h2>
+        )}
+
+        {/* Source link under title */}
+        {post.url && (
+          <a
+            href={post.url}
+            target="_blank"
+            rel="noopener noreferrer"
+            class="text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300 text-sm mb-3 inline-flex items-center gap-1"
+          >
+            <span class="truncate max-w-md">{new URL(post.url).hostname}</span>
+            <svg
+              class="w-3 h-3 flex-shrink-0"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                stroke-width="2"
+                d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"
+              />
+            </svg>
+          </a>
+        )}
+
+        {/* Full content */}
+        <div class="prose prose-gray dark:prose-invert max-w-none mb-4">
+          {raw(renderMarkdown(post.content))}
+        </div>
+
+        {/* Meta */}
+        <div class="flex flex-wrap items-center gap-3 text-sm text-gray-500 dark:text-gray-400">
+          <time>{formattedDate}</time>
+          <span class="text-gray-300 dark:text-gray-600">•</span>
+          <span class="text-gray-400 dark:text-gray-500">Link</span>
+          {post.source && (
+            <>
+              <span class="text-gray-300 dark:text-gray-600">•</span>
+              <span>
+                via{" "}
+                <a
+                  href={post.source.url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  class="hover:text-gray-700 dark:hover:text-gray-300"
+                >
+                  {post.source.name}
+                </a>
+              </span>
+            </>
+          )}
+        </div>
+      </article>
+    );
+  }
+
+  // Article: title + excerpt + "Read more" link
+  return (
+    <article class="bg-white dark:bg-transparent border border-gray-200 dark:border-gray-700 rounded-lg p-6">
+      <a href={`/posts/${post.slug}`} class="block group">
+        <h2 class="text-xl font-semibold text-gray-900 dark:text-gray-100 group-hover:text-blue-600 dark:group-hover:text-blue-400 mb-2">
+          {post.title}
+        </h2>
+        <p class="text-gray-600 dark:text-gray-400 mb-3">
+          {post.excerpt || truncate(post.content, 200)}
+        </p>
+      </a>
+      <div class="flex items-center gap-3 text-sm text-gray-500 dark:text-gray-400">
+        <time>{formattedDate}</time>
+        <span class="text-gray-300 dark:text-gray-600">•</span>
+        <span class="text-gray-400 dark:text-gray-500">Article</span>
+        <span class="text-gray-300 dark:text-gray-600">•</span>
+        <a
+          href={`/posts/${post.slug}`}
+          class="text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300"
+        >
+          Read more →
+        </a>
+      </div>
+    </article>
+  );
+}
+
 /** Reusable post card component */
 function PostCard({ post }: { post: PostWithSource }) {
   const isLink = post.type === "link";
@@ -547,6 +669,89 @@ export function createPagesRoutes(db: Database): Hono {
         {/* Pagination */}
         {totalPages > 1 && (
           <Pagination currentPage={page} totalPages={totalPages} baseUrl="/articles" />
+        )}
+      </Layout>
+    );
+  });
+
+  // Feed page - all post types with full content for notes/links, excerpts for articles
+  const FEED_POSTS_PER_PAGE = 10;
+
+  pages.get("/feed", (c) => {
+    // Get page number from query string
+    const pageParam = c.req.query("page");
+    const page = pageParam ? parseInt(pageParam, 10) : 1;
+
+    // Validate page number
+    if (isNaN(page) || page < 1) {
+      return c.redirect("/feed");
+    }
+
+    // Count total posts
+    const countResult = db
+      .select({ count: posts.id })
+      .from(posts)
+      .where(isNotNull(posts.published_at))
+      .all();
+    const totalPosts = countResult.length;
+    const totalPages = Math.ceil(totalPosts / FEED_POSTS_PER_PAGE);
+
+    // Handle no posts
+    if (totalPosts === 0) {
+      return c.html(
+        <Layout title="Feed | erikcraddock.me">
+          <h1 class="text-3xl font-bold text-gray-900 dark:text-gray-100 mb-8">Feed</h1>
+          <p class="text-gray-600 dark:text-gray-400">No posts yet.</p>
+        </Layout>
+      );
+    }
+
+    // Handle page out of range
+    if (page > totalPages) {
+      return c.redirect(`/feed?page=${totalPages}`);
+    }
+
+    // Fetch posts for current page with source info
+    const offset = (page - 1) * FEED_POSTS_PER_PAGE;
+    const results = db
+      .select({
+        post: posts,
+        source: sources,
+      })
+      .from(posts)
+      .leftJoin(sources, eq(posts.source_id, sources.id))
+      .where(isNotNull(posts.published_at))
+      .orderBy(desc(posts.published_at))
+      .limit(FEED_POSTS_PER_PAGE)
+      .offset(offset)
+      .all();
+
+    const pagePosts: PostWithSource[] = results.map((row) => ({
+      ...row.post,
+      source: row.source,
+    }));
+
+    return c.html(
+      <Layout title={`Feed${page > 1 ? ` - Page ${page}` : ""} | erikcraddock.me`}>
+        <h1 class="text-3xl font-bold text-gray-900 dark:text-gray-100 mb-8">Feed</h1>
+
+        {/* Page indicator at top */}
+        {totalPages > 1 && (
+          <p class="text-center text-gray-600 dark:text-gray-400 mb-6">
+            Page {page} of {totalPages}
+          </p>
+        )}
+
+        {/* Posts list */}
+        <div class="space-y-8">
+          {pagePosts.map((post) => (
+            <FeedPost key={post.id} post={post} />
+          ))}
+        </div>
+
+        {/* Pagination */}
+        {totalPages > 1 && (
+          <Pagination currentPage={page} totalPages={totalPages} baseUrl="/feed" />
         )}
       </Layout>
     );
