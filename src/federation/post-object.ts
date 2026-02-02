@@ -1,4 +1,4 @@
-import { Note, Article } from "@fedify/fedify";
+import { Note, Article, Document } from "@fedify/fedify";
 import { dateToInstant, baseUrl } from "./utils";
 
 // ActivityPub Public address
@@ -13,6 +13,8 @@ export interface PublishedPost {
   excerpt: string | null;
   url: string | null;
   published_at: Date;
+  banner_url?: string | null;
+  banner_alt?: string | null;
 }
 
 /**
@@ -42,6 +44,31 @@ export function postToObject(
     content = post.excerpt ? `${post.excerpt}\n\n${postUrl}` : postUrl;
   }
 
+  // Build attachments array for media (banner images on articles only)
+  const attachments: Document[] = [];
+  if (post.type === "article" && post.banner_url) {
+    // Determine media type from URL extension
+    const ext = post.banner_url.split(".").pop()?.toLowerCase();
+    const mediaType =
+      ext === "png"
+        ? "image/png"
+        : ext === "gif"
+          ? "image/gif"
+          : ext === "webp"
+            ? "image/webp"
+            : "image/jpeg";
+
+    const bannerUrlObj = new URL(post.banner_url);
+    attachments.push(
+      new Document({
+        id: bannerUrlObj,
+        url: bannerUrlObj,
+        mediaType,
+        name: post.banner_alt ?? post.title ?? undefined,
+      })
+    );
+  }
+
   return new ObjectClass({
     id: postUri,
     attribution: actorUri,
@@ -55,5 +82,6 @@ export function postToObject(
     summary: post.title && post.type !== "link" ? (post.excerpt ?? undefined) : undefined,
     published: post.published_at ? dateToInstant(new Date(post.published_at)) : undefined,
     url: postUri,
+    attachments: attachments.length > 0 ? attachments : undefined,
   });
 }
