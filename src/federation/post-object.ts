@@ -25,7 +25,7 @@ export function postToObject(
   actorUri: URL,
   followersUri: URL
 ): Note | Article {
-  const postUri = new URL(`/posts/${post.id}`, baseUrl);
+  const postUri = new URL(`/posts/${post.slug}`, baseUrl);
 
   // Use Article for articles (posts with titles that aren't links)
   // Use Note for notes and links (links are commentary + URL, displayed inline)

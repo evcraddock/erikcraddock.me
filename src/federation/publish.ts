@@ -11,6 +11,7 @@ import { dateToInstant, baseUrl } from "./utils";
  */
 interface PostWithBanner {
   id: number;
+  slug: string;
   type: string;
   title: string | null;
   content: string;
@@ -66,7 +67,7 @@ export function postToObjectWithAttachment(
   actorUri: URL,
   followersUri: URL
 ): Note | Article {
-  const postUri = new URL(`/posts/${post.id}`, baseUrl);
+  const postUri = new URL(`/posts/${post.slug}`, baseUrl);
 
   // Use Article for posts with titles, Note for everything else
   const ObjectClass = post.title ? Article : Note;
@@ -99,7 +100,7 @@ export function postToObjectWithAttachment(
  * Convert a post to a Create activity.
  */
 function postToCreateActivity(post: PostWithBanner, actorUri: URL, followersUri: URL): Create {
-  const activityUri = new URL(`/posts/${post.id}#create`, baseUrl);
+  const activityUri = new URL(`/posts/${post.slug}#create`, baseUrl);
   const object = postToObjectWithAttachment(post, actorUri, followersUri);
 
   return new Create({
@@ -130,6 +131,7 @@ export async function federatePost(postId: number): Promise<boolean> {
   const post = db
     .select({
       id: posts.id,
+      slug: posts.slug,
       type: posts.type,
       title: posts.title,
       content: posts.content,
@@ -189,19 +191,19 @@ export async function federatePost(postId: number): Promise<boolean> {
  * @param postId The ID of the deleted post
  * @returns true if activity was sent, false if no followers
  */
-export async function sendDeleteActivity(postId: number): Promise<boolean> {
+export async function sendDeleteActivity(slug: string): Promise<boolean> {
   const followers = getAllFollowers();
   if (followers.length === 0) {
-    logger.debug("federation", `No followers to send Delete for post ${postId}`);
+    logger.debug("federation", `No followers to send Delete for post ${slug}`);
     return true;
   }
 
   const ctx = federation.createContext(new URL(baseUrl), undefined);
   const actorUri = ctx.getActorUri("erik");
 
-  // The object URI that was deleted
-  const objectUri = new URL(`/posts/${postId}`, baseUrl);
-  const activityUri = new URL(`/posts/${postId}#delete`, baseUrl);
+  // The object URI that was deleted (must match the URI used when created)
+  const objectUri = new URL(`/posts/${slug}`, baseUrl);
+  const activityUri = new URL(`/posts/${slug}#delete`, baseUrl);
 
   const activity = new Delete({
     id: activityUri,
@@ -211,7 +213,7 @@ export async function sendDeleteActivity(postId: number): Promise<boolean> {
 
   logger.info(
     "federation",
-    `Sending Delete activity for post ${postId} to ${followers.length} followers`
+    `Sending Delete activity for post ${slug} to ${followers.length} followers`
   );
 
   try {
@@ -219,10 +221,10 @@ export async function sendDeleteActivity(postId: number): Promise<boolean> {
       preferSharedInbox: true,
     });
 
-    logger.info("federation", `Successfully queued Delete activity for post ${postId}`);
+    logger.info("federation", `Successfully queued Delete activity for post ${slug}`);
     return true;
   } catch (error) {
-    logger.error("federation", `Failed to send Delete activity for post ${postId}`, { error });
+    logger.error("federation", `Failed to send Delete activity for post ${slug}`, { error });
     return false;
   }
 }
@@ -241,6 +243,7 @@ export async function sendUpdateActivity(postId: number): Promise<boolean> {
   const post = db
     .select({
       id: posts.id,
+      slug: posts.slug,
       type: posts.type,
       title: posts.title,
       content: posts.content,
@@ -267,7 +270,7 @@ export async function sendUpdateActivity(postId: number): Promise<boolean> {
   const actorUri = ctx.getActorUri("erik");
   const followersUri = ctx.getFollowersUri("erik");
 
-  const activityUri = new URL(`/posts/${postId}#update-${Date.now()}`, baseUrl);
+  const activityUri = new URL(`/posts/${post.slug}#update-${Date.now()}`, baseUrl);
   const object = postToObjectWithAttachment(post as PostWithBanner, actorUri, followersUri);
 
   const activity = new Update({

@@ -74,10 +74,10 @@ export function postToCreateActivity(
   actorUri: URL,
   followersUri: URL
 ): Create {
-  const activityUri = new URL(`/posts/${post.id}#create`, baseUrl);
+  const activityUri = new URL(`/posts/${post.slug}#create`, baseUrl);
   const object = postToObject(post, actorUri, followersUri);
 
-  logger.debug("federation", `Converting post ${post.id} to Create activity`);
+  logger.debug("federation", `Converting post ${post.slug} to Create activity`);
 
   return new Create({
     id: activityUri,
