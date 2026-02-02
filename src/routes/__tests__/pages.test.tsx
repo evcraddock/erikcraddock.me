@@ -153,6 +153,45 @@ describe("pages routes", () => {
       // About link removed from nav but page still accessible
       expect(html).not.toContain('href="/about"');
     });
+
+    it("displays Recent Articles section", async () => {
+      const app = getApp();
+      const res = await app.request("/");
+      const html = await res.text();
+
+      expect(html).toContain("Recent Articles");
+    });
+
+    it("displays article cards with titles linked to post pages", async () => {
+      const app = getApp();
+      const res = await app.request("/");
+      const html = await res.text();
+
+      // Card should link to post page
+      expect(html).toContain('href="/posts/test-post"');
+    });
+
+    it("displays More Articles button linking to /articles", async () => {
+      const app = getApp();
+      const res = await app.request("/");
+      const html = await res.text();
+
+      expect(html).toContain("More Articles");
+      expect(html).toContain('href="/articles"');
+    });
+
+    it("only shows articles (type=article), not links or notes", async () => {
+      const app = getApp();
+      const res = await app.request("/");
+      const html = await res.text();
+
+      // Should show article
+      expect(html).toContain("Test Post");
+      // Should not show link post
+      expect(html).not.toContain("Test Link Post");
+      // Should not show note
+      expect(html).not.toContain("Short note content");
+    });
   });
 
   describe("GET /about", () => {
@@ -455,33 +494,8 @@ describe("pages routes", () => {
   });
 
   describe("Note posts", () => {
-    describe("GET / (home page)", () => {
-      it("displays short notes with full content", async () => {
-        const app = getApp();
-        const res = await app.request("/");
-        const html = await res.text();
-
-        expect(html).toContain("Short note content 🚀");
-      });
-
-      it("displays notes with left border styling", async () => {
-        const app = getApp();
-        const res = await app.request("/");
-        const html = await res.text();
-
-        expect(html).toContain("border-l-2");
-        expect(html).toContain("border-l-gray-300");
-      });
-
-      it("truncates long notes with ellipsis", async () => {
-        const app = getApp();
-        const res = await app.request("/");
-        const html = await res.text();
-
-        expect(html).not.toContain("x".repeat(300));
-        expect(html).toContain("…");
-      });
-    });
+    // Note: Home page now shows only article cards, not notes.
+    // Notes are accessible via /posts/:slug but not listed on home page.
 
     describe("GET /posts/:slug (single note page)", () => {
       it("displays note with left border styling", async () => {
