@@ -1,4 +1,4 @@
-import { Create, Delete, Update, Note, Article, Image } from "@fedify/fedify";
+import { Create, Delete, Update, Note, Article, Image, Person, Endpoints } from "@fedify/fedify";
 import { eq } from "drizzle-orm";
 import { db, posts, media } from "@/db";
 import { federation } from "./setup";
@@ -290,6 +290,69 @@ export async function sendUpdateActivity(postId: number): Promise<boolean> {
     return true;
   } catch (error) {
     logger.error("federation", `Failed to send Update activity for post ${postId}`, { error });
+    return false;
+  }
+}
+
+/**
+ * Send an Update activity for the actor profile to all followers.
+ *
+ * Should be called when actor profile changes (icon, name, summary, etc.).
+ * Remote servers should update their cached copy of the actor.
+ *
+ * @returns true if activity was sent, false if no followers
+ */
+export async function sendActorUpdateActivity(): Promise<boolean> {
+  const followers = getAllFollowers();
+  if (followers.length === 0) {
+    logger.debug("federation", "No followers to send actor Update to");
+    return true;
+  }
+
+  const ctx = federation.createContext(new URL(baseUrl), undefined);
+  const actorUri = ctx.getActorUri("erik");
+
+  // Get key pairs for the actor
+  const keys = await ctx.getActorKeyPairs("erik");
+
+  // Build the Person object (same as actor dispatcher)
+  const iconUrl = new URL("/images/erik-logo.png", baseUrl);
+  const bannerUrl = new URL("/images/banner.png", baseUrl);
+
+  const person = new Person({
+    id: actorUri,
+    preferredUsername: "erik",
+    name: "Erik Craddock",
+    summary: "Writer, coder, and musician — not always in that order.",
+    icon: new Image({ url: iconUrl, mediaType: "image/png" }),
+    image: new Image({ url: bannerUrl, mediaType: "image/png" }),
+    url: new URL("/", baseUrl),
+    inbox: ctx.getInboxUri("erik"),
+    outbox: ctx.getOutboxUri("erik"),
+    followers: ctx.getFollowersUri("erik"),
+    endpoints: new Endpoints({ sharedInbox: ctx.getInboxUri() }),
+    publicKey: keys[0].cryptographicKey,
+    assertionMethods: keys.map((key) => key.multikey),
+  });
+
+  const activityUri = new URL(`/users/erik#update-${Date.now()}`, baseUrl);
+  const activity = new Update({
+    id: activityUri,
+    actor: actorUri,
+    object: person,
+  });
+
+  logger.info("federation", `Sending actor Update activity to ${followers.length} followers`);
+
+  try {
+    await ctx.sendActivity({ identifier: "erik" }, "followers", activity, {
+      preferSharedInbox: true,
+    });
+
+    logger.info("federation", "Successfully queued actor Update activity");
+    return true;
+  } catch (error) {
+    logger.error("federation", "Failed to send actor Update activity", { error });
     return false;
   }
 }

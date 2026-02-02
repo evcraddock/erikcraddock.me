@@ -22,7 +22,12 @@ import {
   deleteSource,
 } from "@/services/sources";
 import { listTags } from "@/services/tags";
-import { federatePost, sendDeleteActivity, sendUpdateActivity } from "@/federation/publish";
+import {
+  federatePost,
+  sendDeleteActivity,
+  sendUpdateActivity,
+  sendActorUpdateActivity,
+} from "@/federation/publish";
 
 export const api = new Hono();
 
@@ -677,6 +682,21 @@ api.delete("/media/:id", async (c) => {
     }
 
     return c.body(null, 204);
+  } catch (error) {
+    return c.json({ error: String(error) }, 500);
+  }
+});
+
+/**
+ * POST /api/federation/update-actor - Send actor Update activity to all followers
+ *
+ * Call this when actor profile changes (icon, banner, name, summary).
+ * Remote servers will re-fetch and cache the updated actor info.
+ */
+api.post("/federation/update-actor", async (c) => {
+  try {
+    const sent = await sendActorUpdateActivity();
+    return c.json({ success: sent });
   } catch (error) {
     return c.json({ error: String(error) }, 500);
   }
