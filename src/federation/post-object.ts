@@ -81,7 +81,8 @@ export function postToObject(
     // Only set summary for Articles - for Notes it triggers CW behavior
     summary: post.title && post.type !== "link" ? (post.excerpt ?? undefined) : undefined,
     published: post.published_at ? dateToInstant(new Date(post.published_at)) : undefined,
-    url: postUri,
+    // For links, url points to external article so Mastodon links there and generates preview
+    url: post.type === "link" && post.url ? new URL(post.url) : postUri,
     attachments: attachments.length > 0 ? attachments : undefined,
   });
 }
