@@ -1,6 +1,7 @@
 import {
   createFederation,
   Person,
+  Image,
   Endpoints,
   Follow,
   Undo,
@@ -88,11 +89,17 @@ export function createFedifyFederation() {
       // for both HTTP Signatures (publicKey) and Object Integrity Proofs (assertionMethods)
       const keys = await ctx.getActorKeyPairs(identifier);
 
+      // Build image URLs using canonical origin for correct protocol behind reverse proxy
+      const iconUrl = new URL("/images/erik-logo.png", ctx.canonicalOrigin);
+      const bannerUrl = new URL("/images/banner.png", ctx.canonicalOrigin);
+
       return new Person({
         id: ctx.getActorUri(identifier),
         preferredUsername: identifier,
         name: "Erik Craddock",
-        summary: "Personal blog - articles, links, and notes",
+        summary: "Writer, coder, and musician — not always in that order.",
+        icon: new Image({ url: iconUrl, mediaType: "image/png" }),
+        image: new Image({ url: bannerUrl, mediaType: "image/png" }),
         // Use canonicalOrigin to ensure correct protocol behind reverse proxy
         url: new URL("/", ctx.canonicalOrigin),
         inbox: ctx.getInboxUri(identifier),

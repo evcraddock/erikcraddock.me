@@ -42,6 +42,7 @@
     "@types/marked": "^5.0.2",
     "@types/node": "^20.0.0",
     "@types/nodemailer": "^7.0.9",
+    "canvas": "^3.2.1",
     "drizzle-kit": "^0.31.8",
     "esbuild": "^0.27.2",
     "eslint": "^9.0.0",
