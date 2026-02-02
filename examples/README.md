@@ -1,6 +1,6 @@
 # Example Content
 
-Example articles and images for testing.
+Example content for testing: articles, linkblogs, and notes.
 
 ## Seed Dev Database
 
@@ -10,10 +10,11 @@ Example articles and images for testing.
 
 Requires dev server running (`make dev`) and `cli/dev-config.yaml` configured.
 
-## Articles
+## Content
 
-7 sample articles in `articles/` covering writing, coding, and music topics.
-
-## Images
-
-Banner images (1200x630px) in `images/` for each article.
+| Folder      | Type    | Count | Description                        |
+| ----------- | ------- | ----- | ---------------------------------- |
+| `articles/` | article | 7     | Long-form posts with banner images |
+| `links/`    | link    | 3     | Linkblogs with commentary          |
+| `notes/`    | note    | 5     | Short thoughts                     |
+| `images/`   | -       | 7     | Banner images for articles         |

@@ -68,6 +68,17 @@ testDb
       created_at: now,
       updated_at: now,
     },
+    {
+      id: 6,
+      slug: "test-link",
+      type: "link",
+      title: "Test Link Post",
+      content: "This is commentary on an external link.",
+      url: "https://example.com/article",
+      published_at: now,
+      created_at: now,
+      updated_at: now,
+    },
   ])
   .run();
 
@@ -144,12 +155,13 @@ describe("pages routes", () => {
       expect(html).toContain("dark:border-gray-700");
     });
 
-    it("includes navigation links to Articles and Sources", async () => {
+    it("includes navigation links to Articles, Feed, and Sources", async () => {
       const app = getApp();
       const res = await app.request("/");
       const html = await res.text();
 
       expect(html).toContain('href="/articles"');
+      expect(html).toContain('href="/feed"');
       expect(html).toContain('href="/sources"');
       // About link removed from nav but page still accessible
       expect(html).not.toContain('href="/about"');
@@ -289,6 +301,66 @@ describe("pages routes", () => {
 
       expect(res.status).toBe(302);
       expect(res.headers.get("Location")).toBe("/articles");
+    });
+  });
+
+  describe("GET /feed", () => {
+    it("returns 200 and displays feed page", async () => {
+      const app = getApp();
+      const res = await app.request("/feed");
+
+      expect(res.status).toBe(200);
+
+      const html = await res.text();
+      expect(html).toContain("<h1");
+      expect(html).toContain("Feed");
+    });
+
+    it("displays all post types (articles, links, notes)", async () => {
+      const app = getApp();
+      const res = await app.request("/feed");
+      const html = await res.text();
+
+      // Should contain article
+      expect(html).toContain("Test Post");
+      // Should contain link post
+      expect(html).toContain("Test Link Post");
+      // Should contain note
+      expect(html).toContain("Short note content");
+    });
+
+    it("shows article posts with Read more link", async () => {
+      const app = getApp();
+      const res = await app.request("/feed");
+      const html = await res.text();
+
+      expect(html).toContain("Read more →");
+      expect(html).toContain('href="/posts/test-post"');
+    });
+
+    it("shows note posts with left border styling", async () => {
+      const app = getApp();
+      const res = await app.request("/feed");
+      const html = await res.text();
+
+      expect(html).toContain("border-l-4");
+    });
+
+    it("includes dark mode classes", async () => {
+      const app = getApp();
+      const res = await app.request("/feed");
+      const html = await res.text();
+
+      expect(html).toContain("dark:bg-gray-900");
+      expect(html).toContain("dark:text-gray-100");
+    });
+
+    it("redirects invalid page numbers to /feed", async () => {
+      const app = getApp();
+      const res = await app.request("/feed?page=0");
+
+      expect(res.status).toBe(302);
+      expect(res.headers.get("Location")).toBe("/feed");
     });
   });
 
