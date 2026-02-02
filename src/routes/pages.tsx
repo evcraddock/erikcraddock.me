@@ -7,6 +7,8 @@ import { NotFound } from "../templates/not-found";
 import { truncate } from "../utils/text";
 import { renderMarkdown } from "../utils/markdown";
 import { mediaUrl } from "../services/media";
+import { postToObject, PublishedPost } from "../federation/post-object";
+import { baseUrl } from "../federation/utils";
 
 // Database type for dependency injection
 type Database = typeof defaultDb;
@@ -903,8 +905,69 @@ export function createPagesRoutes(db: Database): Hono {
   });
 
   // Single post page
-  pages.get("/posts/:slug", (c) => {
+  pages.get("/posts/:slug", async (c) => {
     const slug = c.req.param("slug");
+
+    // Content negotiation: return ActivityPub JSON-LD if requested
+    const accept = c.req.header("Accept") || "";
+    const wantsActivityPub =
+      accept.includes("application/activity+json") || accept.includes("application/ld+json");
+
+    if (wantsActivityPub) {
+      // Query the post for ActivityPub
+      const post = db
+        .select({
+          id: posts.id,
+          slug: posts.slug,
+          type: posts.type,
+          title: posts.title,
+          content: posts.content,
+          excerpt: posts.excerpt,
+          url: posts.url,
+          published_at: posts.published_at,
+          banner_image_id: posts.banner_image_id,
+        })
+        .from(posts)
+        .where(eq(posts.slug, slug))
+        .get();
+
+      if (!post || !post.published_at) {
+        return c.json({ error: "Not found" }, 404);
+      }
+
+      // Get banner URL if present
+      let bannerUrl: string | null = null;
+      let bannerAlt: string | null = null;
+      if (post.banner_image_id) {
+        const bannerMedia = db.select().from(media).where(eq(media.id, post.banner_image_id)).get();
+        if (bannerMedia) {
+          bannerUrl = new URL(mediaUrl(bannerMedia.s3_key), baseUrl).href;
+          bannerAlt = bannerMedia.alt_text;
+        }
+      }
+
+      const publishedPost: PublishedPost = {
+        id: post.id,
+        slug: post.slug,
+        type: post.type,
+        title: post.title,
+        content: post.content,
+        excerpt: post.excerpt,
+        url: post.url,
+        published_at: post.published_at,
+        banner_url: bannerUrl,
+        banner_alt: bannerAlt,
+      };
+
+      const actorUri = new URL("/users/erik", baseUrl);
+      const followersUri = new URL("/users/erik/followers", baseUrl);
+      const object = postToObject(publishedPost, actorUri, followersUri);
+
+      const jsonLd = await object.toJsonLd();
+      return c.json(jsonLd, 200, {
+        "Content-Type": "application/activity+json",
+      });
+    }
 
     // Query the post with source info
     const result = db
