@@ -1,5 +1,6 @@
 import { Note, Article, Document } from "@fedify/fedify";
 import { dateToInstant, baseUrl } from "./utils";
+import { renderMarkdown } from "../utils/markdown";
 
 // ActivityPub Public address
 const PUBLIC = new URL("https://www.w3.org/ns/activitystreams#Public");
@@ -31,17 +32,27 @@ export function postToObject(
   // Use Note for notes and links (links are commentary + URL, displayed inline)
   const ObjectClass = post.title && post.type !== "link" ? Article : Note;
 
-  // Build content based on post type:
-  // - Notes: full content (short by nature)
-  // - Links: commentary + external URL (Mastodon generates preview card)
-  // - Articles: excerpt + link to article (Mastodon generates preview card from our site)
-  let content = post.content;
+  // Build content as HTML based on post type:
+  // - Notes: full content rendered as HTML
+  // - Links: commentary HTML + external URL as clickable link (Mastodon crawls first link for preview)
+  // - Articles: excerpt HTML + link to article
+  // Mastodon expects HTML content and parses <a> tags to find links for preview cards.
   const postUrl = new URL(`/posts/${post.slug}`, baseUrl).href;
+  let content: string;
 
   if (post.type === "link" && post.url) {
-    content = `${post.content}\n\n${post.url}`;
+    // Link posts: render commentary as HTML, append external URL as visible link
+    const commentaryHtml = renderMarkdown(post.content);
+    content = `${commentaryHtml}<p><a href="${post.url}">${post.url}</a></p>`;
   } else if (post.type === "article") {
-    content = post.excerpt ? `${post.excerpt}\n\n${postUrl}` : postUrl;
+    // Articles: render excerpt as HTML, append link to our site
+    const excerptHtml = post.excerpt ? renderMarkdown(post.excerpt) : "";
+    content = excerptHtml
+      ? `${excerptHtml}<p><a href="${postUrl}">${postUrl}</a></p>`
+      : `<p><a href="${postUrl}">${postUrl}</a></p>`;
+  } else {
+    // Notes: render full content as HTML
+    content = renderMarkdown(post.content);
   }
 
   // Build attachments array for media (banner images on articles only)

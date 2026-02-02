@@ -21,7 +21,7 @@ function createPost(overrides: Partial<PublishedPost>): PublishedPost {
 
 describe("postToObject", () => {
   describe("Note posts", () => {
-    it("converts note to Note type with full content", () => {
+    it("converts note to Note type with full content as HTML", () => {
       const post = createPost({
         type: "note",
         title: null,
@@ -34,7 +34,8 @@ describe("postToObject", () => {
       expect(result).toBeInstanceOf(Note);
       expect(result.name).toBeFalsy();
       expect(result.summary).toBeFalsy();
-      expect(result.content).toBe("This is a short note");
+      // Content is rendered as HTML for Mastodon compatibility
+      expect(result.content).toBe("<p>This is a short note</p>\n");
     });
 
     it("does not set summary on notes (avoids CW behavior)", () => {
@@ -52,7 +53,7 @@ describe("postToObject", () => {
   });
 
   describe("Link posts", () => {
-    it("converts link to Note type with commentary and external URL", () => {
+    it("converts link to Note type with HTML commentary and clickable URL", () => {
       const post = createPost({
         type: "link",
         title: "Link Title",
@@ -63,7 +64,10 @@ describe("postToObject", () => {
       const result = postToObject(post, actorUri, followersUri);
 
       expect(result).toBeInstanceOf(Note);
-      expect(result.content).toBe("My commentary on this link\n\nhttps://example.com/article");
+      // Content is HTML with clickable <a> tag so Mastodon can crawl for preview card
+      expect(result.content).toBe(
+        '<p>My commentary on this link</p>\n<p><a href="https://example.com/article">https://example.com/article</a></p>'
+      );
     });
 
     it("does not set name on link posts (Note type)", () => {
