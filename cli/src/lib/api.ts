@@ -206,6 +206,12 @@ export class ApiClient {
   async listTags(): Promise<ApiResponse<TagWithCount[]>> {
     return this.request<TagWithCount[]>("GET", "/tags");
   }
+
+  // Federation methods
+
+  async federationDelete(uri: string): Promise<ApiResponse<{ success: boolean; uri: string }>> {
+    return this.request<{ success: boolean; uri: string }>("POST", "/federation/delete", { uri });
+  }
 }
 
 function getMimeType(filename: string): string {

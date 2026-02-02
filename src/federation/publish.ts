@@ -200,6 +200,7 @@ export async function sendDeleteActivity(slug: string): Promise<boolean> {
 
   const ctx = federation.createContext(new URL(baseUrl), undefined);
   const actorUri = ctx.getActorUri("erik");
+  const followersUri = ctx.getFollowersUri("erik");
 
   // The object URI that was deleted (must match the URI used when created)
   const objectUri = new URL(`/posts/${slug}`, baseUrl);
@@ -209,6 +210,8 @@ export async function sendDeleteActivity(slug: string): Promise<boolean> {
     id: activityUri,
     actor: actorUri,
     object: objectUri,
+    to: PUBLIC,
+    cc: followersUri,
   });
 
   logger.info(
@@ -225,6 +228,55 @@ export async function sendDeleteActivity(slug: string): Promise<boolean> {
     return true;
   } catch (error) {
     logger.error("federation", `Failed to send Delete activity for post ${slug}`, { error });
+    return false;
+  }
+}
+
+/**
+ * Send a Delete activity for an arbitrary URI.
+ *
+ * Use this to delete posts that were federated with old URIs,
+ * or to clean up posts during development.
+ *
+ * @param uri The full URI of the object to delete (e.g., https://erikcraddock.me/posts/4)
+ * @returns true if activity was sent, false if no followers
+ */
+export async function sendDeleteActivityForUri(uri: string): Promise<boolean> {
+  const followers = getAllFollowers();
+  if (followers.length === 0) {
+    logger.debug("federation", `No followers to send Delete for URI ${uri}`);
+    return true;
+  }
+
+  const ctx = federation.createContext(new URL(baseUrl), undefined);
+  const actorUri = ctx.getActorUri("erik");
+  const followersUri = ctx.getFollowersUri("erik");
+
+  const objectUri = new URL(uri);
+  const activityUri = new URL(`${uri}#delete-${Date.now()}`);
+
+  const activity = new Delete({
+    id: activityUri,
+    actor: actorUri,
+    object: objectUri,
+    to: PUBLIC,
+    cc: followersUri,
+  });
+
+  logger.info(
+    "federation",
+    `Sending Delete activity for URI ${uri} to ${followers.length} followers`
+  );
+
+  try {
+    await ctx.sendActivity({ identifier: "erik" }, "followers", activity, {
+      preferSharedInbox: true,
+    });
+
+    logger.info("federation", `Successfully queued Delete activity for URI ${uri}`);
+    return true;
+  } catch (error) {
+    logger.error("federation", `Failed to send Delete activity for URI ${uri}`, { error });
     return false;
   }
 }
