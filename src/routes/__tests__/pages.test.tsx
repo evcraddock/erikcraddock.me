@@ -155,16 +155,17 @@ describe("pages routes", () => {
       expect(html).toContain("dark:border-gray-700");
     });
 
-    it("includes navigation links to Articles, Feed, and Sources", async () => {
+    it("includes navigation links to Articles and Feed", async () => {
       const app = getApp();
       const res = await app.request("/");
       const html = await res.text();
 
       expect(html).toContain('href="/articles"');
       expect(html).toContain('href="/feed"');
-      expect(html).toContain('href="/sources"');
-      // About link removed from nav but page still accessible
-      expect(html).not.toContain('href="/about"');
+      // Sources removed from nav
+      expect(html).not.toContain('href="/sources"');
+      // About is linked from footer and Fediverse icon, but not in main nav
+      expect(html).toContain('href="/about"');
     });
 
     it("displays Recent Articles section", async () => {

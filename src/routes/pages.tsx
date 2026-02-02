@@ -759,29 +759,95 @@ export function createPagesRoutes(db: Database): Hono {
 
   // About page
   pages.get("/about", (c) => {
+    const socialLinks = [
+      { name: "GitHub", url: "https://github.com/evcraddock", icon: <GitHubIcon /> },
+      { name: "LinkedIn", url: "https://linkedin.com/in/erikvancraddock", icon: <LinkedInIcon /> },
+      { name: "Facebook", url: "https://facebook.com/erikvancraddock", icon: <FacebookIcon /> },
+      { name: "YouTube", url: "https://youtube.com/@erikvancraddock", icon: <YouTubeIcon /> },
+    ];
+
     return c.html(
-      <Layout title="About | erikcraddock.me">
-        <h1 class="text-3xl font-bold text-gray-900 dark:text-gray-100 mb-8">About</h1>
+      <Layout title="About | Erik Craddock">
+        {/* Hero-style header */}
+        <section class="mb-12 py-8 bg-gray-100 dark:bg-gray-800 -mx-4 px-4 rounded-lg">
+          <div class="flex flex-col md:flex-row items-center gap-8">
+            {/* Logo */}
+            <div class="flex-shrink-0">
+              <div class="w-48 h-48 rounded-full overflow-hidden bg-gray-200 dark:bg-gray-700 border-4 border-gray-300 dark:border-gray-600 shadow-lg">
+                <img
+                  src="/images/erik-logo.png"
+                  alt="Erik Craddock"
+                  class="w-full h-full object-cover"
+                />
+              </div>
+            </div>
+
+            {/* Bio */}
+            <div class="text-center md:text-left">
+              <h1 class="text-3xl font-bold text-gray-900 dark:text-gray-100 mb-2">
+                Erik Craddock
+              </h1>
+              <p class="text-xl text-gray-600 dark:text-gray-300 mb-4">
+                <span class="text-teal-600 dark:text-teal-400">Writer</span>,{" "}
+                <span class="text-blue-600 dark:text-blue-400">coder</span>, and{" "}
+                <span class="text-purple-600 dark:text-purple-400">musician</span> —{" "}
+                <em>not always in that order.</em>
+              </p>
+
+              {/* Social links */}
+              <div class="flex justify-center md:justify-start gap-4">
+                {socialLinks.map((link) => (
+                  <a
+                    href={link.url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    class="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 transition-colors"
+                    title={link.name}
+                  >
+                    {link.icon}
+                  </a>
+                ))}
+              </div>
+            </div>
+          </div>
+        </section>
 
         <div class="prose prose-gray dark:prose-invert max-w-none">
-          <p>
-            Hi, I'm Erik Craddock. This is my personal blog where I write about software
-            development, technology, and whatever else interests me.
+          {/* About me */}
+          <p class="text-lg">
+            This is my haphazard living autobiography — a place where I share articles, link to
+            things I find interesting, and jot down quick notes and thoughts.
           </p>
 
+          <h2>Follow This Site</h2>
           <p>
-            This site is built with modern web technologies and supports ActivityPub, which means
-            you can follow it from Mastodon and other federated platforms.
+            This site is an{" "}
+            <a href="https://activitypub.rocks/" target="_blank" rel="noopener noreferrer">
+              ActivityPub
+            </a>{" "}
+            actor, which means you can follow it directly from Mastodon or any other Fediverse
+            platform. New posts will appear in your home feed just like any other account you
+            follow.
           </p>
 
-          <h2>Follow Me</h2>
-          <p>
-            You can follow this blog on the Fediverse at <code>@erik@erikcraddock.me</code>. New
-            posts will appear in your home feed just like any other account you follow.
-          </p>
+          <div class="bg-gray-100 dark:bg-gray-800 rounded-lg p-6 not-prose my-6">
+            <p class="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-2">Follow me at:</p>
+            <code class="text-xl text-teal-600 dark:text-teal-400 bg-gray-200 dark:bg-gray-700 px-3 py-2 rounded">
+              @erik@erikcraddock.me
+            </code>
+            <p class="text-sm text-gray-600 dark:text-gray-400 mt-4">
+              <strong>How to follow:</strong> Copy the handle above, then in your Mastodon (or other
+              Fediverse) app, paste it into the search box and click "Follow" on the profile that
+              appears.
+            </p>
+          </div>
 
-          <h2>Contact</h2>
-          <p>Feel free to reach out via the Fediverse or check out my projects on GitHub.</p>
+          <h2>Get in Touch</h2>
+          <p>
+            The best way to reach me is through the Fediverse — just mention{" "}
+            <code>@erik@erikcraddock.me</code> in a post. You can also find me on the social
+            platforms linked above.
+          </p>
         </div>
       </Layout>
     );

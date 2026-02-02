@@ -22,7 +22,7 @@ export function Layout({ title, children, ogImage, description }: LayoutProps) {
   const siteUrl = process.env.SITE_URL || "https://erikcraddock.me";
 
   return (
-    <html lang="en">
+    <html lang="en" class="overflow-y-scroll">
       <head>
         <meta charset="UTF-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1.0" />
@@ -54,7 +54,7 @@ export function Layout({ title, children, ogImage, description }: LayoutProps) {
         <link
           rel="alternate"
           type="application/rss+xml"
-          title="erikcraddock.me RSS Feed"
+          title="Erik Craddock RSS Feed"
           href="/feed.xml"
         />
       </head>
@@ -65,7 +65,7 @@ export function Layout({ title, children, ogImage, description }: LayoutProps) {
               href="/"
               class="text-lg font-semibold text-gray-900 hover:text-gray-600 dark:text-gray-100 dark:hover:text-gray-300"
             >
-              erikcraddock.me
+              Erik Craddock
             </a>
             <div class="flex items-center gap-6">
               <a
@@ -81,10 +81,10 @@ export function Layout({ title, children, ogImage, description }: LayoutProps) {
                 Feed
               </a>
               <a
-                href="/sources"
+                href="/about"
                 class="text-gray-600 hover:text-gray-900 dark:text-gray-400 dark:hover:text-gray-100"
               >
-                Sources
+                About
               </a>
               <ThemeToggle />
             </div>
@@ -92,8 +92,17 @@ export function Layout({ title, children, ogImage, description }: LayoutProps) {
         </header>
         <main class="flex-1 max-w-6xl mx-auto px-4 py-8 w-full">{children}</main>
         <footer class="bg-white border-t dark:bg-gray-800 dark:border-gray-700">
-          <div class="max-w-6xl mx-auto px-4 py-4 text-center text-gray-500 dark:text-gray-400 text-sm">
-            &copy; {new Date().getFullYear()} Erik Craddock
+          <div class="max-w-6xl mx-auto px-4 py-6 text-center text-gray-500 dark:text-gray-400 text-sm">
+            <p class="mb-2">
+              Follow on the Fediverse:{" "}
+              <a
+                href="/about"
+                class="text-teal-600 hover:text-teal-700 dark:text-teal-400 dark:hover:text-teal-300"
+              >
+                @erik@erikcraddock.me
+              </a>
+            </p>
+            <p>&copy; {new Date().getFullYear()} Erik Craddock</p>
           </div>
         </footer>
         <script>{raw(toggleScript)}</script>
