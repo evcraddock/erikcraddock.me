@@ -69,6 +69,12 @@ export function Layout({ title, children, ogImage, description }: LayoutProps) {
             </a>
             <div class="flex items-center gap-6">
               <a
+                href="/articles"
+                class="text-gray-600 hover:text-gray-900 dark:text-gray-400 dark:hover:text-gray-100"
+              >
+                Articles
+              </a>
+              <a
                 href="/sources"
                 class="text-gray-600 hover:text-gray-900 dark:text-gray-400 dark:hover:text-gray-100"
               >

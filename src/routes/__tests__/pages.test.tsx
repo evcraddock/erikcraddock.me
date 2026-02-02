@@ -144,11 +144,12 @@ describe("pages routes", () => {
       expect(html).toContain("dark:border-gray-700");
     });
 
-    it("includes navigation link to Sources", async () => {
+    it("includes navigation links to Articles and Sources", async () => {
       const app = getApp();
       const res = await app.request("/");
       const html = await res.text();
 
+      expect(html).toContain('href="/articles"');
       expect(html).toContain('href="/sources"');
       // About link removed from nav but page still accessible
       expect(html).not.toContain('href="/about"');
@@ -222,6 +223,72 @@ describe("pages routes", () => {
 
       expect(html).toContain("dark:bg-gray-900");
       expect(html).toContain("dark:text-gray-100");
+    });
+  });
+
+  describe("GET /articles", () => {
+    it("returns 200 and displays articles page", async () => {
+      const app = getApp();
+      const res = await app.request("/articles");
+
+      expect(res.status).toBe(200);
+
+      const html = await res.text();
+      expect(html).toContain("<h1");
+      expect(html).toContain("Articles");
+    });
+
+    it("displays article posts with links to post pages", async () => {
+      const app = getApp();
+      const res = await app.request("/articles");
+      const html = await res.text();
+
+      // Should contain article
+      expect(html).toContain("Test Post");
+      expect(html).toContain('href="/posts/test-post"');
+    });
+
+    it("only shows articles, not links or notes", async () => {
+      const app = getApp();
+      const res = await app.request("/articles");
+      const html = await res.text();
+
+      expect(html).toContain("Test Post"); // article
+      expect(html).not.toContain("Test Link Post"); // link
+      expect(html).not.toContain("Short note content"); // note
+    });
+
+    it("includes dark mode classes", async () => {
+      const app = getApp();
+      const res = await app.request("/articles");
+      const html = await res.text();
+
+      expect(html).toContain("dark:bg-gray-900");
+      expect(html).toContain("dark:text-gray-100");
+    });
+
+    it("redirects invalid page numbers to /articles", async () => {
+      const app = getApp();
+      const res = await app.request("/articles?page=0");
+
+      expect(res.status).toBe(302);
+      expect(res.headers.get("Location")).toBe("/articles");
+    });
+
+    it("redirects negative page numbers to /articles", async () => {
+      const app = getApp();
+      const res = await app.request("/articles?page=-1");
+
+      expect(res.status).toBe(302);
+      expect(res.headers.get("Location")).toBe("/articles");
+    });
+
+    it("redirects non-numeric page to /articles", async () => {
+      const app = getApp();
+      const res = await app.request("/articles?page=abc");
+
+      expect(res.status).toBe(302);
+      expect(res.headers.get("Location")).toBe("/articles");
     });
   });
 
