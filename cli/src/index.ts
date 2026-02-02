@@ -8,6 +8,7 @@ import { noteCommand } from "./commands/note";
 import { sourceCommand, showSourceHelp } from "./commands/source";
 import { tagCommand, showTagHelp } from "./commands/tag";
 import { imageCommand, showImageHelp } from "./commands/image";
+import { federationCommand, showFederationHelp } from "./commands/federation";
 import type { GlobalOptions } from "./types";
 
 export function parseArgs(args: string[]): {
@@ -66,6 +67,7 @@ Commands:
   source          Manage sources (list, show, create, edit, delete)
   tag             Manage tags (list)
   image           Manage images (upload, delete)
+  federation      Manage ActivityPub federation (delete)
   version         Show CLI version
   help            Show this help message
 
@@ -215,6 +217,14 @@ async function main(): Promise<void> {
         return;
       }
       await imageCommand(command.slice(1), options);
+      break;
+
+    case "federation":
+      if (options.help && !subcmd) {
+        showFederationHelp();
+        return;
+      }
+      await federationCommand(command.slice(1), options);
       break;
 
     default:

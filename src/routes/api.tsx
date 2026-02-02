@@ -25,6 +25,7 @@ import { listTags } from "@/services/tags";
 import {
   federatePost,
   sendDeleteActivity,
+  sendDeleteActivityForUri,
   sendUpdateActivity,
   sendActorUpdateActivity,
 } from "@/federation/publish";
@@ -698,6 +699,37 @@ api.post("/federation/update-actor", async (c) => {
   try {
     const sent = await sendActorUpdateActivity();
     return c.json({ success: sent });
+  } catch (error) {
+    return c.json({ error: String(error) }, 500);
+  }
+});
+
+/**
+ * POST /api/federation/delete - Send Delete activity for an arbitrary URI
+ *
+ * Use this to delete posts that were federated with old URIs,
+ * or to clean up posts during development.
+ *
+ * Body: { "uri": "https://erikcraddock.me/posts/4" }
+ */
+api.post("/federation/delete", async (c) => {
+  try {
+    const body = await c.req.json();
+    const { uri } = body;
+
+    if (!uri || typeof uri !== "string") {
+      return c.json({ error: "uri is required and must be a string" }, 400);
+    }
+
+    // Validate it's a valid URL
+    try {
+      new URL(uri);
+    } catch {
+      return c.json({ error: "uri must be a valid URL" }, 400);
+    }
+
+    const sent = await sendDeleteActivityForUri(uri);
+    return c.json({ success: sent, uri });
   } catch (error) {
     return c.json({ error: String(error) }, 500);
   }
