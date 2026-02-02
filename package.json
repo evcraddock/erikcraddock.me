@@ -1,6 +1,6 @@
 {
   "name": "erikcraddock.me",
-  "version": "0.5.0",
+  "version": "1.0.0",
   "description": "Personal website and blog that also acts as an activitypub actor",
   "type": "module",
   "scripts": {
