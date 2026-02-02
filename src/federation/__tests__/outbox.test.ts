@@ -112,6 +112,40 @@ describe("postToObject", () => {
       expect(result.content).toContain("/posts/my-article");
     });
 
+    it("includes banner image as attachment", async () => {
+      const post = createPost({
+        type: "article",
+        title: "My Article",
+        banner_url: "http://example.com/image.jpg",
+        banner_alt: "A test image",
+      });
+
+      const result = postToObject(post, actorUri, followersUri);
+      const json = (await result.toJsonLd()) as Record<string, unknown>;
+      const attachment = json.attachment as Record<string, unknown>;
+
+      expect(attachment).toBeDefined();
+      expect(attachment.type).toBe("Document");
+      expect(attachment.url).toBe("http://example.com/image.jpg");
+      expect(attachment.mediaType).toBe("image/jpeg");
+      expect(attachment.name).toBe("A test image");
+    });
+
+    it("uses title as attachment name when no alt text", async () => {
+      const post = createPost({
+        type: "article",
+        title: "My Article Title",
+        banner_url: "http://example.com/image.png",
+      });
+
+      const result = postToObject(post, actorUri, followersUri);
+      const json = (await result.toJsonLd()) as Record<string, unknown>;
+      const attachment = json.attachment as Record<string, unknown>;
+
+      expect(attachment.name).toBe("My Article Title");
+      expect(attachment.mediaType).toBe("image/png");
+    });
+
     it("sets summary on articles", () => {
       const post = createPost({
         type: "article",

@@ -1,9 +1,10 @@
 import { Create } from "@fedify/fedify";
-import { desc, isNotNull, count } from "drizzle-orm";
-import { db, posts } from "@/db";
+import { desc, isNotNull, count, eq } from "drizzle-orm";
+import { db, posts, media } from "@/db";
 import { logger } from "@/utils/logger";
 import { baseUrl, dateToInstant } from "./utils";
 import { postToObject, PublishedPost } from "./post-object";
+import { mediaUrl } from "@/services/media";
 
 // ActivityPub Public address
 const PUBLIC = new URL("https://www.w3.org/ns/activitystreams#Public");
@@ -17,7 +18,7 @@ export type { PublishedPost } from "./post-object";
  * Only returns posts that have been published (published_at is not null).
  */
 export function getPublishedPosts(limit: number = 20, offset: number = 0): PublishedPost[] {
-  return db
+  const results = db
     .select({
       id: posts.id,
       slug: posts.slug,
@@ -27,13 +28,30 @@ export function getPublishedPosts(limit: number = 20, offset: number = 0): Publi
       excerpt: posts.excerpt,
       url: posts.url,
       published_at: posts.published_at,
+      banner_s3_key: media.s3_key,
+      banner_alt: media.alt_text,
     })
     .from(posts)
+    .leftJoin(media, eq(posts.banner_image_id, media.id))
     .where(isNotNull(posts.published_at))
     .orderBy(desc(posts.published_at))
     .limit(limit)
     .offset(offset)
-    .all() as PublishedPost[];
+    .all();
+
+  // Transform to PublishedPost with banner URL
+  return results.map((r) => ({
+    id: r.id,
+    slug: r.slug,
+    type: r.type,
+    title: r.title,
+    content: r.content,
+    excerpt: r.excerpt,
+    url: r.url,
+    published_at: r.published_at!,
+    banner_url: r.banner_s3_key ? new URL(mediaUrl(r.banner_s3_key), baseUrl).href : null,
+    banner_alt: r.banner_alt,
+  }));
 }
 
 /**
