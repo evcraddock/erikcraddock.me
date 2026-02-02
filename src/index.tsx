@@ -92,7 +92,11 @@ app.use("*", async (c, next) => {
   const duration = Date.now() - start;
 
   // Skip logging for static assets to reduce noise
-  if (c.req.path.startsWith("/css/")) {
+  if (
+    c.req.path.startsWith("/css/") ||
+    c.req.path.startsWith("/images/") ||
+    c.req.path === "/favicon.ico"
+  ) {
     return;
   }
 
@@ -108,10 +112,14 @@ if (isBun) {
   // eslint-disable-next-line @typescript-eslint/no-require-imports
   const { serveStatic } = require("hono/bun");
   app.use("/css/*", serveStatic({ root: "./public" }));
+  app.use("/images/*", serveStatic({ root: "./public" }));
+  app.use("/favicon.ico", serveStatic({ root: "./public/images", path: "favicon.ico" }));
 } else {
   // eslint-disable-next-line @typescript-eslint/no-require-imports
   const { serveStatic } = require("@hono/node-server/serve-static");
   app.use("/css/*", serveStatic({ root: "./public" }));
+  app.use("/images/*", serveStatic({ root: "./public" }));
+  app.use("/favicon.ico", serveStatic({ root: "./public/images", path: "favicon.ico" }));
 }
 
 // Mount routes
