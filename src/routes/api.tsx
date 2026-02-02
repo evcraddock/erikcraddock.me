@@ -264,6 +264,7 @@ api.delete("/posts/:id", async (c) => {
   // Check if post was published before deleting
   const existingPost = getPost(id);
   const wasPublished = existingPost?.published_at;
+  const slug = existingPost?.slug;
 
   const deleted = deletePost(id);
 
@@ -272,8 +273,8 @@ api.delete("/posts/:id", async (c) => {
   }
 
   // Send Delete activity if post was previously published
-  if (wasPublished) {
-    await sendDeleteActivity(id);
+  if (wasPublished && slug) {
+    await sendDeleteActivity(slug);
   }
 
   return c.body(null, 204);
@@ -423,7 +424,7 @@ api.delete("/posts/by-slug/:slug", async (c) => {
 
   // Send Delete activity if post was previously published
   if (wasPublished) {
-    await sendDeleteActivity(postId);
+    await sendDeleteActivity(slug);
   }
 
   return c.body(null, 204);
