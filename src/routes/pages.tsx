@@ -1015,7 +1015,8 @@ export function createPagesRoutes(db: Database): Hono {
 
     const title = post.title || (isNote ? "Note" : "Post");
     const description = post.excerpt || truncate(post.content, 160);
-    const canonicalUrl = `/posts/${slug}`;
+    // For link posts, use external URL for OG tags so Mastodon generates correct preview
+    const canonicalUrl = post.type === "link" && post.url ? post.url : `/posts/${slug}`;
 
     return c.html(
       <Layout

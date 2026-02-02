@@ -559,6 +559,29 @@ describe("pages routes", () => {
       const html = await res.text();
       expect(html).not.toContain('class="w-full h-64 object-cover');
     });
+
+    it("sets og:url to external URL for link posts", async () => {
+      const app = getApp();
+      const res = await app.request("/posts/test-link");
+
+      expect(res.status).toBe(200);
+
+      const html = await res.text();
+      // Link posts should have og:url pointing to the external article
+      expect(html).toContain('property="og:url" content="https://example.com/article"');
+    });
+
+    it("sets og:url to site URL for article posts", async () => {
+      const app = getApp();
+      const res = await app.request("/posts/test-post");
+
+      expect(res.status).toBe(200);
+
+      const html = await res.text();
+      // Article posts should have og:url pointing to the site
+      expect(html).toContain('property="og:url"');
+      expect(html).toContain("/posts/test-post");
+    });
   });
 
   describe("GET /tags/:slug", () => {
