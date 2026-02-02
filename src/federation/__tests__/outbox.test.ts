@@ -92,6 +92,19 @@ describe("postToObject", () => {
 
       expect(result.summary).toBeFalsy();
     });
+
+    it("sets url to external URL for link posts", () => {
+      const post = createPost({
+        type: "link",
+        title: "Link Title",
+        content: "Commentary",
+        url: "https://example.com/article",
+      });
+
+      const result = postToObject(post, actorUri, followersUri);
+
+      expect(result.url?.href).toBe("https://example.com/article");
+    });
   });
 
   describe("Article posts", () => {
