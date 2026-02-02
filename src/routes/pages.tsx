@@ -234,6 +234,68 @@ function ArticleCardsSection({
   );
 }
 
+/** Pagination component */
+function Pagination({
+  currentPage,
+  totalPages,
+  baseUrl,
+}: {
+  currentPage: number;
+  totalPages: number;
+  baseUrl: string;
+}) {
+  const prevUrl = currentPage > 1 ? `${baseUrl}?page=${currentPage - 1}` : null;
+  const nextUrl = currentPage < totalPages ? `${baseUrl}?page=${currentPage + 1}` : null;
+
+  // Clean up URL for page 1 (no query param needed)
+  const cleanPrevUrl = currentPage === 2 ? baseUrl : prevUrl;
+
+  return (
+    <div class="flex flex-col items-center gap-4 mt-8">
+      {/* Page indicator */}
+      <p class="text-gray-600 dark:text-gray-400">
+        Page {currentPage} of {totalPages}
+      </p>
+
+      {/* Navigation */}
+      <div class="flex gap-4">
+        {cleanPrevUrl ? (
+          <a
+            href={cleanPrevUrl}
+            class="inline-flex items-center gap-2 px-4 py-2 bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-lg transition-colors"
+          >
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                stroke-width="2"
+                d="M15 19l-7-7 7-7"
+              />
+            </svg>
+            Previous
+          </a>
+        ) : null}
+        {nextUrl ? (
+          <a
+            href={nextUrl}
+            class="inline-flex items-center gap-2 px-4 py-2 bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-lg transition-colors"
+          >
+            Next
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                stroke-width="2"
+                d="M9 5l7 7-7 7"
+              />
+            </svg>
+          </a>
+        ) : null}
+      </div>
+    </div>
+  );
+}
+
 /** Reusable post card component */
 function PostCard({ post }: { post: PostWithSource }) {
   const isLink = post.type === "link";
@@ -390,6 +452,102 @@ export function createPagesRoutes(db: Database): Hono {
       <Layout title="Home | erikcraddock.me">
         <HeroSection />
         <ArticleCardsSection articles={recentArticles} getBannerUrl={getBannerUrl} />
+      </Layout>
+    );
+  });
+
+  // Articles page with pagination
+  const ARTICLES_PER_PAGE = 12;
+
+  pages.get("/articles", (c) => {
+    // Get page number from query string
+    const pageParam = c.req.query("page");
+    const page = pageParam ? parseInt(pageParam, 10) : 1;
+
+    // Validate page number
+    if (isNaN(page) || page < 1) {
+      return c.redirect("/articles");
+    }
+
+    // Count total articles
+    const countResult = db
+      .select({ count: posts.id })
+      .from(posts)
+      .where(and(eq(posts.type, "article"), isNotNull(posts.published_at)))
+      .all();
+    const totalArticles = countResult.length;
+    const totalPages = Math.ceil(totalArticles / ARTICLES_PER_PAGE);
+
+    // Handle no articles
+    if (totalArticles === 0) {
+      return c.html(
+        <Layout title="Articles | erikcraddock.me">
+          <h1 class="text-3xl font-bold text-gray-900 dark:text-gray-100 mb-8">Articles</h1>
+          <p class="text-gray-600 dark:text-gray-400">No articles yet.</p>
+        </Layout>
+      );
+    }
+
+    // Handle page out of range
+    if (page > totalPages) {
+      return c.redirect(`/articles?page=${totalPages}`);
+    }
+
+    // Fetch articles for current page
+    const offset = (page - 1) * ARTICLES_PER_PAGE;
+    const pageArticles = db
+      .select()
+      .from(posts)
+      .where(and(eq(posts.type, "article"), isNotNull(posts.published_at)))
+      .orderBy(desc(posts.published_at))
+      .limit(ARTICLES_PER_PAGE)
+      .offset(offset)
+      .all();
+
+    // Get banner URLs
+    const bannerIds = pageArticles
+      .map((a) => a.banner_image_id)
+      .filter((id): id is number => id !== null);
+
+    const bannerMedia =
+      bannerIds.length > 0
+        ? db
+            .select()
+            .from(media)
+            .where(isNotNull(media.id))
+            .all()
+            .filter((m) => bannerIds.includes(m.id))
+        : [];
+
+    const bannerUrlMap = new Map<number, string>();
+    for (const m of bannerMedia) {
+      bannerUrlMap.set(m.id, mediaUrl(m.s3_key));
+    }
+
+    const getBannerUrl = (id: number) => bannerUrlMap.get(id) || null;
+
+    return c.html(
+      <Layout title={`Articles${page > 1 ? ` - Page ${page}` : ""} | erikcraddock.me`}>
+        <h1 class="text-3xl font-bold text-gray-900 dark:text-gray-100 mb-8">Articles</h1>
+
+        {/* Pagination indicator at top */}
+        {totalPages > 1 && (
+          <p class="text-center text-gray-600 dark:text-gray-400 mb-6">
+            Page {page} of {totalPages}
+          </p>
+        )}
+
+        {/* Article cards grid */}
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {pageArticles.map((article) => (
+            <ArticleCard key={article.id} post={article} getBannerUrl={getBannerUrl} />
+          ))}
+        </div>
+
+        {/* Pagination */}
+        {totalPages > 1 && (
+          <Pagination currentPage={page} totalPages={totalPages} baseUrl="/articles" />
+        )}
       </Layout>
     );
   });
