@@ -6,6 +6,7 @@ interface LayoutProps {
   children: Child;
   ogImage?: string;
   description?: string;
+  canonicalUrl?: string;
 }
 
 // Inline script to prevent flash of wrong theme
@@ -18,8 +19,13 @@ const themeScript = `
 })();
 `;
 
-export function Layout({ title, children, ogImage, description }: LayoutProps) {
+export function Layout({ title, children, ogImage, description, canonicalUrl }: LayoutProps) {
   const siteUrl = process.env.SITE_URL || "https://erikcraddock.me";
+  const fullCanonicalUrl = canonicalUrl
+    ? canonicalUrl.startsWith("http")
+      ? canonicalUrl
+      : `${siteUrl}${canonicalUrl}`
+    : undefined;
 
   return (
     <html lang="en" class="overflow-y-scroll">
@@ -29,8 +35,10 @@ export function Layout({ title, children, ogImage, description }: LayoutProps) {
         <title>{title}</title>
         {description && <meta name="description" content={description} />}
         {/* Open Graph tags */}
+        <meta property="og:site_name" content="Erik Craddock" />
         <meta property="og:title" content={title} />
         {description && <meta property="og:description" content={description} />}
+        {fullCanonicalUrl && <meta property="og:url" content={fullCanonicalUrl} />}
         {ogImage && (
           <meta
             property="og:image"
