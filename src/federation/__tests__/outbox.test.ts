@@ -34,8 +34,8 @@ describe("postToObject", () => {
       expect(result).toBeInstanceOf(Note);
       expect(result.name).toBeFalsy();
       expect(result.summary).toBeFalsy();
-      // Content is rendered as HTML for Mastodon compatibility
-      expect(result.content).toBe("<p>This is a short note</p>\n");
+      // Content is rendered as HTML for Mastodon compatibility, wrapped in LanguageString
+      expect(String(result.content)).toBe("<p>This is a short note</p>\n");
     });
 
     it("does not set summary on notes (avoids CW behavior)", () => {
@@ -65,7 +65,7 @@ describe("postToObject", () => {
 
       expect(result).toBeInstanceOf(Note);
       // Content is HTML with clickable <a> tag so Mastodon can crawl for preview card
-      expect(result.content).toBe(
+      expect(String(result.content)).toBe(
         '<p>My commentary on this link</p>\n<p><a href="https://example.com/article">https://example.com/article</a></p>'
       );
     });
@@ -125,8 +125,8 @@ describe("postToObject", () => {
 
       expect(result).toBeInstanceOf(Article);
       expect(result.name).toBe("My Article");
-      expect(result.content).toContain("Brief excerpt");
-      expect(result.content).toContain("/posts/my-article");
+      expect(String(result.content)).toContain("Brief excerpt");
+      expect(String(result.content)).toContain("/posts/my-article");
     });
 
     it("includes banner image as attachment", async () => {
@@ -185,8 +185,8 @@ describe("postToObject", () => {
 
       const result = postToObject(post, actorUri, followersUri);
 
-      expect(result.content).toContain("/posts/no-excerpt-article");
-      expect(result.content).not.toContain("\n\n"); // Just URL, no excerpt prefix
+      expect(String(result.content)).toContain("/posts/no-excerpt-article");
+      expect(String(result.content)).not.toContain("\n\n"); // Just URL, no excerpt prefix
     });
   });
 
