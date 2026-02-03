@@ -1043,7 +1043,7 @@ export function createPagesRoutes(db: Database): Hono {
             <img
               src={bannerUrl}
               alt={post.title || "Post banner"}
-              class="w-full h-64 object-cover rounded-lg mb-6"
+              class="w-full aspect-[1200/630] object-cover rounded-lg mb-6"
             />
           )}
 
