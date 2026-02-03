@@ -88,8 +88,10 @@ export function postToObject(
     cc: followersUri,
     // Only set name for Articles (not links, not notes)
     name: post.title && post.type !== "link" ? post.title : undefined,
-    // Wrap content in LanguageString to set language, avoiding Mastodon's "Translate" link
-    content: new LanguageString(content, "en"),
+    // Use contents (plural) with both plain string and LanguageString to output both
+    // 'content' and 'contentMap' fields. Mastodon needs 'content' for Updates to work,
+    // and 'contentMap' tells it the language (avoiding "Translate" link).
+    contents: [content, new LanguageString(content, "en")],
     // Only set summary for Articles - for Notes it triggers CW behavior
     summary: post.title && post.type !== "link" ? (post.excerpt ?? undefined) : undefined,
     published: post.published_at ? dateToInstant(new Date(post.published_at)) : undefined,
