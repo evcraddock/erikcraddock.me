@@ -15,6 +15,7 @@ function createPost(overrides: Partial<PublishedPost>): PublishedPost {
     excerpt: "Test excerpt",
     url: null,
     published_at: new Date("2026-01-01"),
+    updated_at: new Date("2026-01-01"),
     ...overrides,
   };
 }
