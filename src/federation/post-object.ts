@@ -1,4 +1,4 @@
-import { Note, Article, Document } from "@fedify/fedify";
+import { Note, Article, Document, LanguageString } from "@fedify/fedify";
 import { dateToInstant, baseUrl } from "./utils";
 import { renderMarkdown } from "../utils/markdown";
 
@@ -88,7 +88,8 @@ export function postToObject(
     cc: followersUri,
     // Only set name for Articles (not links, not notes)
     name: post.title && post.type !== "link" ? post.title : undefined,
-    content: content,
+    // Wrap content in LanguageString to set language, avoiding Mastodon's "Translate" link
+    content: new LanguageString(content, "en"),
     // Only set summary for Articles - for Notes it triggers CW behavior
     summary: post.title && post.type !== "link" ? (post.excerpt ?? undefined) : undefined,
     published: post.published_at ? dateToInstant(new Date(post.published_at)) : undefined,
