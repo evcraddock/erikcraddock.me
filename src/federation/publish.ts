@@ -256,6 +256,9 @@ export async function sendUpdateActivity(postId: number): Promise<boolean> {
   const activity = new Update({
     id: activityUri,
     actor: actorUri,
+    // Addressing: public posts visible to everyone, CC'd to followers
+    to: PUBLIC,
+    cc: followersUri,
     object: object,
   });
 
