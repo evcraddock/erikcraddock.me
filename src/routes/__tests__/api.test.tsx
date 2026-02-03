@@ -210,6 +210,61 @@ describe("POST /api/posts - slug validation", () => {
     const json = await res.json();
     expect(json.data.slug).toBe("valid-slug-123");
   });
+
+  it("creates post as draft when no published_at provided", async () => {
+    const res = await api.request("/posts", {
+      method: "POST",
+      headers: { ...authHeader, "Content-Type": "application/json" },
+      body: JSON.stringify({
+        type: "article",
+        slug: "draft-post",
+        title: "Draft Post",
+        content: "Content",
+      }),
+    });
+
+    expect(res.status).toBe(201);
+    const json = await res.json();
+    expect(json.data.published_at).toBeNull();
+  });
+
+  it("creates post as published when published_at is provided", async () => {
+    const publishDate = "2024-03-15T10:30:00Z";
+    const res = await api.request("/posts", {
+      method: "POST",
+      headers: { ...authHeader, "Content-Type": "application/json" },
+      body: JSON.stringify({
+        type: "article",
+        slug: "published-post",
+        title: "Published Post",
+        content: "Content",
+        published_at: publishDate,
+      }),
+    });
+
+    expect(res.status).toBe(201);
+    const json = await res.json();
+    // Compare as Date objects to handle format differences (e.g., .000Z vs Z)
+    expect(new Date(json.data.published_at).getTime()).toBe(new Date(publishDate).getTime());
+  });
+
+  it("rejects invalid published_at date", async () => {
+    const res = await api.request("/posts", {
+      method: "POST",
+      headers: { ...authHeader, "Content-Type": "application/json" },
+      body: JSON.stringify({
+        type: "article",
+        slug: "invalid-date-post",
+        title: "Post",
+        content: "Content",
+        published_at: "not-a-date",
+      }),
+    });
+
+    expect(res.status).toBe(400);
+    const json = await res.json();
+    expect(json.error).toContain("not a valid date");
+  });
 });
 
 describe("GET /api/posts/by-slug/:slug", () => {

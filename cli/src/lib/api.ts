@@ -86,6 +86,7 @@ export class ApiClient {
     source_id?: number;
     tags?: string[];
     banner_image_id?: number;
+    published_at?: string; // ISO date string for imports
   }): Promise<ApiResponse<Post>> {
     return this.request<Post>("POST", "/posts", data);
   }

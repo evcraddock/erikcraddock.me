@@ -13,6 +13,7 @@ export interface PostFrontmatter {
   type?: string;
   url?: string;
   source?: string;
+  date?: string; // For imports - original publish date
 }
 
 export interface ParsedMarkdown {

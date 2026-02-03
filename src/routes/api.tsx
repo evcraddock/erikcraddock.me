@@ -113,7 +113,18 @@ api.post("/posts", async (c) => {
   const body = await c.req.json();
 
   // Validate type
-  const { type, slug, title, content, excerpt, url, source_id, tags, banner_image_id } = body;
+  const {
+    type,
+    slug,
+    title,
+    content,
+    excerpt,
+    url,
+    source_id,
+    tags,
+    banner_image_id,
+    published_at,
+  } = body;
 
   if (!type || !["article", "link", "note"].includes(type)) {
     return c.json({ error: "Invalid or missing type. Must be article, link, or note" }, 400);
@@ -175,6 +186,18 @@ api.post("/posts", async (c) => {
     return c.json({ error: "source_id must be a number" }, 400);
   }
 
+  // Validate published_at if provided (ISO date string)
+  let publishedAtDate: Date | null = null;
+  if (published_at !== undefined && published_at !== null) {
+    if (typeof published_at !== "string") {
+      return c.json({ error: "published_at must be an ISO date string" }, 400);
+    }
+    publishedAtDate = new Date(published_at);
+    if (isNaN(publishedAtDate.getTime())) {
+      return c.json({ error: "published_at is not a valid date" }, 400);
+    }
+  }
+
   try {
     const post = createPost({
       type,
@@ -186,6 +209,7 @@ api.post("/posts", async (c) => {
       source_id: source_id ?? null,
       tags: tags || [],
       banner_image_id: banner_image_id ?? null,
+      published_at: publishedAtDate,
     });
 
     return c.json({ data: post }, 201);
