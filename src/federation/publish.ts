@@ -26,6 +26,7 @@ function getPublishedPostById(postId: number): PublishedPost | null {
       excerpt: posts.excerpt,
       url: posts.url,
       published_at: posts.published_at,
+      updated_at: posts.updated_at,
       banner_s3_key: media.s3_key,
       banner_alt: media.alt_text,
     })
@@ -47,6 +48,7 @@ function getPublishedPostById(postId: number): PublishedPost | null {
     excerpt: result.excerpt,
     url: result.url,
     published_at: result.published_at,
+    updated_at: result.updated_at,
     banner_url: result.banner_s3_key ? new URL(mediaUrl(result.banner_s3_key), baseUrl).href : null,
     banner_alt: result.banner_alt,
   };

@@ -925,6 +925,7 @@ export function createPagesRoutes(db: Database): Hono {
           excerpt: posts.excerpt,
           url: posts.url,
           published_at: posts.published_at,
+          updated_at: posts.updated_at,
           banner_image_id: posts.banner_image_id,
         })
         .from(posts)
@@ -955,6 +956,7 @@ export function createPagesRoutes(db: Database): Hono {
         excerpt: post.excerpt,
         url: post.url,
         published_at: post.published_at,
+        updated_at: post.updated_at,
         banner_url: bannerUrl,
         banner_alt: bannerAlt,
       };

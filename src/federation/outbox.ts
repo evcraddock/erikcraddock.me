@@ -28,6 +28,7 @@ export function getPublishedPosts(limit: number = 20, offset: number = 0): Publi
       excerpt: posts.excerpt,
       url: posts.url,
       published_at: posts.published_at,
+      updated_at: posts.updated_at,
       banner_s3_key: media.s3_key,
       banner_alt: media.alt_text,
     })
@@ -49,6 +50,7 @@ export function getPublishedPosts(limit: number = 20, offset: number = 0): Publi
     excerpt: r.excerpt,
     url: r.url,
     published_at: r.published_at!,
+    updated_at: r.updated_at,
     banner_url: r.banner_s3_key ? new URL(mediaUrl(r.banner_s3_key), baseUrl).href : null,
     banner_alt: r.banner_alt,
   }));
