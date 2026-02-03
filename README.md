@@ -82,6 +82,56 @@ banner: ./images/my-banner.png
 
 The CLI will upload the banner image and attach it to the post.
 
+### Publishing Workflows
+
+There are two workflows depending on whether you want followers to be notified.
+
+#### New Content (notify followers)
+
+For new posts that should appear in followers' Mastodon timelines, **omit the `date:` field** to create as a draft, then publish:
+
+```yaml
+---
+title: "My New Post"
+slug: my-new-post
+excerpt: "A short summary"
+banner: ./banner.png
+type: article
+---
+Your content here...
+```
+
+```bash
+ec post create --file article.md   # Creates as draft
+# Review at https://erikcraddock.me/posts/my-new-post
+ec post publish my-new-post        # Publishes + federates to followers
+```
+
+#### Old Content (import without notifying)
+
+For importing old posts that shouldn't notify followers (e.g., migrating from another blog), **include a `date:` field** with the original publish date:
+
+```yaml
+---
+title: "My Old Post"
+slug: my-old-post
+date: 2024-03-15 # Original publish date
+excerpt: "A short summary"
+banner: ./banner.png
+type: article
+---
+Your content here...
+```
+
+```bash
+ec post create --file article.md   # Published immediately, not federated
+```
+
+| Workflow    | Frontmatter        | Commands             | Federated to followers? |
+| ----------- | ------------------ | -------------------- | ----------------------- |
+| New content | no `date:`         | `create` → `publish` | ✅ Yes                  |
+| Old content | `date: YYYY-MM-DD` | `create`             | ❌ No                   |
+
 ## Getting Started
 
 ### Prerequisites
