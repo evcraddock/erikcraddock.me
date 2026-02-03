@@ -133,6 +133,7 @@ export async function create(args: string[], globalOptions: GlobalOptions): Prom
   let url = options.url;
   let banner: string | undefined;
   let bannerImageId: number | undefined;
+  let publishedAt: string | undefined; // For imports - original publish date from frontmatter
 
   if (options.file) {
     // File-based creation
@@ -154,6 +155,7 @@ export async function create(args: string[], globalOptions: GlobalOptions): Prom
     type = options.type ?? frontmatter.type;
     url = options.url ?? frontmatter.url;
     banner = frontmatter.banner;
+    publishedAt = frontmatter.date; // For imports - set original publish date
 
     // Merge tags: CLI tags override, or use frontmatter
     tags = options.tags ?? frontmatter.tags;
@@ -231,6 +233,7 @@ export async function create(args: string[], globalOptions: GlobalOptions): Prom
     tags,
     url,
     banner_image_id: bannerImageId,
+    published_at: publishedAt,
   });
 
   if (result.error) {
@@ -246,7 +249,7 @@ export async function create(args: string[], globalOptions: GlobalOptions): Prom
     console.log(`✅ Post created: ${post.slug}`);
     console.log(`   Title: ${post.title || "(no title)"}`);
     console.log(`   Type: ${post.type}`);
-    console.log(`   Status: draft`);
+    console.log(`   Status: ${post.published_at ? "published" : "draft"}`);
     if (post.tags.length > 0) {
       console.log(`   Tags: ${post.tags.join(", ")}`);
     }

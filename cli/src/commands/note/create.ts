@@ -89,6 +89,7 @@ export async function create(args: string[], globalOptions: GlobalOptions): Prom
   let content = options.content;
   let banner: string | undefined;
   let bannerImageId: number | undefined;
+  let publishedAt: string | undefined; // For imports - original publish date from frontmatter
 
   if (options.file) {
     // File-based creation
@@ -106,6 +107,7 @@ export async function create(args: string[], globalOptions: GlobalOptions): Prom
     // Use frontmatter values, allow CLI overrides
     slug = options.slug ?? frontmatter.slug;
     banner = frontmatter.banner;
+    publishedAt = frontmatter.date; // For imports - set original publish date
 
     // Process images
     const imageRefs = detectImages(banner, bodyContent, basePath);
@@ -157,6 +159,7 @@ export async function create(args: string[], globalOptions: GlobalOptions): Prom
     slug,
     content,
     banner_image_id: bannerImageId,
+    published_at: publishedAt,
   });
 
   if (result.error) {
@@ -170,7 +173,7 @@ export async function create(args: string[], globalOptions: GlobalOptions): Prom
     console.log(JSON.stringify(post, null, 2));
   } else {
     console.log(`✅ Note created: ${post.slug}`);
-    console.log(`   Status: draft`);
+    console.log(`   Status: ${post.published_at ? "published" : "draft"}`);
     if (options.file) {
       console.log(`   Source: ${options.file}`);
     }

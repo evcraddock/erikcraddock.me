@@ -135,6 +135,7 @@ export interface CreatePostInput {
   source_id?: number | null;
   tags?: string[]; // Tag slugs
   banner_image_id?: number | null;
+  published_at?: Date | null; // For imports - set to create as already published
 }
 
 /**
@@ -184,6 +185,7 @@ export function createPost(input: CreatePostInput) {
     source_id,
     tags: tagSlugs,
     banner_image_id,
+    published_at,
   } = input;
 
   // Validate banner_image_id if provided
@@ -208,6 +210,7 @@ export function createPost(input: CreatePostInput) {
   const now = new Date();
 
   // Create the post
+  // If published_at is provided, use it for updated_at too (for imports)
   const post = db
     .insert(posts)
     .values({
@@ -219,8 +222,9 @@ export function createPost(input: CreatePostInput) {
       url: url ?? null,
       source_id: source_id ?? null,
       banner_image_id: banner_image_id ?? null,
-      created_at: now,
-      updated_at: now,
+      created_at: published_at ?? now,
+      updated_at: published_at ?? now,
+      published_at: published_at ?? null,
     })
     .returning()
     .get();
