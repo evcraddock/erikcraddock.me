@@ -11,7 +11,7 @@ import {
   type KvStore,
 } from "@fedify/fedify";
 import { getOrCreateKeyPairs } from "./keys";
-import { addFollower, removeFollower, getAllFollowers } from "./followers";
+import { addFollower, removeFollower, getAllFollowers, getFollowerCount } from "./followers";
 import { getOutboxActivities, getPublishedPostCount } from "./outbox";
 import { getOrigin } from "./utils";
 import { logger } from "@/utils/logger";
@@ -222,21 +222,23 @@ export function createFedifyFederation() {
     });
 
   // Set up followers collection dispatcher - returns list of followers
-  federation.setFollowersDispatcher("/users/{identifier}/followers", async (_ctx, identifier) => {
-    if (identifier !== "erik") {
-      return null;
-    }
+  federation
+    .setFollowersDispatcher("/users/{identifier}/followers", async (_ctx, identifier) => {
+      if (identifier !== "erik") {
+        return null;
+      }
 
-    const followerList = getAllFollowers();
-    // Return Recipient objects with required id and inboxId
-    return {
-      items: followerList.map((f) => ({
-        id: new URL(f.actor_uri),
-        inboxId: new URL(f.inbox_uri),
-        endpoints: f.shared_inbox_uri ? { sharedInbox: new URL(f.shared_inbox_uri) } : undefined,
-      })),
-    };
-  });
+      const followerList = getAllFollowers();
+      // Return Recipient objects with required id and inboxId
+      return {
+        items: followerList.map((f) => ({
+          id: new URL(f.actor_uri),
+          inboxId: new URL(f.inbox_uri),
+          endpoints: f.shared_inbox_uri ? { sharedInbox: new URL(f.shared_inbox_uri) } : undefined,
+        })),
+      };
+    })
+    .setCounter((_ctx, identifier) => (identifier === "erik" ? getFollowerCount() : 0));
 
   logger.info("federation", "Federation configured");
   return federation;
