@@ -53,6 +53,35 @@ ec image delete 42              # Delete image
 
 Run `ec --help` or `ec <command> --help` for full usage.
 
+## Content Guidelines
+
+### Banner Images
+
+Banner images should be **1200x630 pixels** (1.91:1 aspect ratio). This is the Open Graph standard, which means banners also work well as social media preview cards when posts are shared.
+
+| Dimension | Value       |
+| --------- | ----------- |
+| Width     | 1200px      |
+| Height    | 630px       |
+| Aspect    | 1.91:1      |
+| Format    | PNG or JPEG |
+
+Images that don't match this ratio will be cropped (centered) to fit.
+
+### Creating Posts with Banners
+
+In your markdown frontmatter:
+
+```yaml
+---
+title: "My Post Title"
+slug: my-post
+banner: ./images/my-banner.png
+---
+```
+
+The CLI will upload the banner image and attach it to the post.
+
 ## Getting Started
 
 ### Prerequisites
