@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 #
-# Create a web release with proper version bumping.
+# Create a CLI release with proper version bumping and verification.
 #
 # Usage:
 #   ./scripts/release.sh patch|minor|major
@@ -9,10 +9,11 @@
 # This script:
 #   1. Validates we're on main with no unpushed commits
 #   2. Calculates or validates the new version
-#   3. Updates package.json
+#   3. Updates cli/package.json
 #   4. Commits the version bump
 #   5. Creates an annotated tag
 #   6. Pushes commit and tag to origin
+#   7. VERIFIES tag exists on remote (catches silent push failures)
 #
 set -euo pipefail
 
@@ -39,10 +40,10 @@ if [[ $# -ne 1 ]]; then
   echo "Usage: $0 patch|minor|major|<version>"
   echo ""
   echo "Examples:"
-  echo "  $0 patch    # 1.2.3 -> 1.2.4"
-  echo "  $0 minor    # 1.2.3 -> 1.3.0"
-  echo "  $0 major    # 1.2.3 -> 2.0.0"
-  echo "  $0 1.5.0    # Explicit version"
+  echo "  $0 patch    # 0.4.0 -> 0.4.1"
+  echo "  $0 minor    # 0.4.0 -> 0.5.0"
+  echo "  $0 major    # 0.4.0 -> 1.0.0"
+  echo "  $0 0.5.0    # Explicit version"
   exit 1
 fi
 
@@ -62,11 +63,11 @@ if [[ -n "$UNPUSHED" ]]; then
 fi
 
 # Step 3: Get current version from latest tag
-LATEST_TAG=$(git tag --list 'web-v*' --sort=-v:refname | head -1)
+LATEST_TAG=$(git tag --list 'cli-v*' --sort=-v:refname | head -1)
 if [[ -z "$LATEST_TAG" ]]; then
   CURRENT_VERSION="0.0.0"
 else
-  CURRENT_VERSION="${LATEST_TAG#web-v}"
+  CURRENT_VERSION="${LATEST_TAG#cli-v}"
 fi
 
 info "Current version: $CURRENT_VERSION"
@@ -88,7 +89,7 @@ else
   die "Invalid argument: $BUMP_ARG (expected patch|minor|major or X.Y.Z)"
 fi
 
-NEW_TAG="web-v$NEW_VERSION"
+NEW_TAG="cli-v$NEW_VERSION"
 
 info "New version: $NEW_VERSION (tag: $NEW_TAG)"
 
@@ -102,27 +103,31 @@ if git ls-remote --tags origin | grep -q "refs/tags/$NEW_TAG$"; then
   die "Tag $NEW_TAG already exists on remote"
 fi
 
-# Step 5: Update package.json
-CURRENT_PKG_VERSION=$(jq -r .version package.json)
+# Step 5: Update cli/package.json
+if [[ ! -f cli/package.json ]]; then
+  die "cli/package.json not found"
+fi
+
+CURRENT_PKG_VERSION=$(jq -r .version cli/package.json)
 if [[ "$CURRENT_PKG_VERSION" != "$NEW_VERSION" ]]; then
-  info "Updating package.json: $CURRENT_PKG_VERSION -> $NEW_VERSION"
-  jq --arg v "$NEW_VERSION" '.version = $v' package.json > package.json.tmp
-  mv package.json.tmp package.json
+  info "Updating cli/package.json: $CURRENT_PKG_VERSION -> $NEW_VERSION"
+  jq --arg v "$NEW_VERSION" '.version = $v' cli/package.json > cli/package.json.tmp
+  mv cli/package.json.tmp cli/package.json
 else
-  warn "package.json already at $NEW_VERSION"
+  warn "cli/package.json already at $NEW_VERSION"
 fi
 
 # Step 6: Commit the version bump (if there are changes)
-if ! git diff --quiet package.json; then
-  git add package.json
-  git commit -m "chore: bump version to $NEW_VERSION"
+if ! git diff --quiet cli/package.json; then
+  git add cli/package.json
+  git commit -m "chore(cli): bump version to $NEW_VERSION"
   info "Committed version bump"
 else
-  warn "No changes to commit (package.json unchanged)"
+  warn "No changes to commit (cli/package.json unchanged)"
 fi
 
 # Step 7: Create annotated tag
-git tag -a "$NEW_TAG" -m "Release $NEW_TAG"
+git tag -a "$NEW_TAG" -m "CLI Release $NEW_TAG"
 info "Created tag: $NEW_TAG"
 
 # Step 8: Push commit and tag
@@ -142,4 +147,4 @@ info ""
 info "✅ Released $NEW_TAG"
 info "✅ Verified tag exists on remote"
 info ""
-info "GitHub Actions will now build and push the Docker image."
+info "GitHub Actions will now build CLI binaries and create a release."
