@@ -7,6 +7,7 @@ import { NotFound } from "../templates/not-found";
 import { truncate } from "../utils/text";
 import { renderMarkdown } from "../utils/markdown";
 import { mediaUrl } from "../services/media";
+import { listTags } from "../services/tags";
 import { postToObject, PublishedPost } from "../federation/post-object";
 import { baseUrl } from "../federation/utils";
 
@@ -1280,6 +1281,42 @@ export function createPagesRoutes(db: Database): Hono {
           {/* Post content */}
           <div class="prose prose-gray max-w-none">{raw(renderMarkdown(post.content))}</div>
         </article>
+      </Layout>
+    );
+  });
+
+  // Tags listing page
+  pages.get("/tags", (c) => {
+    const allTags = listTags().filter((t) => t.count > 0);
+
+    return c.html(
+      <Layout title="Tags | erikcraddock.me">
+        {/* Back link */}
+        <a
+          href="/"
+          class="text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300 text-sm mb-6 inline-block"
+        >
+          ← Back to home
+        </a>
+
+        <h1 class="text-3xl font-bold text-gray-900 dark:text-gray-100 mb-8">Tags</h1>
+
+        {allTags.length === 0 ? (
+          <p class="text-gray-600 dark:text-gray-400">No tags yet.</p>
+        ) : (
+          <div class="flex flex-wrap gap-3">
+            {allTags.map((tag) => (
+              <a
+                key={tag.id}
+                href={`/tags/${tag.slug}`}
+                class="inline-flex items-center gap-2 bg-gray-100 hover:bg-gray-200 dark:bg-gray-700 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-300 px-4 py-2 rounded-lg transition-colors"
+              >
+                <span class="font-medium">{tag.name}</span>
+                <span class="text-sm text-gray-500 dark:text-gray-400">({tag.count})</span>
+              </a>
+            ))}
+          </div>
+        )}
       </Layout>
     );
   });
