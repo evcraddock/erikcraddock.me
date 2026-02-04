@@ -78,9 +78,13 @@ function RssIcon() {
 function HeroSection() {
   const socialLinks = [
     { name: "GitHub", url: "https://github.com/evcraddock", icon: <GitHubIcon /> },
-    { name: "LinkedIn", url: "https://linkedin.com/in/erikvancraddock", icon: <LinkedInIcon /> },
-    { name: "Facebook", url: "https://facebook.com/erikvancraddock", icon: <FacebookIcon /> },
-    { name: "YouTube", url: "https://youtube.com/@erikvancraddock", icon: <YouTubeIcon /> },
+    {
+      name: "LinkedIn",
+      url: "https://www.linkedin.com/in/erik-craddock-42aa9815",
+      icon: <LinkedInIcon />,
+    },
+    { name: "Facebook", url: "https://www.facebook.com/evcraddock", icon: <FacebookIcon /> },
+    { name: "YouTube", url: "https://youtube.com/@ErikCraddock", icon: <YouTubeIcon /> },
     { name: "RSS", url: "/feed.xml", icon: <RssIcon /> },
   ];
 
@@ -763,9 +767,14 @@ export function createPagesRoutes(db: Database): Hono {
   pages.get("/about", (c) => {
     const socialLinks = [
       { name: "GitHub", url: "https://github.com/evcraddock", icon: <GitHubIcon /> },
-      { name: "LinkedIn", url: "https://linkedin.com/in/erikvancraddock", icon: <LinkedInIcon /> },
-      { name: "Facebook", url: "https://facebook.com/erikvancraddock", icon: <FacebookIcon /> },
-      { name: "YouTube", url: "https://youtube.com/@erikvancraddock", icon: <YouTubeIcon /> },
+      {
+        name: "LinkedIn",
+        url: "https://www.linkedin.com/in/erik-craddock-42aa9815",
+        icon: <LinkedInIcon />,
+      },
+      { name: "Facebook", url: "https://www.facebook.com/evcraddock", icon: <FacebookIcon /> },
+      { name: "YouTube", url: "https://youtube.com/@ErikCraddock", icon: <YouTubeIcon /> },
+      { name: "RSS", url: "/feed.xml", icon: <RssIcon /> },
     ];
 
     return c.html(
