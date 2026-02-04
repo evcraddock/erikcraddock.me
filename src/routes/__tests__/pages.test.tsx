@@ -617,6 +617,47 @@ describe("pages routes", () => {
     });
   });
 
+  describe("GET /tags", () => {
+    it("returns 200 and displays tags page", async () => {
+      const app = getApp();
+      const res = await app.request("/tags");
+
+      expect(res.status).toBe(200);
+
+      const html = await res.text();
+      expect(html).toContain("<h1");
+      expect(html).toContain("Tags");
+    });
+
+    it("displays tags with post counts", async () => {
+      const app = getApp();
+      const res = await app.request("/tags");
+      const html = await res.text();
+
+      // Should show tags that have posts
+      expect(html).toContain("Testing");
+      expect(html).toContain("TypeScript");
+    });
+
+    it("links tags to their tag pages", async () => {
+      const app = getApp();
+      const res = await app.request("/tags");
+      const html = await res.text();
+
+      expect(html).toContain('href="/tags/testing"');
+      expect(html).toContain('href="/tags/typescript"');
+    });
+
+    it("includes dark mode classes", async () => {
+      const app = getApp();
+      const res = await app.request("/tags");
+      const html = await res.text();
+
+      expect(html).toContain("dark:bg-gray-900");
+      expect(html).toContain("dark:text-gray-100");
+    });
+  });
+
   describe("GET /tags/:slug", () => {
     it("returns 200 and displays tag name as heading", async () => {
       const app = getApp();
