@@ -16,6 +16,7 @@ type Database = typeof defaultDb;
 // Post type for the card component (with optional source)
 type Post = typeof posts.$inferSelect;
 type Source = typeof sources.$inferSelect;
+type Tag = { id: number; name: string; slug: string };
 type PostWithSource = Post & { source?: Source | null };
 
 /** Max length for showing full note content inline */
@@ -140,13 +141,40 @@ function HeroSection() {
   );
 }
 
+/** Reusable tag badge component */
+function TagBadge({ tag }: { tag: Tag }) {
+  return (
+    <a
+      href={`/tags/${tag.slug}`}
+      class="bg-gray-100 hover:bg-gray-200 dark:bg-gray-700 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-300 px-2 py-0.5 rounded text-xs"
+      onClick={(e) => e.stopPropagation()}
+    >
+      {tag.name}
+    </a>
+  );
+}
+
+/** Tag badges list component */
+function TagBadges({ tags }: { tags: Tag[] }) {
+  if (tags.length === 0) return null;
+  return (
+    <div class="flex flex-wrap gap-1">
+      {tags.map((tag) => (
+        <TagBadge key={tag.id} tag={tag} />
+      ))}
+    </div>
+  );
+}
+
 /** Article card for grid display */
 function ArticleCard({
   post,
   getBannerUrl,
+  tags: postTags = [],
 }: {
   post: Post;
   getBannerUrl: (id: number) => string | null;
+  tags?: Tag[];
 }) {
   const bannerUrl = post.banner_image_id ? getBannerUrl(post.banner_image_id) : null;
 
@@ -187,9 +215,10 @@ function ArticleCard({
           <h3 class="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-2 line-clamp-2 group-hover:text-blue-600">
             {post.title}
           </h3>
-          <p class="text-gray-600 dark:text-gray-400 text-sm line-clamp-3">
+          <p class="text-gray-600 dark:text-gray-400 text-sm line-clamp-3 mb-2">
             {post.excerpt || truncate(post.content, 150)}
           </p>
+          {postTags.length > 0 && <TagBadges tags={postTags} />}
         </div>
       </a>
     </article>
@@ -200,10 +229,12 @@ function ArticleCard({
 function ArticleCardsSection({
   articles,
   getBannerUrl,
+  getTagsForPost,
   hasMore,
 }: {
   articles: Post[];
   getBannerUrl: (id: number) => string | null;
+  getTagsForPost: (postId: number) => Tag[];
   hasMore: boolean;
 }) {
   if (articles.length === 0) {
@@ -217,7 +248,12 @@ function ArticleCardsSection({
       {/* Responsive grid: 1 col mobile, 2 tablet, 3 desktop */}
       <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {articles.map((article) => (
-          <ArticleCard key={article.id} post={article} getBannerUrl={getBannerUrl} />
+          <ArticleCard
+            key={article.id}
+            post={article}
+            getBannerUrl={getBannerUrl}
+            tags={getTagsForPost(article.id)}
+          />
         ))}
       </div>
 
@@ -307,7 +343,7 @@ function Pagination({
 }
 
 /** Feed post component - renders differently based on post type */
-function FeedPost({ post }: { post: PostWithSource }) {
+function FeedPost({ post, tags: postTags = [] }: { post: PostWithSource; tags?: Tag[] }) {
   const formattedDate = post.published_at
     ? new Date(post.published_at).toLocaleDateString("en-US", {
         year: "numeric",
@@ -323,10 +359,16 @@ function FeedPost({ post }: { post: PostWithSource }) {
         <div class="prose prose-gray dark:prose-invert max-w-none mb-3">
           {raw(renderMarkdown(post.content))}
         </div>
-        <div class="flex items-center gap-3 text-sm text-gray-500 dark:text-gray-400">
+        <div class="flex flex-wrap items-center gap-3 text-sm text-gray-500 dark:text-gray-400">
           <time>{formattedDate}</time>
           <span class="text-gray-300 dark:text-gray-600">•</span>
           <span class="text-gray-400 dark:text-gray-500">Note</span>
+          {postTags.length > 0 && (
+            <>
+              <span class="text-gray-300 dark:text-gray-600">•</span>
+              <TagBadges tags={postTags} />
+            </>
+          )}
         </div>
       </article>
     );
@@ -396,6 +438,12 @@ function FeedPost({ post }: { post: PostWithSource }) {
               </span>
             </>
           )}
+          {postTags.length > 0 && (
+            <>
+              <span class="text-gray-300 dark:text-gray-600">•</span>
+              <TagBadges tags={postTags} />
+            </>
+          )}
         </div>
       </article>
     );
@@ -412,7 +460,7 @@ function FeedPost({ post }: { post: PostWithSource }) {
           {post.excerpt || truncate(post.content, 200)}
         </p>
       </a>
-      <div class="flex items-center gap-3 text-sm text-gray-500 dark:text-gray-400">
+      <div class="flex flex-wrap items-center gap-3 text-sm text-gray-500 dark:text-gray-400">
         <time>{formattedDate}</time>
         <span class="text-gray-300 dark:text-gray-600">•</span>
         <span class="text-gray-400 dark:text-gray-500">Article</span>
@@ -423,13 +471,19 @@ function FeedPost({ post }: { post: PostWithSource }) {
         >
           Read more →
         </a>
+        {postTags.length > 0 && (
+          <>
+            <span class="text-gray-300 dark:text-gray-600">•</span>
+            <TagBadges tags={postTags} />
+          </>
+        )}
       </div>
     </article>
   );
 }
 
 /** Reusable post card component */
-function PostCard({ post }: { post: PostWithSource }) {
+function PostCard({ post, tags: postTags = [] }: { post: PostWithSource; tags?: Tag[] }) {
   const isLink = post.type === "link";
   const isNote = post.type === "note";
 
@@ -506,6 +560,16 @@ function PostCard({ post }: { post: PostWithSource }) {
               </a>
             </span>
           )}
+
+          {/* Tags */}
+          {postTags.length > 0 && (
+            <span class="ml-2 flex flex-wrap gap-1">
+              •{" "}
+              {postTags.map((tag) => (
+                <TagBadge key={tag.id} tag={tag} />
+              ))}
+            </span>
+          )}
         </div>
       </a>
     </article>
@@ -515,9 +579,11 @@ function PostCard({ post }: { post: PostWithSource }) {
 /** Reusable post list component */
 function PostList({
   posts: postList,
+  getTagsForPost,
   emptyMessage,
 }: {
   posts: PostWithSource[];
+  getTagsForPost: (postId: number) => Tag[];
   emptyMessage?: string;
 }) {
   return (
@@ -525,7 +591,9 @@ function PostList({
       {postList.length === 0 ? (
         <p class="text-gray-600 dark:text-gray-400">{emptyMessage || "No posts yet."}</p>
       ) : (
-        postList.map((post) => <PostCard key={post.id} post={post} />)
+        postList.map((post) => (
+          <PostCard key={post.id} post={post} tags={getTagsForPost(post.id)} />
+        ))
       )}
     </div>
   );
@@ -586,12 +654,41 @@ export function createPagesRoutes(db: Database): Hono {
     // Helper function to get banner URL
     const getBannerUrl = (id: number) => bannerUrlMap.get(id) || null;
 
+    // Fetch tags for all displayed articles
+    const articleIds = recentArticles.map((a) => a.id);
+    const articleTags =
+      articleIds.length > 0
+        ? db
+            .select({
+              postId: postTags.post_id,
+              tagId: tags.id,
+              tagName: tags.name,
+              tagSlug: tags.slug,
+            })
+            .from(postTags)
+            .innerJoin(tags, eq(postTags.tag_id, tags.id))
+            .all()
+            .filter((t) => articleIds.includes(t.postId))
+        : [];
+
+    // Create a map of post_id -> tags[]
+    const tagsMap = new Map<number, Tag[]>();
+    for (const t of articleTags) {
+      const existing = tagsMap.get(t.postId) || [];
+      existing.push({ id: t.tagId, name: t.tagName, slug: t.tagSlug });
+      tagsMap.set(t.postId, existing);
+    }
+
+    // Helper function to get tags for a post
+    const getTagsForPost = (postId: number) => tagsMap.get(postId) || [];
+
     return c.html(
       <Layout title="Home | erikcraddock.me">
         <HeroSection />
         <ArticleCardsSection
           articles={recentArticles}
           getBannerUrl={getBannerUrl}
+          getTagsForPost={getTagsForPost}
           hasMore={hasMoreArticles}
         />
       </Layout>
@@ -668,6 +765,34 @@ export function createPagesRoutes(db: Database): Hono {
 
     const getBannerUrl = (id: number) => bannerUrlMap.get(id) || null;
 
+    // Fetch tags for all displayed articles
+    const articleIds = pageArticles.map((a) => a.id);
+    const articleTags =
+      articleIds.length > 0
+        ? db
+            .select({
+              postId: postTags.post_id,
+              tagId: tags.id,
+              tagName: tags.name,
+              tagSlug: tags.slug,
+            })
+            .from(postTags)
+            .innerJoin(tags, eq(postTags.tag_id, tags.id))
+            .all()
+            .filter((t) => articleIds.includes(t.postId))
+        : [];
+
+    // Create a map of post_id -> tags[]
+    const tagsMap = new Map<number, Tag[]>();
+    for (const t of articleTags) {
+      const existing = tagsMap.get(t.postId) || [];
+      existing.push({ id: t.tagId, name: t.tagName, slug: t.tagSlug });
+      tagsMap.set(t.postId, existing);
+    }
+
+    // Helper function to get tags for a post
+    const getTagsForPost = (postId: number) => tagsMap.get(postId) || [];
+
     return c.html(
       <Layout title={`Articles${page > 1 ? ` - Page ${page}` : ""} | erikcraddock.me`}>
         <h1 class="text-3xl font-bold text-gray-900 dark:text-gray-100 mb-8">Articles</h1>
@@ -682,7 +807,12 @@ export function createPagesRoutes(db: Database): Hono {
         {/* Article cards grid */}
         <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {pageArticles.map((article) => (
-            <ArticleCard key={article.id} post={article} getBannerUrl={getBannerUrl} />
+            <ArticleCard
+              key={article.id}
+              post={article}
+              getBannerUrl={getBannerUrl}
+              tags={getTagsForPost(article.id)}
+            />
           ))}
         </div>
 
@@ -751,6 +881,34 @@ export function createPagesRoutes(db: Database): Hono {
       source: row.source,
     }));
 
+    // Fetch tags for all displayed posts
+    const postIds = pagePosts.map((p) => p.id);
+    const feedTags =
+      postIds.length > 0
+        ? db
+            .select({
+              postId: postTags.post_id,
+              tagId: tags.id,
+              tagName: tags.name,
+              tagSlug: tags.slug,
+            })
+            .from(postTags)
+            .innerJoin(tags, eq(postTags.tag_id, tags.id))
+            .all()
+            .filter((t) => postIds.includes(t.postId))
+        : [];
+
+    // Create a map of post_id -> tags[]
+    const feedTagsMap = new Map<number, Tag[]>();
+    for (const t of feedTags) {
+      const existing = feedTagsMap.get(t.postId) || [];
+      existing.push({ id: t.tagId, name: t.tagName, slug: t.tagSlug });
+      feedTagsMap.set(t.postId, existing);
+    }
+
+    // Helper function to get tags for a post
+    const getTagsForPost = (postId: number) => feedTagsMap.get(postId) || [];
+
     return c.html(
       <Layout title={`Feed${page > 1 ? ` - Page ${page}` : ""} | erikcraddock.me`}>
         <h1 class="text-3xl font-bold text-gray-900 dark:text-gray-100 mb-8">Feed</h1>
@@ -765,7 +923,7 @@ export function createPagesRoutes(db: Database): Hono {
         {/* Posts list */}
         <div class="space-y-8">
           {pagePosts.map((post) => (
-            <FeedPost key={post.id} post={post} />
+            <FeedPost key={post.id} post={post} tags={getTagsForPost(post.id)} />
           ))}
         </div>
 
@@ -1116,19 +1274,7 @@ export function createPagesRoutes(db: Database): Hono {
               </a>
             )}
 
-            {postTagsResult.length > 0 ? (
-              <div class="flex flex-wrap gap-2">
-                {postTagsResult.map((tag) => (
-                  <a
-                    key={tag.id}
-                    href={`/tags/${tag.slug}`}
-                    class="bg-gray-100 hover:bg-gray-200 dark:bg-gray-700 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-300 px-2 py-1 rounded text-xs"
-                  >
-                    {tag.name}
-                  </a>
-                ))}
-              </div>
-            ) : null}
+            {postTagsResult.length > 0 && <TagBadges tags={postTagsResult} />}
           </div>
 
           {/* Post content */}
@@ -1171,6 +1317,34 @@ export function createPagesRoutes(db: Database): Hono {
       source: row.source,
     }));
 
+    // Fetch all tags for the displayed posts
+    const taggedPostIds = taggedPosts.map((p) => p.id);
+    const allPostTags =
+      taggedPostIds.length > 0
+        ? db
+            .select({
+              postId: postTags.post_id,
+              tagId: tags.id,
+              tagName: tags.name,
+              tagSlug: tags.slug,
+            })
+            .from(postTags)
+            .innerJoin(tags, eq(postTags.tag_id, tags.id))
+            .all()
+            .filter((t) => taggedPostIds.includes(t.postId))
+        : [];
+
+    // Create a map of post_id -> tags[]
+    const taggedPostTagsMap = new Map<number, Tag[]>();
+    for (const t of allPostTags) {
+      const existing = taggedPostTagsMap.get(t.postId) || [];
+      existing.push({ id: t.tagId, name: t.tagName, slug: t.tagSlug });
+      taggedPostTagsMap.set(t.postId, existing);
+    }
+
+    // Helper function to get tags for a post
+    const getTagsForPost = (postId: number) => taggedPostTagsMap.get(postId) || [];
+
     return c.html(
       <Layout title={`${tag.name} | erikcraddock.me`}>
         {/* Back link */}
@@ -1187,7 +1361,11 @@ export function createPagesRoutes(db: Database): Hono {
         </h1>
 
         {/* Post list */}
-        <PostList posts={taggedPosts} emptyMessage={`No posts tagged "${tag.name}" yet.`} />
+        <PostList
+          posts={taggedPosts}
+          getTagsForPost={getTagsForPost}
+          emptyMessage={`No posts tagged "${tag.name}" yet.`}
+        />
       </Layout>
     );
   });
