@@ -1,9 +1,9 @@
 import { Create } from "@fedify/fedify";
 import { desc, isNotNull, count, eq } from "drizzle-orm";
-import { db, posts, media } from "@/db";
+import { db, posts, media, postTags, tags } from "@/db";
 import { logger } from "@/utils/logger";
 import { baseUrl, dateToInstant } from "./utils";
-import { postToObject, PublishedPost } from "./post-object";
+import { postToObject, PublishedPost, PostTag } from "./post-object";
 import { mediaUrl } from "@/services/media";
 
 // ActivityPub Public address
@@ -40,7 +40,31 @@ export function getPublishedPosts(limit: number = 20, offset: number = 0): Publi
     .offset(offset)
     .all();
 
-  // Transform to PublishedPost with banner URL
+  // Fetch tags for all posts in a single query
+  const postIds = results.map((r) => r.id);
+  const allTags =
+    postIds.length > 0
+      ? db
+          .select({
+            postId: postTags.post_id,
+            name: tags.name,
+            slug: tags.slug,
+          })
+          .from(postTags)
+          .innerJoin(tags, eq(postTags.tag_id, tags.id))
+          .all()
+          .filter((t) => postIds.includes(t.postId))
+      : [];
+
+  // Create a map of post_id -> tags
+  const tagsMap = new Map<number, PostTag[]>();
+  for (const t of allTags) {
+    const existing = tagsMap.get(t.postId) || [];
+    existing.push({ name: t.name, slug: t.slug });
+    tagsMap.set(t.postId, existing);
+  }
+
+  // Transform to PublishedPost with banner URL and tags
   return results.map((r) => ({
     id: r.id,
     slug: r.slug,
@@ -53,6 +77,7 @@ export function getPublishedPosts(limit: number = 20, offset: number = 0): Publi
     updated_at: r.updated_at,
     banner_url: r.banner_s3_key ? new URL(mediaUrl(r.banner_s3_key), baseUrl).href : null,
     banner_alt: r.banner_alt,
+    tags: tagsMap.get(r.id) || [],
   }));
 }
 

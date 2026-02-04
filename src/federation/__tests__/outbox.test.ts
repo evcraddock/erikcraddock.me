@@ -207,4 +207,86 @@ describe("postToObject", () => {
       expect(result.published).toBeDefined();
     });
   });
+
+  describe("hashtags", () => {
+    it("includes tags as ActivityPub Hashtag objects", async () => {
+      const post = createPost({
+        type: "note",
+        title: null,
+        content: "A post with tags",
+        tags: [
+          { name: "Coding", slug: "coding" },
+          { name: "TypeScript", slug: "typescript" },
+        ],
+      });
+
+      const result = postToObject(post, actorUri, followersUri);
+      const json = (await result.toJsonLd()) as Record<string, unknown>;
+      const tags = json.tag as Array<Record<string, unknown>>;
+
+      expect(tags).toBeDefined();
+      expect(tags.length).toBe(2);
+      expect(tags[0].type).toBe("Hashtag");
+      expect(tags[0].name).toBe("#coding");
+      expect(tags[0].href).toContain("/tags/coding");
+      expect(tags[1].type).toBe("Hashtag");
+      expect(tags[1].name).toBe("#typescript");
+      expect(tags[1].href).toContain("/tags/typescript");
+    });
+
+    it("converts tag names to lowercase hashtags", async () => {
+      const post = createPost({
+        type: "article",
+        title: "Tagged Article",
+        tags: [{ name: "AI", slug: "ai" }],
+      });
+
+      const result = postToObject(post, actorUri, followersUri);
+      const json = (await result.toJsonLd()) as Record<string, unknown>;
+      // Single tag is an object, not an array
+      const tag = json.tag as Record<string, unknown>;
+
+      expect(tag.name).toBe("#ai");
+    });
+
+    it("removes spaces from tag names", async () => {
+      const post = createPost({
+        type: "note",
+        title: null,
+        tags: [{ name: "Machine Learning", slug: "machine-learning" }],
+      });
+
+      const result = postToObject(post, actorUri, followersUri);
+      const json = (await result.toJsonLd()) as Record<string, unknown>;
+      // Single tag is an object, not an array
+      const tag = json.tag as Record<string, unknown>;
+
+      expect(tag.name).toBe("#machinelearning");
+    });
+
+    it("does not include tags property when no tags", async () => {
+      const post = createPost({
+        type: "note",
+        title: null,
+        tags: [],
+      });
+
+      const result = postToObject(post, actorUri, followersUri);
+      const json = (await result.toJsonLd()) as Record<string, unknown>;
+
+      expect(json.tag).toBeUndefined();
+    });
+
+    it("does not include tags property when tags is undefined", async () => {
+      const post = createPost({
+        type: "note",
+        title: null,
+      });
+
+      const result = postToObject(post, actorUri, followersUri);
+      const json = (await result.toJsonLd()) as Record<string, unknown>;
+
+      expect(json.tag).toBeUndefined();
+    });
+  });
 });
