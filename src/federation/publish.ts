@@ -1,11 +1,11 @@
 import { Create, Delete, Update, Image, Person, Endpoints } from "@fedify/fedify";
 import { eq } from "drizzle-orm";
-import { db, posts, media } from "@/db";
+import { db, posts, media, postTags, tags } from "@/db";
 import { federation } from "./setup";
 import { getAllFollowers } from "./followers";
 import { logger } from "@/utils/logger";
 import { dateToInstant, baseUrl } from "./utils";
-import { postToObject, PublishedPost } from "./post-object";
+import { postToObject, PublishedPost, PostTag } from "./post-object";
 import { mediaUrl } from "@/services/media";
 
 // ActivityPub Public address
@@ -39,6 +39,17 @@ function getPublishedPostById(postId: number): PublishedPost | null {
     return null;
   }
 
+  // Fetch tags for this post
+  const postTagsResult: PostTag[] = db
+    .select({
+      name: tags.name,
+      slug: tags.slug,
+    })
+    .from(postTags)
+    .innerJoin(tags, eq(postTags.tag_id, tags.id))
+    .where(eq(postTags.post_id, postId))
+    .all();
+
   return {
     id: result.id,
     slug: result.slug,
@@ -51,6 +62,7 @@ function getPublishedPostById(postId: number): PublishedPost | null {
     updated_at: result.updated_at,
     banner_url: result.banner_s3_key ? new URL(mediaUrl(result.banner_s3_key), baseUrl).href : null,
     banner_alt: result.banner_alt,
+    tags: postTagsResult,
   };
 }
 

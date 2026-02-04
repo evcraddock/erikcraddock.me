@@ -1,9 +1,14 @@
-import { Note, Article, Document, LanguageString } from "@fedify/fedify";
+import { Note, Article, Document, LanguageString, Hashtag } from "@fedify/fedify";
 import { dateToInstant, baseUrl } from "./utils";
 import { renderMarkdown } from "../utils/markdown";
 
 // ActivityPub Public address
 const PUBLIC = new URL("https://www.w3.org/ns/activitystreams#Public");
+
+export interface PostTag {
+  name: string;
+  slug: string;
+}
 
 export interface PublishedPost {
   id: number;
@@ -17,6 +22,7 @@ export interface PublishedPost {
   updated_at: Date;
   banner_url?: string | null;
   banner_alt?: string | null;
+  tags?: PostTag[];
 }
 
 /**
@@ -81,6 +87,15 @@ export function postToObject(
     );
   }
 
+  // Build hashtags array from post tags
+  const hashtags: Hashtag[] = (post.tags ?? []).map(
+    (tag) =>
+      new Hashtag({
+        href: new URL(`/tags/${tag.slug}`, baseUrl),
+        name: `#${tag.name.toLowerCase().replace(/\s+/g, "")}`,
+      })
+  );
+
   return new ObjectClass({
     id: postUri,
     attribution: actorUri,
@@ -100,5 +115,7 @@ export function postToObject(
     // For links, url points to external article so Mastodon links there and generates preview
     url: post.type === "link" && post.url ? new URL(post.url) : postUri,
     attachments: attachments.length > 0 ? attachments : undefined,
+    // Include tags as ActivityPub Hashtag objects for discoverability
+    tags: hashtags.length > 0 ? hashtags : undefined,
   });
 }
