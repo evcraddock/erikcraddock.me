@@ -200,9 +200,11 @@ function ArticleCard({
 function ArticleCardsSection({
   articles,
   getBannerUrl,
+  hasMore,
 }: {
   articles: Post[];
   getBannerUrl: (id: number) => string | null;
+  hasMore: boolean;
 }) {
   if (articles.length === 0) {
     return null;
@@ -219,23 +221,25 @@ function ArticleCardsSection({
         ))}
       </div>
 
-      {/* More Articles button */}
-      <div class="mt-8 text-center">
-        <a
-          href="/articles"
-          class="inline-flex items-center gap-2 px-6 py-3 bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-lg transition-colors"
-        >
-          More Articles
-          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path
-              stroke-linecap="round"
-              stroke-linejoin="round"
-              stroke-width="2"
-              d="M9 5l7 7-7 7"
-            />
-          </svg>
-        </a>
-      </div>
+      {/* More Articles button - only show if there are more articles */}
+      {hasMore && (
+        <div class="mt-8 text-center">
+          <a
+            href="/articles"
+            class="inline-flex items-center gap-2 px-6 py-3 bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-lg transition-colors"
+          >
+            More Articles
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                stroke-width="2"
+                d="M9 5l7 7-7 7"
+              />
+            </svg>
+          </a>
+        </div>
+      )}
     </section>
   );
 }
@@ -535,15 +539,21 @@ export function createPagesRoutes(db: Database): Hono {
   const pages = new Hono();
 
   // Home page
+  const HOME_ARTICLES_LIMIT = 6;
+
   pages.get("/", (c) => {
-    // Fetch recent articles (type=article, published, limit 6)
-    const recentArticles = db
+    // Fetch one extra article to check if there are more
+    const fetchedArticles = db
       .select()
       .from(posts)
       .where(and(eq(posts.type, "article"), isNotNull(posts.published_at)))
       .orderBy(desc(posts.published_at))
-      .limit(6)
+      .limit(HOME_ARTICLES_LIMIT + 1)
       .all();
+
+    // Check if there are more articles beyond what we display
+    const hasMoreArticles = fetchedArticles.length > HOME_ARTICLES_LIMIT;
+    const recentArticles = fetchedArticles.slice(0, HOME_ARTICLES_LIMIT);
 
     // Get all banner IDs for the articles
     const bannerIds = recentArticles
@@ -579,7 +589,11 @@ export function createPagesRoutes(db: Database): Hono {
     return c.html(
       <Layout title="Home | erikcraddock.me">
         <HeroSection />
-        <ArticleCardsSection articles={recentArticles} getBannerUrl={getBannerUrl} />
+        <ArticleCardsSection
+          articles={recentArticles}
+          getBannerUrl={getBannerUrl}
+          hasMore={hasMoreArticles}
+        />
       </Layout>
     );
   });
