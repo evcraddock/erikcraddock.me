@@ -774,6 +774,7 @@ export function createPagesRoutes(db: Database): Hono {
       },
       { name: "Facebook", url: "https://www.facebook.com/evcraddock", icon: <FacebookIcon /> },
       { name: "YouTube", url: "https://youtube.com/@ErikCraddock", icon: <YouTubeIcon /> },
+      { name: "RSS", url: "/feed.xml", icon: <RssIcon /> },
     ];
 
     return c.html(
