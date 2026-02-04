@@ -1,6 +1,7 @@
 /* eslint-disable @typescript-eslint/no-require-imports */
 import { describe, it, expect, beforeAll } from "bun:test";
 import { mock } from "bun:test";
+import { Hono } from "hono";
 import { createTestDb } from "../../db/test-utils";
 import { posts, tags, postTags, sources, media } from "../../db/schema";
 
@@ -185,9 +186,41 @@ describe("pages routes", () => {
       expect(html).toContain('href="/posts/test-post"');
     });
 
-    it("displays More Articles button linking to /articles", async () => {
+    it("hides More Articles button when 6 or fewer articles", async () => {
       const app = getApp();
       const res = await app.request("/");
+      const html = await res.text();
+
+      // With only 2 published articles in test data, button should be hidden
+      expect(html).not.toContain("More Articles");
+    });
+
+    it("shows More Articles button when more than 6 articles", async () => {
+      // Create a separate db with 7 published articles
+      const manyArticlesDb = createTestDb();
+      const manyArticlesNow = new Date();
+
+      // Insert 7 published articles
+      for (let i = 1; i <= 7; i++) {
+        manyArticlesDb
+          .insert(posts)
+          .values({
+            id: i,
+            slug: `article-${i}`,
+            type: "article",
+            title: `Article ${i}`,
+            content: `Content for article ${i}`,
+            published_at: manyArticlesNow,
+            created_at: manyArticlesNow,
+            updated_at: manyArticlesNow,
+          })
+          .run();
+      }
+
+      const manyArticlesApp = new Hono();
+      manyArticlesApp.route("/", createPagesRoutes(manyArticlesDb));
+
+      const res = await manyArticlesApp.request("/");
       const html = await res.text();
 
       expect(html).toContain("More Articles");
