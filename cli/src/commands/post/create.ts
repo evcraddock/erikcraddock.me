@@ -72,6 +72,20 @@ function parseCreateArgs(args: string[]): { options: CreateOptions; help: boolea
   return { options, help };
 }
 
+async function ensureSlugAvailable(client: ApiClient, slug: string): Promise<void> {
+  const existing = await client.getPost(slug);
+
+  if (existing.data) {
+    console.error(`❌ Error: Slug '${slug}' already exists`);
+    process.exit(1);
+  }
+
+  if (existing.error && !existing.error.includes("404") && !existing.error.includes("not found")) {
+    console.error(`❌ Error checking slug: ${existing.error}`);
+    process.exit(1);
+  }
+}
+
 function showCreateHelp(): void {
   console.log(`ec post create - Create a new post
 
@@ -170,6 +184,8 @@ export async function create(args: string[], globalOptions: GlobalOptions): Prom
         console.error("   Add 'slug:' to frontmatter or use --slug option.");
         process.exit(1);
       }
+
+      await ensureSlugAvailable(client, slug);
 
       console.log(`📤 Processing ${localImages.length} image(s)...`);
 
