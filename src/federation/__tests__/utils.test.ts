@@ -16,11 +16,16 @@ describe("Federation Utils", () => {
       expect(getProtocol("subdomain.example.com")).toBe("https");
     });
 
+    it("returns http for local network hosts", () => {
+      expect(getProtocol("127.0.0.1")).toBe("http");
+      expect(getProtocol("10.10.1.197:5000")).toBe("http");
+      expect(getProtocol("192.168.1.20")).toBe("http");
+      expect(getProtocol("172.16.0.5")).toBe("http");
+      expect(getProtocol("devbox.local:5000")).toBe("http");
+    });
+
     it("returns https for domains containing localhost as substring", () => {
-      // "mylocalhost.com" contains "localhost" - but this is an edge case
-      // Current implementation would return http, which may not be desired
-      // For now, documenting current behavior
-      expect(getProtocol("mylocalhost.com")).toBe("http");
+      expect(getProtocol("mylocalhost.com")).toBe("https");
     });
   });
 
@@ -33,6 +38,10 @@ describe("Federation Utils", () => {
     it("returns https:// for production domains", () => {
       expect(getOrigin("erikcraddock.me")).toBe("https://erikcraddock.me");
       expect(getOrigin("example.com")).toBe("https://example.com");
+    });
+
+    it("returns http:// for LAN IPs", () => {
+      expect(getOrigin("10.10.1.197:5000")).toBe("http://10.10.1.197:5000");
     });
   });
 

@@ -5,10 +5,24 @@ const domain = process.env.DOMAIN || "localhost:5000";
 
 /**
  * Determine the protocol (http or https) for a given domain.
- * Uses http for localhost, https for everything else.
+ * Uses http for local development hosts and private LAN IPs, https otherwise.
  */
 export function getProtocol(domain: string): "http" | "https" {
-  return domain.includes("localhost") ? "http" : "https";
+  const hostname = domain.split(":")[0]?.toLowerCase() ?? domain.toLowerCase();
+
+  if (
+    hostname === "localhost" ||
+    hostname === "127.0.0.1" ||
+    hostname === "::1" ||
+    hostname.endsWith(".local") ||
+    /^10\./.test(hostname) ||
+    /^192\.168\./.test(hostname) ||
+    /^172\.(1[6-9]|2\d|3[0-1])\./.test(hostname)
+  ) {
+    return "http";
+  }
+
+  return "https";
 }
 
 /**
