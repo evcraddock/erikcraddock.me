@@ -50,7 +50,7 @@ dev: ## Start dev environment
 		sleep 2; \
 		overmind ps -s $(SOCKET); \
 		echo ""; \
-		echo "Dev started: http://localhost:5000"; \
+		echo "Dev started: http://localhost:5000 (LAN: http://<your-machine-ip>:5000)"; \
 	fi
 
 dev-stop: ## Stop dev environment

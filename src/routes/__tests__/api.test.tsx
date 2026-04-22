@@ -56,6 +56,41 @@ beforeEach(() => {
 
 const authHeader = { Authorization: "Bearer ek_test" };
 
+describe("API docs", () => {
+  let api: typeof import("../api").api;
+
+  beforeAll(async () => {
+    const module = await import("../api");
+    api = module.api;
+  });
+
+  it("serves the OpenAPI document", async () => {
+    const res = await api.request("/openapi.json");
+
+    expect(res.status).toBe(200);
+    expect(res.headers.get("content-type")).toContain("application/json");
+
+    const json = await res.json();
+    expect(json.openapi).toBe("3.1.0");
+    expect(json.info.title).toBe("erikcraddock.me API");
+    expect(json.paths).toHaveProperty("/posts");
+    expect(json.paths).toHaveProperty("/sources");
+    expect(json.paths).toHaveProperty("/media");
+    expect(json.components.securitySchemes).toHaveProperty("Bearer");
+  });
+
+  it("serves Swagger UI", async () => {
+    const res = await api.request("/docs");
+
+    expect(res.status).toBe(200);
+    expect(res.headers.get("content-type")).toContain("text/html");
+
+    const html = await res.text();
+    expect(html).toContain("SwaggerUIBundle");
+    expect(html).toContain("./openapi.json");
+  });
+});
+
 describe("POST /api/posts - slug validation", () => {
   let api: typeof import("../api").api;
 

@@ -132,15 +132,20 @@ app.route("/api", api);
 app.route("/media", mediaRoute);
 
 const port = Number(process.env.PORT) || 5000;
+const host = process.env.HOST || "0.0.0.0";
+const displayHost = host === "0.0.0.0" ? "localhost" : host;
 
-logger.info("server", `Starting on http://localhost:${port}`);
+logger.info("server", `Starting on http://${displayHost}:${port} (bind: ${host})`);
 
 // In dev, log helpful info
 if (process.env.NODE_ENV !== "production") {
   const adminEmail = process.env.ADMIN_EMAIL;
   if (adminEmail) {
     logger.info("server", `Admin email: ${adminEmail}`);
-    logger.info("server", `Login at: http://localhost:${port}/login`);
+    logger.info("server", `Login at: http://${displayHost}:${port}/login`);
+    if (host === "0.0.0.0") {
+      logger.info("server", `LAN access enabled on port ${port}`);
+    }
   } else {
     logger.warn("server", "ADMIN_EMAIL not set - run seed script after setting it in .env");
   }
@@ -152,6 +157,7 @@ if (isBun) {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   (globalThis as any).default = {
     port,
+    hostname: host,
     fetch: app.fetch,
   };
 } else {
@@ -161,6 +167,7 @@ if (isBun) {
   serve({
     fetch: app.fetch,
     port,
+    hostname: host,
   });
 }
 

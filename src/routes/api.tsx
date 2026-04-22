@@ -1,5 +1,9 @@
-import { Hono } from "hono";
+import { readFileSync } from "fs";
+import type { Context } from "hono";
+import { join } from "path";
 import { bodyLimit } from "hono/body-limit";
+import { OpenAPIHono, createRoute, z } from "@hono/zod-openapi";
+import { swaggerUI } from "@hono/swagger-ui";
 import { requireApiKey } from "@/auth/api-key";
 import {
   listPosts,
@@ -30,616 +34,1257 @@ import {
   sendActorUpdateActivity,
 } from "@/federation/publish";
 
-export const api = new Hono();
+let version = "unknown";
+try {
+  const packageJson = JSON.parse(readFileSync(join(process.cwd(), "package.json"), "utf-8"));
+  version = packageJson.version || "unknown";
+} catch {
+  // Fallback if package.json can't be read
+}
 
-// Apply API key middleware to all API routes
-api.use("*", requireApiKey);
+const api = new OpenAPIHono();
+const protectedApi = new OpenAPIHono();
 
-/**
- * GET /api/ping - Health check endpoint
- */
-api.get("/ping", (c) => {
-  const auth = c.get("apiAuth");
-  return c.json({
-    data: {
-      status: "ok",
-      authenticated: auth.email,
+api.openAPIRegistry.registerComponent("securitySchemes", "Bearer", {
+  type: "http",
+  scheme: "bearer",
+  bearerFormat: "API key",
+  description: "Send the API key as a Bearer token in the Authorization header.",
+});
+
+api.doc("/openapi.json", (c: Context) => ({
+  openapi: "3.1.0",
+  info: {
+    title: "erikcraddock.me API",
+    version,
+    description:
+      "Authenticated content management API for posts, sources, tags, media, and federation actions.",
+  },
+  servers: [
+    {
+      url: `${new URL(c.req.url).origin}/api`,
+      description: "Current environment",
     },
+  ],
+}));
+
+api.get(
+  "/docs",
+  swaggerUI({
+    url: "./openapi.json",
+  })
+);
+
+protectedApi.use("*", requireApiKey);
+const PostTypeSchema = z.enum(["article", "link", "note"]).openapi("PostType");
+const NullableStringSchema = z.string().nullable();
+const IsoDateTimeSchema = z.string().datetime();
+
+const ErrorSchema = z
+  .object({
+    error: z.string().openapi({ example: "Post not found" }),
+  })
+  .openapi("ErrorResponse");
+
+const ApiPingSchema = z
+  .object({
+    status: z.literal("ok").openapi({ example: "ok" }),
+    authenticated: z.string().email().openapi({ example: "erik@example.com" }),
+  })
+  .openapi("ApiPing");
+
+const SourceSummarySchema = z
+  .object({
+    id: z.number().int().openapi({ example: 1 }),
+    name: z.string().openapi({ example: "Hacker News" }),
+    url: z.string().url().openapi({ example: "https://news.ycombinator.com" }),
+  })
+  .openapi("SourceSummary");
+
+const SourceSchema = SourceSummarySchema.extend({
+  feed_url: NullableStringSchema,
+}).openapi("Source");
+
+const TagSchema = z
+  .object({
+    id: z.number().int().openapi({ example: 1 }),
+    name: z.string().openapi({ example: "Tech" }),
+    slug: z.string().openapi({ example: "tech" }),
+    count: z.number().int().openapi({ example: 2 }),
+  })
+  .openapi("Tag");
+
+const MediaRecordSchema = z
+  .object({
+    id: z.number().int().openapi({ example: 42 }),
+    filename: z.string().openapi({ example: "hero.jpg" }),
+    mime_type: z.string().openapi({ example: "image/jpeg" }),
+    s3_key: z.string().openapi({ example: "posts/my-post/hero.jpg" }),
+    alt_text: NullableStringSchema,
+    created_at: IsoDateTimeSchema,
+    url: z.string().openapi({ example: "/media/posts/my-post/hero.jpg" }),
+  })
+  .openapi("MediaRecord");
+
+const PostListItemSchema = z
+  .object({
+    id: z.number().int().openapi({ example: 1 }),
+    slug: z.string().openapi({ example: "my-post" }),
+    type: PostTypeSchema,
+    title: NullableStringSchema,
+    excerpt: NullableStringSchema,
+    published_at: IsoDateTimeSchema.nullable(),
+    tags: z.array(z.string()).openapi({ example: ["Tech", "Writing"] }),
+  })
+  .openapi("PostListItem");
+
+const PostSchema = z
+  .object({
+    id: z.number().int().openapi({ example: 1 }),
+    slug: z.string().openapi({ example: "my-post" }),
+    type: PostTypeSchema,
+    title: NullableStringSchema,
+    content: z.string().openapi({ example: "# Hello" }),
+    excerpt: NullableStringSchema,
+    url: NullableStringSchema,
+    source_id: z.number().int().nullable(),
+    banner_image_id: z.number().int().nullable(),
+    banner_url: NullableStringSchema,
+    source: SourceSummarySchema.nullable(),
+    published_at: IsoDateTimeSchema.nullable(),
+    created_at: IsoDateTimeSchema,
+    updated_at: IsoDateTimeSchema,
+    tags: z.array(z.string()).openapi({ example: ["Tech", "Writing"] }),
+  })
+  .openapi("Post");
+
+const DeleteUriResponseSchema = z
+  .object({
+    success: z.boolean().openapi({ example: true }),
+    uri: z.string().url().openapi({ example: "https://erikcraddock.me/posts/old-post" }),
+  })
+  .openapi("DeleteUriResponse");
+
+const SuccessResponseSchema = z
+  .object({
+    success: z.boolean().openapi({ example: true }),
+  })
+  .openapi("SuccessResponse");
+
+const dataEnvelope = <T extends z.ZodTypeAny>(schema: T) => z.object({ data: schema });
+
+const IdParamSchema = z.object({
+  id: z.string().openapi({
+    param: { name: "id", in: "path" },
+    example: "1",
+  }),
+});
+
+const SlugParamSchema = z.object({
+  slug: z.string().openapi({
+    param: { name: "slug", in: "path" },
+    example: "my-post",
+  }),
+});
+
+const PostsQuerySchema = z.object({
+  type: z.string().optional().openapi({ example: "article" }),
+  tag: z.string().optional().openapi({ example: "tech" }),
+  limit: z.string().optional().openapi({ example: "10" }),
+  status: z
+    .string()
+    .optional()
+    .openapi({ example: "published", enum: ["draft", "published", "all"] }),
+});
+
+const CreatePostBodySchema = z
+  .object({
+    type: z.string().openapi({ example: "article", enum: ["article", "link", "note"] }),
+    slug: z.string().optional().openapi({ example: "my-post" }),
+    title: z.string().optional().nullable(),
+    content: z.string().optional().openapi({ example: "# Hello" }),
+    excerpt: z.string().optional().nullable(),
+    url: z.string().optional().nullable(),
+    source_id: z.number().int().optional().nullable(),
+    tags: z.array(z.string()).optional(),
+    banner_image_id: z.number().int().optional().nullable(),
+    published_at: z.string().optional().nullable().openapi({ example: "2024-03-15T10:30:00Z" }),
+  })
+  .openapi("CreatePostBody");
+
+const UpdatePostBodySchema = z
+  .object({
+    title: z.string().optional().nullable(),
+    content: z.string().optional(),
+    excerpt: z.string().optional().nullable(),
+    url: z.string().optional().nullable(),
+    source_id: z.number().int().optional().nullable(),
+    tags: z.array(z.string()).optional(),
+    banner_image_id: z.number().int().optional().nullable(),
+  })
+  .openapi("UpdatePostBody");
+
+const CreateSourceBodySchema = z
+  .object({
+    name: z.string().openapi({ example: "Hacker News" }),
+    url: z.string().openapi({ example: "https://news.ycombinator.com" }),
+    feed_url: z.string().optional().nullable().openapi({ example: "https://hnrss.org/frontpage" }),
+  })
+  .openapi("CreateSourceBody");
+
+const UpdateSourceBodySchema = z
+  .object({
+    name: z.string().optional().nullable(),
+    url: z.string().optional().nullable(),
+    feed_url: z.string().optional().nullable(),
+  })
+  .openapi("UpdateSourceBody");
+
+const DeleteUriBodySchema = z
+  .object({
+    uri: z.string().url().openapi({ example: "https://erikcraddock.me/posts/4" }),
+  })
+  .openapi("DeleteUriBody");
+
+const MediaUploadBodySchema = z
+  .object({
+    file: z.any().openapi({ type: "string", format: "binary" }),
+    alt: z.string().optional(),
+    key: z.string().optional(),
+  })
+  .openapi("MediaUploadBody");
+
+const protectedRoute = <T extends Parameters<typeof createRoute>[0]>(route: T) =>
+  createRoute({
+    ...route,
+    security: [{ Bearer: [] }],
   });
-});
 
-/**
- * GET /api/posts - List posts
- * Query params:
- *   - type: 'article' | 'link' | 'note'
- *   - tag: tag slug to filter by
- *   - limit: max number of posts (default 50)
- *   - status: 'draft' | 'published' | 'all' (default 'published')
- */
-api.get("/posts", (c) => {
-  const type = c.req.query("type") as PostType | undefined;
-  const tag = c.req.query("tag");
-  const limitParam = c.req.query("limit");
-  const limit = limitParam ? parseInt(limitParam, 10) : undefined;
-  const status = c.req.query("status") as PostStatus | undefined;
+const registerProtectedRoute = protectedApi.openapi.bind(protectedApi) as unknown as (
+  route: unknown,
+  handler: (c: Context) => unknown
+) => unknown;
 
-  // Validate type if provided
-  if (type && !["article", "link", "note"].includes(type)) {
-    return c.json({ error: "Invalid type. Must be article, link, or note" }, 400);
+registerProtectedRoute(
+  protectedRoute({
+    method: "get",
+    path: "/ping",
+    tags: ["system"],
+    summary: "Authenticated ping",
+    responses: {
+      200: {
+        description: "API is reachable and the API key was accepted.",
+        content: {
+          "application/json": {
+            schema: dataEnvelope(ApiPingSchema),
+          },
+        },
+      },
+      401: {
+        description: "Missing or invalid API key.",
+        content: { "application/json": { schema: ErrorSchema } },
+      },
+    },
+  }),
+  (c: Context) => {
+    const auth = c.get("apiAuth");
+    return c.json({
+      data: {
+        status: "ok",
+        authenticated: auth.email,
+      },
+    });
   }
+);
 
-  // Validate limit if provided
-  if (limit !== undefined && (isNaN(limit) || limit < 1 || limit > 100)) {
-    return c.json({ error: "Invalid limit. Must be between 1 and 100" }, 400);
+registerProtectedRoute(
+  protectedRoute({
+    method: "get",
+    path: "/posts",
+    tags: ["posts"],
+    summary: "List posts",
+    request: {
+      query: PostsQuerySchema,
+    },
+    responses: {
+      200: {
+        description: "Posts matching the supplied filters.",
+        content: {
+          "application/json": {
+            schema: dataEnvelope(z.array(PostListItemSchema)),
+          },
+        },
+      },
+      400: {
+        description: "Invalid query parameter.",
+        content: { "application/json": { schema: ErrorSchema } },
+      },
+      401: {
+        description: "Missing or invalid API key.",
+        content: { "application/json": { schema: ErrorSchema } },
+      },
+    },
+  }),
+  (c: Context) => {
+    const type = c.req.query("type") as PostType | undefined;
+    const tag = c.req.query("tag");
+    const limitParam = c.req.query("limit");
+    const limit = limitParam ? parseInt(limitParam, 10) : undefined;
+    const status = c.req.query("status") as PostStatus | undefined;
+
+    if (type && !["article", "link", "note"].includes(type)) {
+      return c.json({ error: "Invalid type. Must be article, link, or note" }, 400);
+    }
+
+    if (limit !== undefined && (isNaN(limit) || limit < 1 || limit > 100)) {
+      return c.json({ error: "Invalid limit. Must be between 1 and 100" }, 400);
+    }
+
+    if (status && !["draft", "published", "all"].includes(status)) {
+      return c.json({ error: "Invalid status. Must be draft, published, or all" }, 400);
+    }
+
+    const posts = listPosts({ type, tag, limit, status });
+    return c.json({ data: posts });
   }
+);
 
-  // Validate status if provided
-  if (status && !["draft", "published", "all"].includes(status)) {
-    return c.json({ error: "Invalid status. Must be draft, published, or all" }, 400);
-  }
-
-  const posts = listPosts({ type, tag, limit, status });
-
-  return c.json({ data: posts });
-});
-
-/**
- * GET /api/posts/:id - Get single post
- */
-api.get("/posts/:id", (c) => {
-  const id = parseInt(c.req.param("id"), 10);
-
-  if (isNaN(id)) {
-    return c.json({ error: "Invalid post ID" }, 400);
-  }
-
-  const post = getPost(id);
-
-  if (!post) {
-    return c.json({ error: "Post not found" }, 404);
-  }
-
-  return c.json({ data: post });
-});
-
-// Slug validation pattern: lowercase letters, numbers, hyphens only
 const SLUG_PATTERN = /^[a-z0-9-]+$/;
 const SLUG_MAX_LENGTH = 200;
 
-/**
- * POST /api/posts - Create new post
- */
-api.post("/posts", async (c) => {
-  const body = await c.req.json();
-
-  // Validate type
-  const {
-    type,
-    slug,
-    title,
-    content,
-    excerpt,
-    url,
-    source_id,
-    tags,
-    banner_image_id,
-    published_at,
-  } = body;
-
-  if (!type || !["article", "link", "note"].includes(type)) {
-    return c.json({ error: "Invalid or missing type. Must be article, link, or note" }, 400);
-  }
-
-  // Validate slug
-  if (!slug || typeof slug !== "string" || slug.trim().length === 0) {
-    return c.json({ error: "Slug is required" }, 400);
-  }
-
-  if (!SLUG_PATTERN.test(slug)) {
-    return c.json(
-      { error: "Invalid slug format. Use only lowercase letters, numbers, and hyphens" },
-      400
-    );
-  }
-
-  if (slug.length > SLUG_MAX_LENGTH) {
-    return c.json({ error: `Slug must be ${SLUG_MAX_LENGTH} characters or less` }, 400);
-  }
-
-  // Check for duplicate slug
-  const existingPost = getPostBySlug(slug);
-  if (existingPost) {
-    return c.json({ error: "Slug already exists" }, 400);
-  }
-
-  // Validate content
-  if (!content || typeof content !== "string" || content.trim().length === 0) {
-    return c.json({ error: "Content is required" }, 400);
-  }
-
-  // Articles require title
-  if (type === "article" && (!title || typeof title !== "string" || title.trim().length === 0)) {
-    return c.json({ error: "Title is required for articles" }, 400);
-  }
-
-  // Links require url
-  if (type === "link" && (!url || typeof url !== "string" || url.trim().length === 0)) {
-    return c.json({ error: "URL is required for links" }, 400);
-  }
-
-  // Validate tags if provided
-  if (tags !== undefined && !Array.isArray(tags)) {
-    return c.json({ error: "Tags must be an array" }, 400);
-  }
-
-  // Validate banner_image_id if provided
-  if (
-    banner_image_id !== undefined &&
-    banner_image_id !== null &&
-    typeof banner_image_id !== "number"
-  ) {
-    return c.json({ error: "banner_image_id must be a number" }, 400);
-  }
-
-  // Validate source_id if provided
-  if (source_id !== undefined && source_id !== null && typeof source_id !== "number") {
-    return c.json({ error: "source_id must be a number" }, 400);
-  }
-
-  // Validate published_at if provided (ISO date string)
-  let publishedAtDate: Date | null = null;
-  if (published_at !== undefined && published_at !== null) {
-    if (typeof published_at !== "string") {
-      return c.json({ error: "published_at must be an ISO date string" }, 400);
-    }
-    publishedAtDate = new Date(published_at);
-    if (isNaN(publishedAtDate.getTime())) {
-      return c.json({ error: "published_at is not a valid date" }, 400);
-    }
-  }
-
-  try {
-    const post = createPost({
+registerProtectedRoute(
+  protectedRoute({
+    method: "post",
+    path: "/posts",
+    tags: ["posts"],
+    summary: "Create a post",
+    request: {
+      body: {
+        required: true,
+        content: {
+          "application/json": {
+            schema: CreatePostBodySchema,
+          },
+        },
+      },
+    },
+    responses: {
+      201: {
+        description: "The post was created.",
+        content: {
+          "application/json": {
+            schema: dataEnvelope(PostSchema),
+          },
+        },
+      },
+      400: {
+        description: "The request body failed validation.",
+        content: { "application/json": { schema: ErrorSchema } },
+      },
+      401: {
+        description: "Missing or invalid API key.",
+        content: { "application/json": { schema: ErrorSchema } },
+      },
+    },
+  }),
+  async (c: Context) => {
+    const body = await c.req.json();
+    const {
       type,
       slug,
-      title: title?.trim() || null,
-      content: content.trim(),
-      excerpt: excerpt?.trim() || null,
-      url: url?.trim() || null,
-      source_id: source_id ?? null,
-      tags: tags || [],
-      banner_image_id: banner_image_id ?? null,
-      published_at: publishedAtDate,
-    });
-
-    return c.json({ data: post }, 201);
-  } catch (error) {
-    return c.json({ error: String(error) }, 400);
-  }
-});
-
-/**
- * PUT /api/posts/:id - Update post
- */
-api.put("/posts/:id", async (c) => {
-  const id = parseInt(c.req.param("id"), 10);
-
-  if (isNaN(id)) {
-    return c.json({ error: "Invalid post ID" }, 400);
-  }
-
-  const body = await c.req.json();
-  const { title, content, excerpt, url, source_id, tags, banner_image_id } = body;
-
-  // Validate tags if provided
-  if (tags !== undefined && !Array.isArray(tags)) {
-    return c.json({ error: "Tags must be an array" }, 400);
-  }
-
-  // Validate banner_image_id if provided
-  if (
-    banner_image_id !== undefined &&
-    banner_image_id !== null &&
-    typeof banner_image_id !== "number"
-  ) {
-    return c.json({ error: "banner_image_id must be a number" }, 400);
-  }
-
-  // Validate source_id if provided
-  if (source_id !== undefined && source_id !== null && typeof source_id !== "number") {
-    return c.json({ error: "source_id must be a number" }, 400);
-  }
-
-  try {
-    const post = updatePost(id, {
-      title: title !== undefined ? title?.trim() || null : undefined,
-      content: content?.trim(),
-      excerpt: excerpt !== undefined ? excerpt?.trim() || null : undefined,
-      url: url !== undefined ? url?.trim() || null : undefined,
+      title,
+      content,
+      excerpt,
+      url,
       source_id,
       tags,
       banner_image_id,
-    });
+      published_at,
+    } = body;
 
+    if (!type || !["article", "link", "note"].includes(type)) {
+      return c.json({ error: "Invalid or missing type. Must be article, link, or note" }, 400);
+    }
+
+    if (!slug || typeof slug !== "string" || slug.trim().length === 0) {
+      return c.json({ error: "Slug is required" }, 400);
+    }
+
+    if (!SLUG_PATTERN.test(slug)) {
+      return c.json(
+        { error: "Invalid slug format. Use only lowercase letters, numbers, and hyphens" },
+        400
+      );
+    }
+
+    if (slug.length > SLUG_MAX_LENGTH) {
+      return c.json({ error: `Slug must be ${SLUG_MAX_LENGTH} characters or less` }, 400);
+    }
+
+    const existingPost = getPostBySlug(slug);
+    if (existingPost) {
+      return c.json({ error: "Slug already exists" }, 400);
+    }
+
+    if (!content || typeof content !== "string" || content.trim().length === 0) {
+      return c.json({ error: "Content is required" }, 400);
+    }
+
+    if (type === "article" && (!title || typeof title !== "string" || title.trim().length === 0)) {
+      return c.json({ error: "Title is required for articles" }, 400);
+    }
+
+    if (type === "link" && (!url || typeof url !== "string" || url.trim().length === 0)) {
+      return c.json({ error: "URL is required for links" }, 400);
+    }
+
+    if (tags !== undefined && !Array.isArray(tags)) {
+      return c.json({ error: "Tags must be an array" }, 400);
+    }
+
+    if (
+      banner_image_id !== undefined &&
+      banner_image_id !== null &&
+      typeof banner_image_id !== "number"
+    ) {
+      return c.json({ error: "banner_image_id must be a number" }, 400);
+    }
+
+    if (source_id !== undefined && source_id !== null && typeof source_id !== "number") {
+      return c.json({ error: "source_id must be a number" }, 400);
+    }
+
+    let publishedAtDate: Date | null = null;
+    if (published_at !== undefined && published_at !== null) {
+      if (typeof published_at !== "string") {
+        return c.json({ error: "published_at must be an ISO date string" }, 400);
+      }
+      publishedAtDate = new Date(published_at);
+      if (isNaN(publishedAtDate.getTime())) {
+        return c.json({ error: "published_at is not a valid date" }, 400);
+      }
+    }
+
+    try {
+      const post = createPost({
+        type,
+        slug,
+        title: title?.trim() || null,
+        content: content.trim(),
+        excerpt: excerpt?.trim() || null,
+        url: url?.trim() || null,
+        source_id: source_id ?? null,
+        tags: tags || [],
+        banner_image_id: banner_image_id ?? null,
+        published_at: publishedAtDate,
+      });
+
+      return c.json({ data: post }, 201);
+    } catch (error) {
+      return c.json({ error: String(error) }, 400);
+    }
+  }
+);
+
+registerProtectedRoute(
+  protectedRoute({
+    method: "get",
+    path: "/posts/{id}",
+    tags: ["posts"],
+    summary: "Get a post by ID",
+    request: { params: IdParamSchema },
+    responses: {
+      200: {
+        description: "The requested post.",
+        content: { "application/json": { schema: dataEnvelope(PostSchema) } },
+      },
+      400: {
+        description: "The ID was invalid.",
+        content: { "application/json": { schema: ErrorSchema } },
+      },
+      401: {
+        description: "Missing or invalid API key.",
+        content: { "application/json": { schema: ErrorSchema } },
+      },
+      404: {
+        description: "The post was not found.",
+        content: { "application/json": { schema: ErrorSchema } },
+      },
+    },
+  }),
+  (c: Context) => {
+    const id = parseInt(c.req.param("id") ?? "", 10);
+    if (isNaN(id)) {
+      return c.json({ error: "Invalid post ID" }, 400);
+    }
+
+    const post = getPost(id);
     if (!post) {
       return c.json({ error: "Post not found" }, 404);
     }
 
-    // Send Update activity if post is published
-    if (post.published_at) {
-      await sendUpdateActivity(post.id);
+    return c.json({ data: post });
+  }
+);
+
+registerProtectedRoute(
+  protectedRoute({
+    method: "put",
+    path: "/posts/{id}",
+    tags: ["posts"],
+    summary: "Update a post by ID",
+    request: {
+      params: IdParamSchema,
+      body: {
+        required: true,
+        content: {
+          "application/json": {
+            schema: UpdatePostBodySchema,
+          },
+        },
+      },
+    },
+    responses: {
+      200: {
+        description: "The updated post.",
+        content: { "application/json": { schema: dataEnvelope(PostSchema) } },
+      },
+      400: {
+        description: "The request body or ID was invalid.",
+        content: { "application/json": { schema: ErrorSchema } },
+      },
+      401: {
+        description: "Missing or invalid API key.",
+        content: { "application/json": { schema: ErrorSchema } },
+      },
+      404: {
+        description: "The post was not found.",
+        content: { "application/json": { schema: ErrorSchema } },
+      },
+    },
+  }),
+  async (c: Context) => {
+    const id = parseInt(c.req.param("id") ?? "", 10);
+    if (isNaN(id)) {
+      return c.json({ error: "Invalid post ID" }, 400);
     }
 
-    return c.json({ data: post });
-  } catch (error) {
-    return c.json({ error: String(error) }, 400);
+    const body = await c.req.json();
+    const { title, content, excerpt, url, source_id, tags, banner_image_id } = body;
+
+    if (tags !== undefined && !Array.isArray(tags)) {
+      return c.json({ error: "Tags must be an array" }, 400);
+    }
+
+    if (
+      banner_image_id !== undefined &&
+      banner_image_id !== null &&
+      typeof banner_image_id !== "number"
+    ) {
+      return c.json({ error: "banner_image_id must be a number" }, 400);
+    }
+
+    if (source_id !== undefined && source_id !== null && typeof source_id !== "number") {
+      return c.json({ error: "source_id must be a number" }, 400);
+    }
+
+    try {
+      const post = updatePost(id, {
+        title: title !== undefined ? title?.trim() || null : undefined,
+        content: content?.trim(),
+        excerpt: excerpt !== undefined ? excerpt?.trim() || null : undefined,
+        url: url !== undefined ? url?.trim() || null : undefined,
+        source_id,
+        tags,
+        banner_image_id,
+      });
+
+      if (!post) {
+        return c.json({ error: "Post not found" }, 404);
+      }
+
+      if (post.published_at) {
+        await sendUpdateActivity(post.id);
+      }
+
+      return c.json({ data: post });
+    } catch (error) {
+      return c.json({ error: String(error) }, 400);
+    }
   }
-});
+);
 
-/**
- * DELETE /api/posts/:id - Delete post
- */
-api.delete("/posts/:id", async (c) => {
-  const id = parseInt(c.req.param("id"), 10);
+registerProtectedRoute(
+  protectedRoute({
+    method: "delete",
+    path: "/posts/{id}",
+    tags: ["posts"],
+    summary: "Delete a post by ID",
+    request: { params: IdParamSchema },
+    responses: {
+      204: {
+        description: "The post was deleted.",
+      },
+      400: {
+        description: "The ID was invalid.",
+        content: { "application/json": { schema: ErrorSchema } },
+      },
+      401: {
+        description: "Missing or invalid API key.",
+        content: { "application/json": { schema: ErrorSchema } },
+      },
+      404: {
+        description: "The post was not found.",
+        content: { "application/json": { schema: ErrorSchema } },
+      },
+    },
+  }),
+  async (c: Context) => {
+    const id = parseInt(c.req.param("id") ?? "", 10);
+    if (isNaN(id)) {
+      return c.json({ error: "Invalid post ID" }, 400);
+    }
 
-  if (isNaN(id)) {
-    return c.json({ error: "Invalid post ID" }, 400);
+    const existingPost = getPost(id);
+    const wasPublished = existingPost?.published_at;
+    const slug = existingPost?.slug;
+    const deleted = deletePost(id);
+
+    if (!deleted) {
+      return c.json({ error: "Post not found" }, 404);
+    }
+
+    if (wasPublished && slug) {
+      await sendDeleteActivity(slug);
+    }
+
+    return c.body(null, 204);
   }
+);
 
-  // Check if post was published before deleting
-  const existingPost = getPost(id);
-  const wasPublished = existingPost?.published_at;
-  const slug = existingPost?.slug;
+registerProtectedRoute(
+  protectedRoute({
+    method: "post",
+    path: "/posts/{id}/publish",
+    tags: ["posts"],
+    summary: "Publish a post by ID",
+    request: { params: IdParamSchema },
+    responses: {
+      200: {
+        description: "The post was published.",
+        content: { "application/json": { schema: dataEnvelope(PostSchema) } },
+      },
+      400: {
+        description: "The ID was invalid.",
+        content: { "application/json": { schema: ErrorSchema } },
+      },
+      401: {
+        description: "Missing or invalid API key.",
+        content: { "application/json": { schema: ErrorSchema } },
+      },
+      404: {
+        description: "The post was not found.",
+        content: { "application/json": { schema: ErrorSchema } },
+      },
+    },
+  }),
+  async (c: Context) => {
+    const id = parseInt(c.req.param("id") ?? "", 10);
+    if (isNaN(id)) {
+      return c.json({ error: "Invalid post ID" }, 400);
+    }
 
-  const deleted = deletePost(id);
-
-  if (!deleted) {
-    return c.json({ error: "Post not found" }, 404);
-  }
-
-  // Send Delete activity if post was previously published
-  if (wasPublished && slug) {
-    await sendDeleteActivity(slug);
-  }
-
-  return c.body(null, 204);
-});
-
-/**
- * POST /api/posts/:id/publish - Publish a post
- * Also sends Create activity to all followers via ActivityPub.
- */
-api.post("/posts/:id/publish", async (c) => {
-  const id = parseInt(c.req.param("id"), 10);
-
-  if (isNaN(id)) {
-    return c.json({ error: "Invalid post ID" }, 400);
-  }
-
-  const post = publishPost(id);
-
-  if (!post) {
-    return c.json({ error: "Post not found" }, 404);
-  }
-
-  // Send Create activity to followers (fire and forget - don't block response)
-  // Fedify handles retries if delivery fails
-  federatePost(id).catch(() => {
-    // Error already logged in federatePost
-  });
-
-  return c.json({ data: post });
-});
-
-/**
- * POST /api/posts/:id/unpublish - Unpublish a post
- */
-api.post("/posts/:id/unpublish", (c) => {
-  const id = parseInt(c.req.param("id"), 10);
-
-  if (isNaN(id)) {
-    return c.json({ error: "Invalid post ID" }, 400);
-  }
-
-  const post = unpublishPost(id);
-
-  if (!post) {
-    return c.json({ error: "Post not found" }, 404);
-  }
-
-  return c.json({ data: post });
-});
-
-/**
- * GET /api/posts/by-slug/:slug - Get single post by slug
- */
-api.get("/posts/by-slug/:slug", (c) => {
-  const slug = c.req.param("slug");
-
-  const post = getPostBySlug(slug);
-
-  if (!post) {
-    return c.json({ error: "Post not found" }, 404);
-  }
-
-  return c.json({ data: post });
-});
-
-/**
- * PUT /api/posts/by-slug/:slug - Update post by slug
- */
-api.put("/posts/by-slug/:slug", async (c) => {
-  const slug = c.req.param("slug");
-
-  const existingPost = getPostBySlug(slug);
-
-  if (!existingPost) {
-    return c.json({ error: "Post not found" }, 404);
-  }
-
-  const body = await c.req.json();
-  const { title, content, excerpt, url, source_id, tags, banner_image_id } = body;
-
-  // Validate tags if provided
-  if (tags !== undefined && !Array.isArray(tags)) {
-    return c.json({ error: "Tags must be an array" }, 400);
-  }
-
-  // Validate banner_image_id if provided
-  if (
-    banner_image_id !== undefined &&
-    banner_image_id !== null &&
-    typeof banner_image_id !== "number"
-  ) {
-    return c.json({ error: "banner_image_id must be a number" }, 400);
-  }
-
-  // Validate source_id if provided
-  if (source_id !== undefined && source_id !== null && typeof source_id !== "number") {
-    return c.json({ error: "source_id must be a number" }, 400);
-  }
-
-  try {
-    const post = updatePost(existingPost.id, {
-      title: title !== undefined ? title?.trim() || null : undefined,
-      content: content?.trim(),
-      excerpt: excerpt !== undefined ? excerpt?.trim() || null : undefined,
-      url: url !== undefined ? url?.trim() || null : undefined,
-      source_id,
-      tags,
-      banner_image_id,
-    });
-
+    const post = publishPost(id);
     if (!post) {
       return c.json({ error: "Post not found" }, 404);
     }
 
-    // Send Update activity if post is published
-    if (post.published_at) {
-      await sendUpdateActivity(post.id);
+    federatePost(id).catch(() => {
+      // Error already logged in federatePost
+    });
+
+    return c.json({ data: post });
+  }
+);
+
+registerProtectedRoute(
+  protectedRoute({
+    method: "post",
+    path: "/posts/{id}/unpublish",
+    tags: ["posts"],
+    summary: "Unpublish a post by ID",
+    request: { params: IdParamSchema },
+    responses: {
+      200: {
+        description: "The post was unpublished.",
+        content: { "application/json": { schema: dataEnvelope(PostSchema) } },
+      },
+      400: {
+        description: "The ID was invalid.",
+        content: { "application/json": { schema: ErrorSchema } },
+      },
+      401: {
+        description: "Missing or invalid API key.",
+        content: { "application/json": { schema: ErrorSchema } },
+      },
+      404: {
+        description: "The post was not found.",
+        content: { "application/json": { schema: ErrorSchema } },
+      },
+    },
+  }),
+  (c: Context) => {
+    const id = parseInt(c.req.param("id") ?? "", 10);
+    if (isNaN(id)) {
+      return c.json({ error: "Invalid post ID" }, 400);
+    }
+
+    const post = unpublishPost(id);
+    if (!post) {
+      return c.json({ error: "Post not found" }, 404);
     }
 
     return c.json({ data: post });
-  } catch (error) {
-    return c.json({ error: String(error) }, 400);
   }
-});
+);
 
-/**
- * DELETE /api/posts/by-slug/:slug - Delete post by slug
- */
-api.delete("/posts/by-slug/:slug", async (c) => {
-  const slug = c.req.param("slug");
+registerProtectedRoute(
+  protectedRoute({
+    method: "get",
+    path: "/posts/by-slug/{slug}",
+    tags: ["posts"],
+    summary: "Get a post by slug",
+    request: { params: SlugParamSchema },
+    responses: {
+      200: {
+        description: "The requested post.",
+        content: { "application/json": { schema: dataEnvelope(PostSchema) } },
+      },
+      401: {
+        description: "Missing or invalid API key.",
+        content: { "application/json": { schema: ErrorSchema } },
+      },
+      404: {
+        description: "The post was not found.",
+        content: { "application/json": { schema: ErrorSchema } },
+      },
+    },
+  }),
+  (c: Context) => {
+    const post = getPostBySlug(c.req.param("slug") ?? "");
+    if (!post) {
+      return c.json({ error: "Post not found" }, 404);
+    }
 
-  const existingPost = getPostBySlug(slug);
-
-  if (!existingPost) {
-    return c.json({ error: "Post not found" }, 404);
+    return c.json({ data: post });
   }
+);
 
-  // Remember if post was published for federation
-  const wasPublished = !!existingPost.published_at;
-  const postId = existingPost.id;
+registerProtectedRoute(
+  protectedRoute({
+    method: "put",
+    path: "/posts/by-slug/{slug}",
+    tags: ["posts"],
+    summary: "Update a post by slug",
+    request: {
+      params: SlugParamSchema,
+      body: {
+        required: true,
+        content: {
+          "application/json": {
+            schema: UpdatePostBodySchema,
+          },
+        },
+      },
+    },
+    responses: {
+      200: {
+        description: "The updated post.",
+        content: { "application/json": { schema: dataEnvelope(PostSchema) } },
+      },
+      400: {
+        description: "The request body was invalid.",
+        content: { "application/json": { schema: ErrorSchema } },
+      },
+      401: {
+        description: "Missing or invalid API key.",
+        content: { "application/json": { schema: ErrorSchema } },
+      },
+      404: {
+        description: "The post was not found.",
+        content: { "application/json": { schema: ErrorSchema } },
+      },
+    },
+  }),
+  async (c: Context) => {
+    const slug = c.req.param("slug") ?? "";
+    const existingPost = getPostBySlug(slug);
+    if (!existingPost) {
+      return c.json({ error: "Post not found" }, 404);
+    }
 
-  const deleted = deletePost(postId);
+    const body = await c.req.json();
+    const { title, content, excerpt, url, source_id, tags, banner_image_id } = body;
 
-  if (!deleted) {
-    return c.json({ error: "Post not found" }, 404);
+    if (tags !== undefined && !Array.isArray(tags)) {
+      return c.json({ error: "Tags must be an array" }, 400);
+    }
+
+    if (
+      banner_image_id !== undefined &&
+      banner_image_id !== null &&
+      typeof banner_image_id !== "number"
+    ) {
+      return c.json({ error: "banner_image_id must be a number" }, 400);
+    }
+
+    if (source_id !== undefined && source_id !== null && typeof source_id !== "number") {
+      return c.json({ error: "source_id must be a number" }, 400);
+    }
+
+    try {
+      const post = updatePost(existingPost.id, {
+        title: title !== undefined ? title?.trim() || null : undefined,
+        content: content?.trim(),
+        excerpt: excerpt !== undefined ? excerpt?.trim() || null : undefined,
+        url: url !== undefined ? url?.trim() || null : undefined,
+        source_id,
+        tags,
+        banner_image_id,
+      });
+
+      if (!post) {
+        return c.json({ error: "Post not found" }, 404);
+      }
+
+      if (post.published_at) {
+        await sendUpdateActivity(post.id);
+      }
+
+      return c.json({ data: post });
+    } catch (error) {
+      return c.json({ error: String(error) }, 400);
+    }
   }
+);
 
-  // Send Delete activity if post was previously published
-  if (wasPublished) {
-    await sendDeleteActivity(slug);
+registerProtectedRoute(
+  protectedRoute({
+    method: "delete",
+    path: "/posts/by-slug/{slug}",
+    tags: ["posts"],
+    summary: "Delete a post by slug",
+    request: { params: SlugParamSchema },
+    responses: {
+      204: {
+        description: "The post was deleted.",
+      },
+      401: {
+        description: "Missing or invalid API key.",
+        content: { "application/json": { schema: ErrorSchema } },
+      },
+      404: {
+        description: "The post was not found.",
+        content: { "application/json": { schema: ErrorSchema } },
+      },
+    },
+  }),
+  async (c: Context) => {
+    const slug = c.req.param("slug") ?? "";
+    const existingPost = getPostBySlug(slug);
+    if (!existingPost) {
+      return c.json({ error: "Post not found" }, 404);
+    }
+
+    const wasPublished = !!existingPost.published_at;
+    const postId = existingPost.id;
+    const deleted = deletePost(postId);
+
+    if (!deleted) {
+      return c.json({ error: "Post not found" }, 404);
+    }
+
+    if (wasPublished) {
+      await sendDeleteActivity(slug);
+    }
+
+    return c.body(null, 204);
   }
+);
 
-  return c.body(null, 204);
-});
+registerProtectedRoute(
+  protectedRoute({
+    method: "post",
+    path: "/posts/by-slug/{slug}/publish",
+    tags: ["posts"],
+    summary: "Publish a post by slug",
+    request: { params: SlugParamSchema },
+    responses: {
+      200: {
+        description: "The post was published.",
+        content: { "application/json": { schema: dataEnvelope(PostSchema) } },
+      },
+      401: {
+        description: "Missing or invalid API key.",
+        content: { "application/json": { schema: ErrorSchema } },
+      },
+      404: {
+        description: "The post was not found.",
+        content: { "application/json": { schema: ErrorSchema } },
+      },
+    },
+  }),
+  async (c: Context) => {
+    const slug = c.req.param("slug") ?? "";
+    const existingPost = getPostBySlug(slug);
+    if (!existingPost) {
+      return c.json({ error: "Post not found" }, 404);
+    }
 
-/**
- * POST /api/posts/by-slug/:slug/publish - Publish a post by slug
- * Also sends Create activity to all followers via ActivityPub.
- */
-api.post("/posts/by-slug/:slug/publish", async (c) => {
-  const slug = c.req.param("slug");
+    const post = publishPost(existingPost.id);
+    if (!post) {
+      return c.json({ error: "Post not found" }, 404);
+    }
 
-  const existingPost = getPostBySlug(slug);
-
-  if (!existingPost) {
-    return c.json({ error: "Post not found" }, 404);
-  }
-
-  const post = publishPost(existingPost.id);
-
-  if (!post) {
-    return c.json({ error: "Post not found" }, 404);
-  }
-
-  // Send Create activity to followers (fire and forget - don't block response)
-  // Fedify handles retries if delivery fails
-  federatePost(existingPost.id).catch(() => {
-    // Error already logged in federatePost
-  });
-
-  return c.json({ data: post });
-});
-
-/**
- * POST /api/posts/by-slug/:slug/unpublish - Unpublish a post by slug
- */
-api.post("/posts/by-slug/:slug/unpublish", (c) => {
-  const slug = c.req.param("slug");
-
-  const existingPost = getPostBySlug(slug);
-
-  if (!existingPost) {
-    return c.json({ error: "Post not found" }, 404);
-  }
-
-  const post = unpublishPost(existingPost.id);
-
-  if (!post) {
-    return c.json({ error: "Post not found" }, 404);
-  }
-
-  return c.json({ data: post });
-});
-
-/**
- * GET /api/sources - List all sources
- */
-api.get("/sources", (c) => {
-  const sources = listSources();
-  return c.json({ data: sources });
-});
-
-/**
- * GET /api/sources/:id - Get single source
- */
-api.get("/sources/:id", (c) => {
-  const id = parseInt(c.req.param("id"), 10);
-
-  if (isNaN(id)) {
-    return c.json({ error: "Invalid source ID" }, 400);
-  }
-
-  const source = getSource(id);
-
-  if (!source) {
-    return c.json({ error: "Source not found" }, 404);
-  }
-
-  return c.json({ data: source });
-});
-
-/**
- * POST /api/sources - Create new source
- */
-api.post("/sources", async (c) => {
-  const body = await c.req.json();
-  const { name, url, feed_url } = body;
-
-  if (!name || typeof name !== "string" || name.trim().length === 0) {
-    return c.json({ error: "Name is required" }, 400);
-  }
-
-  if (!url || typeof url !== "string" || url.trim().length === 0) {
-    return c.json({ error: "URL is required" }, 400);
-  }
-
-  try {
-    const source = createSource({
-      name: name.trim(),
-      url: url.trim(),
-      feed_url: feed_url?.trim() || null,
+    federatePost(existingPost.id).catch(() => {
+      // Error already logged in federatePost
     });
 
-    return c.json({ data: source }, 201);
-  } catch (error) {
-    return c.json({ error: String(error) }, 400);
+    return c.json({ data: post });
   }
-});
+);
 
-/**
- * PUT /api/sources/:id - Update source
- */
-api.put("/sources/:id", async (c) => {
-  const id = parseInt(c.req.param("id"), 10);
+registerProtectedRoute(
+  protectedRoute({
+    method: "post",
+    path: "/posts/by-slug/{slug}/unpublish",
+    tags: ["posts"],
+    summary: "Unpublish a post by slug",
+    request: { params: SlugParamSchema },
+    responses: {
+      200: {
+        description: "The post was unpublished.",
+        content: { "application/json": { schema: dataEnvelope(PostSchema) } },
+      },
+      401: {
+        description: "Missing or invalid API key.",
+        content: { "application/json": { schema: ErrorSchema } },
+      },
+      404: {
+        description: "The post was not found.",
+        content: { "application/json": { schema: ErrorSchema } },
+      },
+    },
+  }),
+  (c: Context) => {
+    const slug = c.req.param("slug") ?? "";
+    const existingPost = getPostBySlug(slug);
+    if (!existingPost) {
+      return c.json({ error: "Post not found" }, 404);
+    }
 
-  if (isNaN(id)) {
-    return c.json({ error: "Invalid source ID" }, 400);
+    const post = unpublishPost(existingPost.id);
+    if (!post) {
+      return c.json({ error: "Post not found" }, 404);
+    }
+
+    return c.json({ data: post });
   }
+);
 
-  const body = await c.req.json();
-  const { name, url, feed_url } = body;
+registerProtectedRoute(
+  protectedRoute({
+    method: "get",
+    path: "/sources",
+    tags: ["sources"],
+    summary: "List sources",
+    responses: {
+      200: {
+        description: "All configured sources.",
+        content: { "application/json": { schema: dataEnvelope(z.array(SourceSchema)) } },
+      },
+      401: {
+        description: "Missing or invalid API key.",
+        content: { "application/json": { schema: ErrorSchema } },
+      },
+    },
+  }),
+  (c: Context) => c.json({ data: listSources() })
+);
 
-  // Validate name if provided
-  if (name !== undefined && (typeof name !== "string" || name.trim().length === 0)) {
-    return c.json({ error: "Name cannot be empty" }, 400);
-  }
+registerProtectedRoute(
+  protectedRoute({
+    method: "get",
+    path: "/sources/{id}",
+    tags: ["sources"],
+    summary: "Get a source by ID",
+    request: { params: IdParamSchema },
+    responses: {
+      200: {
+        description: "The requested source.",
+        content: { "application/json": { schema: dataEnvelope(SourceSchema) } },
+      },
+      400: {
+        description: "The ID was invalid.",
+        content: { "application/json": { schema: ErrorSchema } },
+      },
+      401: {
+        description: "Missing or invalid API key.",
+        content: { "application/json": { schema: ErrorSchema } },
+      },
+      404: {
+        description: "The source was not found.",
+        content: { "application/json": { schema: ErrorSchema } },
+      },
+    },
+  }),
+  (c: Context) => {
+    const id = parseInt(c.req.param("id") ?? "", 10);
+    if (isNaN(id)) {
+      return c.json({ error: "Invalid source ID" }, 400);
+    }
 
-  // Validate url if provided
-  if (url !== undefined && (typeof url !== "string" || url.trim().length === 0)) {
-    return c.json({ error: "URL cannot be empty" }, 400);
-  }
-
-  try {
-    const source = updateSource(id, {
-      name: name?.trim(),
-      url: url?.trim(),
-      feed_url: feed_url !== undefined ? feed_url?.trim() || null : undefined,
-    });
-
+    const source = getSource(id);
     if (!source) {
       return c.json({ error: "Source not found" }, 404);
     }
 
     return c.json({ data: source });
-  } catch (error) {
-    return c.json({ error: String(error) }, 400);
   }
-});
+);
 
-/**
- * DELETE /api/sources/:id - Delete source
- */
-api.delete("/sources/:id", (c) => {
-  const id = parseInt(c.req.param("id"), 10);
-
-  if (isNaN(id)) {
-    return c.json({ error: "Invalid source ID" }, 400);
-  }
-
-  const deleted = deleteSource(id);
-
-  if (!deleted) {
-    return c.json({ error: "Source not found" }, 404);
-  }
-
-  return c.body(null, 204);
-});
-
-/**
- * GET /api/tags - List all tags with counts
- */
-api.get("/tags", (c) => {
-  const tags = listTags();
-  return c.json({ data: tags });
-});
-
-/**
- * POST /api/media - Upload media file
- * Accepts multipart/form-data with:
- *   - file: the image file (required)
- *   - alt: alt text (optional)
- *   - key: custom S3 key (optional)
- */
-api.post(
-  "/media",
-  bodyLimit({
-    maxSize: 10 * 1024 * 1024, // 10 MB
-    onError: (c) => c.json({ error: "File too large. Maximum size is 10 MB" }, 413),
+registerProtectedRoute(
+  protectedRoute({
+    method: "post",
+    path: "/sources",
+    tags: ["sources"],
+    summary: "Create a source",
+    request: {
+      body: {
+        required: true,
+        content: {
+          "application/json": {
+            schema: CreateSourceBodySchema,
+          },
+        },
+      },
+    },
+    responses: {
+      201: {
+        description: "The source was created.",
+        content: { "application/json": { schema: dataEnvelope(SourceSchema) } },
+      },
+      400: {
+        description: "The request body failed validation.",
+        content: { "application/json": { schema: ErrorSchema } },
+      },
+      401: {
+        description: "Missing or invalid API key.",
+        content: { "application/json": { schema: ErrorSchema } },
+      },
+    },
   }),
-  async (c) => {
+  async (c: Context) => {
+    const body = await c.req.json();
+    const { name, url, feed_url } = body;
+
+    if (!name || typeof name !== "string" || name.trim().length === 0) {
+      return c.json({ error: "Name is required" }, 400);
+    }
+
+    if (!url || typeof url !== "string" || url.trim().length === 0) {
+      return c.json({ error: "URL is required" }, 400);
+    }
+
+    try {
+      const source = createSource({
+        name: name.trim(),
+        url: url.trim(),
+        feed_url: feed_url?.trim() || null,
+      });
+
+      return c.json({ data: source }, 201);
+    } catch (error) {
+      return c.json({ error: String(error) }, 400);
+    }
+  }
+);
+
+registerProtectedRoute(
+  protectedRoute({
+    method: "put",
+    path: "/sources/{id}",
+    tags: ["sources"],
+    summary: "Update a source",
+    request: {
+      params: IdParamSchema,
+      body: {
+        required: true,
+        content: {
+          "application/json": {
+            schema: UpdateSourceBodySchema,
+          },
+        },
+      },
+    },
+    responses: {
+      200: {
+        description: "The updated source.",
+        content: { "application/json": { schema: dataEnvelope(SourceSchema) } },
+      },
+      400: {
+        description: "The request body or ID was invalid.",
+        content: { "application/json": { schema: ErrorSchema } },
+      },
+      401: {
+        description: "Missing or invalid API key.",
+        content: { "application/json": { schema: ErrorSchema } },
+      },
+      404: {
+        description: "The source was not found.",
+        content: { "application/json": { schema: ErrorSchema } },
+      },
+    },
+  }),
+  async (c: Context) => {
+    const id = parseInt(c.req.param("id") ?? "", 10);
+    if (isNaN(id)) {
+      return c.json({ error: "Invalid source ID" }, 400);
+    }
+
+    const body = await c.req.json();
+    const { name, url, feed_url } = body;
+
+    if (name !== undefined && (typeof name !== "string" || name.trim().length === 0)) {
+      return c.json({ error: "Name cannot be empty" }, 400);
+    }
+
+    if (url !== undefined && (typeof url !== "string" || url.trim().length === 0)) {
+      return c.json({ error: "URL cannot be empty" }, 400);
+    }
+
+    try {
+      const source = updateSource(id, {
+        name: name?.trim(),
+        url: url?.trim(),
+        feed_url: feed_url !== undefined ? feed_url?.trim() || null : undefined,
+      });
+
+      if (!source) {
+        return c.json({ error: "Source not found" }, 404);
+      }
+
+      return c.json({ data: source });
+    } catch (error) {
+      return c.json({ error: String(error) }, 400);
+    }
+  }
+);
+
+registerProtectedRoute(
+  protectedRoute({
+    method: "delete",
+    path: "/sources/{id}",
+    tags: ["sources"],
+    summary: "Delete a source",
+    request: { params: IdParamSchema },
+    responses: {
+      204: { description: "The source was deleted." },
+      400: {
+        description: "The ID was invalid.",
+        content: { "application/json": { schema: ErrorSchema } },
+      },
+      401: {
+        description: "Missing or invalid API key.",
+        content: { "application/json": { schema: ErrorSchema } },
+      },
+      404: {
+        description: "The source was not found.",
+        content: { "application/json": { schema: ErrorSchema } },
+      },
+    },
+  }),
+  (c: Context) => {
+    const id = parseInt(c.req.param("id") ?? "", 10);
+    if (isNaN(id)) {
+      return c.json({ error: "Invalid source ID" }, 400);
+    }
+
+    const deleted = deleteSource(id);
+    if (!deleted) {
+      return c.json({ error: "Source not found" }, 404);
+    }
+
+    return c.body(null, 204);
+  }
+);
+
+registerProtectedRoute(
+  protectedRoute({
+    method: "get",
+    path: "/tags",
+    tags: ["tags"],
+    summary: "List tags",
+    responses: {
+      200: {
+        description: "All tags with usage counts.",
+        content: { "application/json": { schema: dataEnvelope(z.array(TagSchema)) } },
+      },
+      401: {
+        description: "Missing or invalid API key.",
+        content: { "application/json": { schema: ErrorSchema } },
+      },
+    },
+  }),
+  (c: Context) => c.json({ data: listTags() })
+);
+
+registerProtectedRoute(
+  protectedRoute({
+    method: "post",
+    path: "/media",
+    tags: ["media"],
+    summary: "Upload media",
+    request: {
+      body: {
+        required: true,
+        content: {
+          "multipart/form-data": {
+            schema: MediaUploadBodySchema,
+          },
+        },
+      },
+    },
+    middleware: [
+      bodyLimit({
+        maxSize: 10 * 1024 * 1024,
+        onError: (c: Context) => c.json({ error: "File too large. Maximum size is 10 MB" }, 413),
+      }),
+    ],
+    responses: {
+      201: {
+        description: "The media file was uploaded.",
+        content: { "application/json": { schema: dataEnvelope(MediaRecordSchema) } },
+      },
+      400: {
+        description: "The file input failed validation.",
+        content: { "application/json": { schema: ErrorSchema } },
+      },
+      401: {
+        description: "Missing or invalid API key.",
+        content: { "application/json": { schema: ErrorSchema } },
+      },
+      413: {
+        description: "The uploaded file was too large.",
+        content: { "application/json": { schema: ErrorSchema } },
+      },
+      500: {
+        description: "The file could not be stored.",
+        content: { "application/json": { schema: ErrorSchema } },
+      },
+    },
+  }),
+  async (c: Context) => {
     const body = await c.req.parseBody();
     const file = body.file;
 
@@ -671,90 +1316,182 @@ api.post(
   }
 );
 
-/**
- * GET /api/media/:id - Get media record by ID
- */
-api.get("/media/:id", async (c) => {
-  const id = parseInt(c.req.param("id"), 10);
+registerProtectedRoute(
+  protectedRoute({
+    method: "get",
+    path: "/media/{id}",
+    tags: ["media"],
+    summary: "Get a media record by ID",
+    request: { params: IdParamSchema },
+    responses: {
+      200: {
+        description: "The requested media record.",
+        content: { "application/json": { schema: dataEnvelope(MediaRecordSchema) } },
+      },
+      400: {
+        description: "The ID was invalid.",
+        content: { "application/json": { schema: ErrorSchema } },
+      },
+      401: {
+        description: "Missing or invalid API key.",
+        content: { "application/json": { schema: ErrorSchema } },
+      },
+      404: {
+        description: "The media record was not found.",
+        content: { "application/json": { schema: ErrorSchema } },
+      },
+    },
+  }),
+  (c: Context) => {
+    const id = parseInt(c.req.param("id") ?? "", 10);
+    if (isNaN(id)) {
+      return c.json({ error: "Invalid media ID" }, 400);
+    }
 
-  if (isNaN(id)) {
-    return c.json({ error: "Invalid media ID" }, 400);
-  }
-
-  const record = getMedia(id);
-
-  if (!record) {
-    return c.json({ error: "Media not found" }, 404);
-  }
-
-  return c.json({ data: record });
-});
-
-/**
- * DELETE /api/media/:id - Delete media file
- */
-api.delete("/media/:id", async (c) => {
-  const id = parseInt(c.req.param("id"), 10);
-
-  if (isNaN(id)) {
-    return c.json({ error: "Invalid media ID" }, 400);
-  }
-
-  try {
-    const deleted = await deleteMedia(id);
-
-    if (!deleted) {
+    const record = getMedia(id);
+    if (!record) {
       return c.json({ error: "Media not found" }, 404);
     }
 
-    return c.body(null, 204);
-  } catch (error) {
-    return c.json({ error: String(error) }, 500);
+    return c.json({ data: record });
   }
-});
+);
 
-/**
- * POST /api/federation/update-actor - Send actor Update activity to all followers
- *
- * Call this when actor profile changes (icon, banner, name, summary).
- * Remote servers will re-fetch and cache the updated actor info.
- */
-api.post("/federation/update-actor", async (c) => {
-  try {
-    const sent = await sendActorUpdateActivity();
-    return c.json({ success: sent });
-  } catch (error) {
-    return c.json({ error: String(error) }, 500);
-  }
-});
-
-/**
- * POST /api/federation/delete - Send Delete activity for an arbitrary URI
- *
- * Use this to delete posts that were federated with old URIs,
- * or to clean up posts during development.
- *
- * Body: { "uri": "https://erikcraddock.me/posts/4" }
- */
-api.post("/federation/delete", async (c) => {
-  try {
-    const body = await c.req.json();
-    const { uri } = body;
-
-    if (!uri || typeof uri !== "string") {
-      return c.json({ error: "uri is required and must be a string" }, 400);
+registerProtectedRoute(
+  protectedRoute({
+    method: "delete",
+    path: "/media/{id}",
+    tags: ["media"],
+    summary: "Delete a media record by ID",
+    request: { params: IdParamSchema },
+    responses: {
+      204: { description: "The media record was deleted." },
+      400: {
+        description: "The ID was invalid.",
+        content: { "application/json": { schema: ErrorSchema } },
+      },
+      401: {
+        description: "Missing or invalid API key.",
+        content: { "application/json": { schema: ErrorSchema } },
+      },
+      404: {
+        description: "The media record was not found.",
+        content: { "application/json": { schema: ErrorSchema } },
+      },
+      500: {
+        description: "The media record could not be deleted.",
+        content: { "application/json": { schema: ErrorSchema } },
+      },
+    },
+  }),
+  async (c: Context) => {
+    const id = parseInt(c.req.param("id") ?? "", 10);
+    if (isNaN(id)) {
+      return c.json({ error: "Invalid media ID" }, 400);
     }
 
-    // Validate it's a valid URL
     try {
-      new URL(uri);
-    } catch {
-      return c.json({ error: "uri must be a valid URL" }, 400);
-    }
+      const deleted = await deleteMedia(id);
+      if (!deleted) {
+        return c.json({ error: "Media not found" }, 404);
+      }
 
-    const sent = await sendDeleteActivityForUri(uri);
-    return c.json({ success: sent, uri });
-  } catch (error) {
-    return c.json({ error: String(error) }, 500);
+      return c.body(null, 204);
+    } catch (error) {
+      return c.json({ error: String(error) }, 500);
+    }
   }
-});
+);
+
+registerProtectedRoute(
+  protectedRoute({
+    method: "post",
+    path: "/federation/update-actor",
+    tags: ["federation"],
+    summary: "Send an ActivityPub actor update",
+    responses: {
+      200: {
+        description: "Whether the update activity was sent.",
+        content: { "application/json": { schema: SuccessResponseSchema } },
+      },
+      401: {
+        description: "Missing or invalid API key.",
+        content: { "application/json": { schema: ErrorSchema } },
+      },
+      500: {
+        description: "The update activity could not be sent.",
+        content: { "application/json": { schema: ErrorSchema } },
+      },
+    },
+  }),
+  async (c: Context) => {
+    try {
+      const sent = await sendActorUpdateActivity();
+      return c.json({ success: sent });
+    } catch (error) {
+      return c.json({ error: String(error) }, 500);
+    }
+  }
+);
+
+registerProtectedRoute(
+  protectedRoute({
+    method: "post",
+    path: "/federation/delete",
+    tags: ["federation"],
+    summary: "Send an ActivityPub Delete for an arbitrary URI",
+    request: {
+      body: {
+        required: true,
+        content: {
+          "application/json": {
+            schema: DeleteUriBodySchema,
+          },
+        },
+      },
+    },
+    responses: {
+      200: {
+        description: "Whether the delete activity was sent.",
+        content: { "application/json": { schema: DeleteUriResponseSchema } },
+      },
+      400: {
+        description: "The URI was invalid.",
+        content: { "application/json": { schema: ErrorSchema } },
+      },
+      401: {
+        description: "Missing or invalid API key.",
+        content: { "application/json": { schema: ErrorSchema } },
+      },
+      500: {
+        description: "The delete activity could not be sent.",
+        content: { "application/json": { schema: ErrorSchema } },
+      },
+    },
+  }),
+  async (c: Context) => {
+    try {
+      const body = await c.req.json();
+      const { uri } = body;
+
+      if (!uri || typeof uri !== "string") {
+        return c.json({ error: "uri is required and must be a string" }, 400);
+      }
+
+      try {
+        new URL(uri);
+      } catch {
+        return c.json({ error: "uri must be a valid URL" }, 400);
+      }
+
+      const sent = await sendDeleteActivityForUri(uri);
+      return c.json({ success: sent, uri });
+    } catch (error) {
+      return c.json({ error: String(error) }, 500);
+    }
+  }
+);
+
+api.route("/", protectedApi);
+
+export { api };
