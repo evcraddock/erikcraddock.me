@@ -7,6 +7,7 @@ import { eq } from "drizzle-orm";
 
 // Create test db immediately
 const testDb = createTestDb();
+const originalFetch = global.fetch;
 
 // Mock modules
 mock.module("@/db", () => ({
@@ -52,6 +53,7 @@ beforeEach(() => {
   testDb.delete(tags).run();
   testDb.delete(posts).run();
   testDb.delete(sources).run();
+  global.fetch = originalFetch;
 });
 
 const authHeader = { Authorization: "Bearer ek_test" };
@@ -263,6 +265,49 @@ describe("POST /api/posts - slug validation", () => {
     expect(json.data.published_at).toBeNull();
   });
 
+  it("stores link preview metadata for link posts", async () => {
+    global.fetch = mock(
+      async () =>
+        new Response(
+          `
+          <html>
+            <head>
+              <meta property="og:title" content="Preview Title" />
+              <meta property="og:description" content="Preview Description" />
+              <meta property="og:image" content="https://example.com/preview.jpg" />
+              <meta property="og:site_name" content="Example Site" />
+            </head>
+          </html>
+        `,
+          {
+            status: 200,
+            headers: {
+              "content-type": "text/html; charset=utf-8",
+            },
+          }
+        )
+    ) as unknown as typeof fetch;
+
+    const res = await api.request("/posts", {
+      method: "POST",
+      headers: { ...authHeader, "Content-Type": "application/json" },
+      body: JSON.stringify({
+        type: "link",
+        slug: "preview-link",
+        title: "Preview Link",
+        url: "https://example.com/article",
+        content: "Commentary",
+      }),
+    });
+
+    expect(res.status).toBe(201);
+    const json = await res.json();
+    expect(json.data.og_title).toBe("Preview Title");
+    expect(json.data.og_description).toBe("Preview Description");
+    expect(json.data.og_image_url).toBe("https://example.com/preview.jpg");
+    expect(json.data.og_site_name).toBe("Example Site");
+  });
+
   it("creates post as published when published_at is provided", async () => {
     const publishDate = "2024-03-15T10:30:00Z";
     const res = await api.request("/posts", {
@@ -462,6 +507,55 @@ describe("POST /api/posts/by-slug/:slug/publish", () => {
     expect(res.status).toBe(200);
     const json = await res.json();
     expect(json.data.published_at).not.toBeNull();
+  });
+
+  it("backfills link preview metadata when publishing a link post", async () => {
+    global.fetch = mock(
+      async () =>
+        new Response(
+          `
+          <html>
+            <head>
+              <meta property="og:title" content="Published Preview" />
+              <meta property="og:description" content="Published description" />
+              <meta property="og:image" content="https://example.com/published.jpg" />
+              <meta property="og:site_name" content="Example Site" />
+            </head>
+          </html>
+        `,
+          {
+            status: 200,
+            headers: {
+              "content-type": "text/html; charset=utf-8",
+            },
+          }
+        )
+    ) as unknown as typeof fetch;
+
+    testDb
+      .insert(posts)
+      .values({
+        slug: "publish-link",
+        type: "link",
+        title: "Publish Link",
+        content: "Commentary",
+        url: "https://example.com/article",
+        created_at: new Date(),
+        updated_at: new Date(),
+      })
+      .run();
+
+    const res = await api.request("/posts/by-slug/publish-link/publish", {
+      method: "POST",
+      headers: authHeader,
+    });
+
+    expect(res.status).toBe(200);
+    const json = await res.json();
+    expect(json.data.og_title).toBe("Published Preview");
+    expect(json.data.og_description).toBe("Published description");
+    expect(json.data.og_image_url).toBe("https://example.com/published.jpg");
+    expect(json.data.og_site_name).toBe("Example Site");
   });
 
   it("returns 404 for non-existent slug", async () => {

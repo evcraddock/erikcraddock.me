@@ -132,6 +132,10 @@ export interface CreatePostInput {
   content: string;
   excerpt?: string | null;
   url?: string | null;
+  og_title?: string | null;
+  og_description?: string | null;
+  og_image_url?: string | null;
+  og_site_name?: string | null;
   source_id?: number | null;
   tags?: string[]; // Tag slugs
   banner_image_id?: number | null;
@@ -182,6 +186,10 @@ export function createPost(input: CreatePostInput) {
     content,
     excerpt,
     url,
+    og_title,
+    og_description,
+    og_image_url,
+    og_site_name,
     source_id,
     tags: tagSlugs,
     banner_image_id,
@@ -220,6 +228,10 @@ export function createPost(input: CreatePostInput) {
       content,
       excerpt: finalExcerpt,
       url: url ?? null,
+      og_title: og_title ?? null,
+      og_description: og_description ?? null,
+      og_image_url: og_image_url ?? null,
+      og_site_name: og_site_name ?? null,
       source_id: source_id ?? null,
       banner_image_id: banner_image_id ?? null,
       created_at: published_at ?? now,
@@ -281,6 +293,10 @@ export interface UpdatePostInput {
   content?: string;
   excerpt?: string | null;
   url?: string | null;
+  og_title?: string | null;
+  og_description?: string | null;
+  og_image_url?: string | null;
+  og_site_name?: string | null;
   source_id?: number | null;
   tags?: string[]; // Tag slugs
   banner_image_id?: number | null;
@@ -296,7 +312,19 @@ export function updatePost(id: number, input: UpdatePostInput) {
     return null;
   }
 
-  const { title, content, excerpt, url, source_id, tags: tagSlugs, banner_image_id } = input;
+  const {
+    title,
+    content,
+    excerpt,
+    url,
+    og_title,
+    og_description,
+    og_image_url,
+    og_site_name,
+    source_id,
+    tags: tagSlugs,
+    banner_image_id,
+  } = input;
 
   // Validate banner_image_id if provided
   if (banner_image_id !== undefined && banner_image_id !== null) {
@@ -323,6 +351,10 @@ export function updatePost(id: number, input: UpdatePostInput) {
   if (content !== undefined) updates.content = content;
   if (excerpt !== undefined) updates.excerpt = excerpt;
   if (url !== undefined) updates.url = url;
+  if (og_title !== undefined) updates.og_title = og_title;
+  if (og_description !== undefined) updates.og_description = og_description;
+  if (og_image_url !== undefined) updates.og_image_url = og_image_url;
+  if (og_site_name !== undefined) updates.og_site_name = og_site_name;
   if (source_id !== undefined) updates.source_id = source_id;
   if (banner_image_id !== undefined) updates.banner_image_id = banner_image_id;
 
