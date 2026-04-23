@@ -390,6 +390,17 @@ describe("pages routes", () => {
       expect(html).toContain("border-l-4");
     });
 
+    it("renders compact OG preview cards for link posts", async () => {
+      const app = getApp();
+      const res = await app.request("/feed");
+      const html = await res.text();
+
+      expect(html).toContain("Example Article");
+      expect(html).toContain("A rich preview description.");
+      expect(html).toContain("Example Site");
+      expect(html).toContain("sm:w-40 sm:flex-shrink-0");
+    });
+
     it("includes dark mode classes", async () => {
       const app = getApp();
       const res = await app.request("/feed");
