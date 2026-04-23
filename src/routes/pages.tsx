@@ -50,64 +50,6 @@ function getLinkPreviewSiteLabel(url: string | null, siteName: string | null): s
   }
 }
 
-function LinkPreviewCard({
-  post,
-  compact = false,
-}: {
-  post: Pick<Post, "url" | "og_title" | "og_description" | "og_image_url" | "og_site_name">;
-  compact?: boolean;
-}) {
-  if (!post.url || !hasStoredLinkPreview(post)) {
-    return null;
-  }
-
-  const siteLabel = getLinkPreviewSiteLabel(post.url, post.og_site_name);
-
-  return (
-    <a
-      href={post.url}
-      target="_blank"
-      rel="noopener noreferrer"
-      class={`group block overflow-hidden rounded-xl border border-gray-200 bg-white transition hover:border-gray-300 hover:shadow-md dark:border-gray-700 dark:bg-gray-800 dark:hover:border-gray-600 ${compact ? "mt-4" : "mb-8"}`}
-    >
-      <div class={compact ? "flex flex-col sm:flex-row" : "block"}>
-        {post.og_image_url && (
-          <img
-            src={post.og_image_url}
-            alt={post.og_title || "Link preview image"}
-            class={
-              compact
-                ? "h-40 w-full object-cover sm:h-auto sm:w-40 sm:flex-shrink-0"
-                : "h-56 w-full object-cover"
-            }
-          />
-        )}
-        <div class="p-4">
-          {siteLabel && (
-            <p class="mb-2 text-sm uppercase tracking-wide text-gray-500 dark:text-gray-400">
-              {siteLabel}
-            </p>
-          )}
-          {post.og_title && (
-            <h2
-              class={`text-gray-900 group-hover:text-blue-600 dark:text-gray-100 dark:group-hover:text-blue-400 ${compact ? "mb-2 text-lg font-semibold" : "mb-2 text-xl font-semibold"}`}
-            >
-              {post.og_title}
-            </h2>
-          )}
-          {post.og_description && (
-            <p
-              class={`text-sm leading-6 text-gray-600 dark:text-gray-300 ${compact ? "line-clamp-3" : ""}`}
-            >
-              {post.og_description}
-            </p>
-          )}
-        </div>
-      </div>
-    </a>
-  );
-}
-
 /** Social link icons */
 function GitHubIcon() {
   return (
@@ -503,10 +445,8 @@ function FeedPost({ post, tags: postTags = [] }: { post: PostWithSource; tags?: 
           {raw(renderMarkdown(post.content))}
         </div>
 
-        <LinkPreviewCard post={post} compact />
-
         {/* Meta */}
-        <div class="mt-4 flex flex-wrap items-center gap-3 text-sm text-gray-500 dark:text-gray-400">
+        <div class="flex flex-wrap items-center gap-3 text-sm text-gray-500 dark:text-gray-400">
           <time>{formattedDate}</time>
           <span class="text-gray-300 dark:text-gray-600">•</span>
           <span class="text-gray-400 dark:text-gray-500">Link</span>
@@ -1316,7 +1256,10 @@ export function createPagesRoutes(db: Database): Hono {
 
     const title = post.title || (isNote ? "Note" : "Post");
     const description = post.excerpt || truncate(post.content, 160);
-    const hasLinkPreview = Boolean(isLink && hasStoredLinkPreview(post));
+    const linkPreviewSiteLabel = getLinkPreviewSiteLabel(post.url, post.og_site_name);
+    const hasLinkPreview = Boolean(
+      isLink && (post.og_title || post.og_description || post.og_image_url || linkPreviewSiteLabel)
+    );
     // For link posts, use external URL for OG tags so Mastodon generates correct preview
     const canonicalUrl = post.type === "link" && post.url ? post.url : `/posts/${slug}`;
 
@@ -1396,7 +1339,39 @@ export function createPagesRoutes(db: Database): Hono {
             {postTagsResult.length > 0 && <TagBadges tags={postTagsResult} />}
           </div>
 
-          {isLink && post.url && hasLinkPreview && <LinkPreviewCard post={post} />}
+          {isLink && post.url && hasLinkPreview && (
+            <a
+              href={post.url}
+              target="_blank"
+              rel="noopener noreferrer"
+              class="group mb-8 block overflow-hidden rounded-xl border border-gray-200 bg-white transition hover:border-gray-300 hover:shadow-md dark:border-gray-700 dark:bg-gray-800 dark:hover:border-gray-600"
+            >
+              {post.og_image_url && (
+                <img
+                  src={post.og_image_url}
+                  alt={post.og_title || "Link preview image"}
+                  class="h-56 w-full object-cover"
+                />
+              )}
+              <div class="p-4">
+                {linkPreviewSiteLabel && (
+                  <p class="mb-2 text-sm uppercase tracking-wide text-gray-500 dark:text-gray-400">
+                    {linkPreviewSiteLabel}
+                  </p>
+                )}
+                {post.og_title && (
+                  <h2 class="mb-2 text-xl font-semibold text-gray-900 group-hover:text-blue-600 dark:text-gray-100 dark:group-hover:text-blue-400">
+                    {post.og_title}
+                  </h2>
+                )}
+                {post.og_description && (
+                  <p class="text-sm leading-6 text-gray-600 dark:text-gray-300">
+                    {post.og_description}
+                  </p>
+                )}
+              </div>
+            </a>
+          )}
 
           {/* Post content */}
           <div class="prose prose-gray max-w-none">{raw(renderMarkdown(post.content))}</div>
