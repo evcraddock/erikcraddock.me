@@ -8,8 +8,10 @@ import { truncate } from "../utils/text";
 import { renderMarkdown } from "../utils/markdown";
 import { mediaUrl } from "../services/media";
 import { listTags } from "../services/tags";
+import { fetchLinkPreview } from "../services/link-preview";
 import { postToObject, PublishedPost } from "../federation/post-object";
 import { baseUrl } from "../federation/utils";
+import { logger } from "../utils/logger";
 
 // Database type for dependency injection
 type Database = typeof defaultDb;
@@ -22,6 +24,31 @@ type PostWithSource = Post & { source?: Source | null };
 
 /** Max length for showing full note content inline */
 const NOTE_INLINE_MAX_LENGTH = 280;
+
+function hasStoredLinkPreview(post: {
+  og_title?: string | null;
+  og_description?: string | null;
+  og_image_url?: string | null;
+  og_site_name?: string | null;
+}): boolean {
+  return Boolean(post.og_title || post.og_description || post.og_image_url || post.og_site_name);
+}
+
+function getLinkPreviewSiteLabel(url: string | null, siteName: string | null): string | null {
+  if (siteName) {
+    return siteName;
+  }
+
+  if (!url) {
+    return null;
+  }
+
+  try {
+    return new URL(url).hostname.replace(/^www\./, "");
+  } catch {
+    return null;
+  }
+}
 
 /** Social link icons */
 function GitHubIcon() {
@@ -1171,10 +1198,40 @@ export function createPagesRoutes(db: Database): Hono {
       );
     }
 
-    const post = result.post;
+    let post = result.post;
     const source = result.source;
     const isLink = post.type === "link";
     const isNote = post.type === "note";
+
+    if (isLink && post.url && !hasStoredLinkPreview(post)) {
+      const preview = await fetchLinkPreview(post.url);
+
+      if (preview) {
+        db.update(posts)
+          .set({
+            og_title: preview.title,
+            og_description: preview.description,
+            og_image_url: preview.imageUrl,
+            og_site_name: preview.siteName,
+            updated_at: new Date(),
+          })
+          .where(eq(posts.id, post.id))
+          .run();
+
+        post = {
+          ...post,
+          og_title: preview.title,
+          og_description: preview.description,
+          og_image_url: preview.imageUrl,
+          og_site_name: preview.siteName,
+        };
+      } else {
+        logger.debug("link-preview", "No preview metadata found during page render", {
+          postId: post.id,
+          url: post.url,
+        });
+      }
+    }
 
     // Query tags for this post
     const postTagsResult = db
@@ -1199,6 +1256,10 @@ export function createPagesRoutes(db: Database): Hono {
 
     const title = post.title || (isNote ? "Note" : "Post");
     const description = post.excerpt || truncate(post.content, 160);
+    const linkPreviewSiteLabel = getLinkPreviewSiteLabel(post.url, post.og_site_name);
+    const hasLinkPreview = Boolean(
+      isLink && (post.og_title || post.og_description || post.og_image_url || linkPreviewSiteLabel)
+    );
     // For link posts, use external URL for OG tags so Mastodon generates correct preview
     const canonicalUrl = post.type === "link" && post.url ? post.url : `/posts/${slug}`;
 
@@ -1277,6 +1338,40 @@ export function createPagesRoutes(db: Database): Hono {
 
             {postTagsResult.length > 0 && <TagBadges tags={postTagsResult} />}
           </div>
+
+          {isLink && post.url && hasLinkPreview && (
+            <a
+              href={post.url}
+              target="_blank"
+              rel="noopener noreferrer"
+              class="group mb-8 block overflow-hidden rounded-xl border border-gray-200 bg-white transition hover:border-gray-300 hover:shadow-md dark:border-gray-700 dark:bg-gray-800 dark:hover:border-gray-600"
+            >
+              {post.og_image_url && (
+                <img
+                  src={post.og_image_url}
+                  alt={post.og_title || "Link preview image"}
+                  class="h-56 w-full object-cover"
+                />
+              )}
+              <div class="p-4">
+                {linkPreviewSiteLabel && (
+                  <p class="mb-2 text-sm uppercase tracking-wide text-gray-500 dark:text-gray-400">
+                    {linkPreviewSiteLabel}
+                  </p>
+                )}
+                {post.og_title && (
+                  <h2 class="mb-2 text-xl font-semibold text-gray-900 group-hover:text-blue-600 dark:text-gray-100 dark:group-hover:text-blue-400">
+                    {post.og_title}
+                  </h2>
+                )}
+                {post.og_description && (
+                  <p class="text-sm leading-6 text-gray-600 dark:text-gray-300">
+                    {post.og_description}
+                  </p>
+                )}
+              </div>
+            </a>
+          )}
 
           {/* Post content */}
           <div class="prose prose-gray max-w-none">{raw(renderMarkdown(post.content))}</div>

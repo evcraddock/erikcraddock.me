@@ -1,7 +1,13 @@
 /* eslint-disable @typescript-eslint/no-require-imports */
-import { describe, it, expect, beforeAll } from "bun:test";
+import { describe, it, expect, beforeAll, afterEach } from "bun:test";
 import { mock } from "bun:test";
 import { Hono } from "hono";
+
+const originalFetch = global.fetch;
+
+afterEach(() => {
+  global.fetch = originalFetch;
+});
 import { createTestDb } from "../../db/test-utils";
 import { posts, tags, postTags, sources, media } from "../../db/schema";
 
@@ -76,6 +82,10 @@ testDb
       title: "Test Link Post",
       content: "This is commentary on an external link.",
       url: "https://example.com/article",
+      og_title: "Example Article",
+      og_description: "A rich preview description.",
+      og_image_url: "https://example.com/preview.jpg",
+      og_site_name: "Example Site",
       published_at: now,
       created_at: now,
       updated_at: now,
@@ -602,6 +612,70 @@ describe("pages routes", () => {
       const html = await res.text();
       // Link posts should have og:url pointing to the external article
       expect(html).toContain('property="og:url" content="https://example.com/article"');
+    });
+
+    it("renders an OG preview card for link posts", async () => {
+      const app = getApp();
+      const res = await app.request("/posts/test-link");
+
+      expect(res.status).toBe(200);
+
+      const html = await res.text();
+      expect(html).toContain("Example Article");
+      expect(html).toContain("A rich preview description.");
+      expect(html).toContain("Example Site");
+      expect(html).toContain('src="https://example.com/preview.jpg"');
+      expect(html).toContain('href="https://example.com/article"');
+    });
+
+    it("backfills OG preview metadata for older link posts during page render", async () => {
+      global.fetch = mock(
+        async () =>
+          new Response(
+            `
+            <html>
+              <head>
+                <meta property="og:title" content="Fetched Preview Title" />
+                <meta property="og:description" content="Fetched preview description." />
+                <meta property="og:image" content="https://example.com/fetched.jpg" />
+                <meta property="og:site_name" content="Fetched Site" />
+              </head>
+            </html>
+          `,
+            {
+              status: 200,
+              headers: {
+                "content-type": "text/html; charset=utf-8",
+              },
+            }
+          )
+      ) as unknown as typeof fetch;
+
+      const renderTime = new Date();
+      testDb
+        .insert(posts)
+        .values({
+          slug: "backfill-link",
+          type: "link",
+          title: "Backfill Link",
+          content: "Commentary for old link post.",
+          url: "https://example.com/old-link",
+          published_at: renderTime,
+          created_at: renderTime,
+          updated_at: renderTime,
+        })
+        .run();
+
+      const app = getApp();
+      const res = await app.request("/posts/backfill-link");
+
+      expect(res.status).toBe(200);
+
+      const html = await res.text();
+      expect(html).toContain("Fetched Preview Title");
+      expect(html).toContain("Fetched preview description.");
+      expect(html).toContain("Fetched Site");
+      expect(html).toContain('src="https://example.com/fetched.jpg"');
     });
 
     it("sets og:url to site URL for article posts", async () => {

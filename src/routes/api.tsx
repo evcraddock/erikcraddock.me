@@ -26,6 +26,8 @@ import {
   deleteSource,
 } from "@/services/sources";
 import { listTags } from "@/services/tags";
+import { fetchLinkPreview } from "@/services/link-preview";
+import { logger } from "@/utils/logger";
 import {
   federatePost,
   sendDeleteActivity,
@@ -147,6 +149,10 @@ const PostSchema = z
     content: z.string().openapi({ example: "# Hello" }),
     excerpt: NullableStringSchema,
     url: NullableStringSchema,
+    og_title: NullableStringSchema,
+    og_description: NullableStringSchema,
+    og_image_url: NullableStringSchema,
+    og_site_name: NullableStringSchema,
     source_id: z.number().int().nullable(),
     banner_image_id: z.number().int().nullable(),
     banner_url: NullableStringSchema,
@@ -264,6 +270,38 @@ const registerProtectedRoute = protectedApi.openapi.bind(protectedApi) as unknow
   route: unknown,
   handler: (c: Context) => unknown
 ) => unknown;
+
+function hasStoredLinkPreview(post: {
+  og_title?: string | null;
+  og_description?: string | null;
+  og_image_url?: string | null;
+  og_site_name?: string | null;
+}): boolean {
+  return Boolean(post.og_title || post.og_description || post.og_image_url || post.og_site_name);
+}
+
+async function getLinkPreviewData(url: string | null | undefined): Promise<{
+  og_title: string | null;
+  og_description: string | null;
+  og_image_url: string | null;
+  og_site_name: string | null;
+} | null> {
+  if (!url) {
+    return null;
+  }
+
+  const preview = await fetchLinkPreview(url);
+  if (!preview) {
+    return null;
+  }
+
+  return {
+    og_title: preview.title,
+    og_description: preview.description,
+    og_image_url: preview.imageUrl,
+    og_site_name: preview.siteName,
+  };
+}
 
 registerProtectedRoute(
   protectedRoute({
@@ -466,13 +504,19 @@ registerProtectedRoute(
     }
 
     try {
+      const normalizedUrl = url?.trim() || null;
+      const linkPreview = type === "link" ? await getLinkPreviewData(normalizedUrl) : null;
       const post = createPost({
         type,
         slug,
         title: title?.trim() || null,
         content: content.trim(),
         excerpt: excerpt?.trim() || null,
-        url: url?.trim() || null,
+        url: normalizedUrl,
+        og_title: linkPreview?.og_title,
+        og_description: linkPreview?.og_description,
+        og_image_url: linkPreview?.og_image_url,
+        og_site_name: linkPreview?.og_site_name,
         source_id: source_id ?? null,
         tags: tags || [],
         banner_image_id: banner_image_id ?? null,
@@ -589,11 +633,37 @@ registerProtectedRoute(
     }
 
     try {
+      const existingPost = getPost(id);
+      const nextUrl = url !== undefined ? url?.trim() || null : existingPost?.url;
+      const linkPreview =
+        existingPost?.type === "link" && (url !== undefined || !hasStoredLinkPreview(existingPost))
+          ? await getLinkPreviewData(nextUrl)
+          : null;
       const post = updatePost(id, {
         title: title !== undefined ? title?.trim() || null : undefined,
         content: content?.trim(),
         excerpt: excerpt !== undefined ? excerpt?.trim() || null : undefined,
         url: url !== undefined ? url?.trim() || null : undefined,
+        og_title:
+          existingPost?.type === "link" &&
+          (url !== undefined || !hasStoredLinkPreview(existingPost))
+            ? (linkPreview?.og_title ?? null)
+            : undefined,
+        og_description:
+          existingPost?.type === "link" &&
+          (url !== undefined || !hasStoredLinkPreview(existingPost))
+            ? (linkPreview?.og_description ?? null)
+            : undefined,
+        og_image_url:
+          existingPost?.type === "link" &&
+          (url !== undefined || !hasStoredLinkPreview(existingPost))
+            ? (linkPreview?.og_image_url ?? null)
+            : undefined,
+        og_site_name:
+          existingPost?.type === "link" &&
+          (url !== undefined || !hasStoredLinkPreview(existingPost))
+            ? (linkPreview?.og_site_name ?? null)
+            : undefined,
         source_id,
         tags,
         banner_image_id,
@@ -692,6 +762,28 @@ registerProtectedRoute(
     const id = parseInt(c.req.param("id") ?? "", 10);
     if (isNaN(id)) {
       return c.json({ error: "Invalid post ID" }, 400);
+    }
+
+    const existingPost = getPost(id);
+    if (!existingPost) {
+      return c.json({ error: "Post not found" }, 404);
+    }
+
+    if (existingPost.type === "link" && existingPost.url && !hasStoredLinkPreview(existingPost)) {
+      try {
+        const linkPreview = await getLinkPreviewData(existingPost.url);
+        updatePost(id, {
+          og_title: linkPreview?.og_title ?? null,
+          og_description: linkPreview?.og_description ?? null,
+          og_image_url: linkPreview?.og_image_url ?? null,
+          og_site_name: linkPreview?.og_site_name ?? null,
+        });
+      } catch (error) {
+        logger.warn("link-preview", "Failed to backfill link preview on publish", {
+          postId: id,
+          error: String(error),
+        });
+      }
     }
 
     const post = publishPost(id);
@@ -843,11 +935,32 @@ registerProtectedRoute(
     }
 
     try {
+      const nextUrl = url !== undefined ? url?.trim() || null : existingPost.url;
+      const linkPreview =
+        existingPost.type === "link" && (url !== undefined || !hasStoredLinkPreview(existingPost))
+          ? await getLinkPreviewData(nextUrl)
+          : null;
       const post = updatePost(existingPost.id, {
         title: title !== undefined ? title?.trim() || null : undefined,
         content: content?.trim(),
         excerpt: excerpt !== undefined ? excerpt?.trim() || null : undefined,
         url: url !== undefined ? url?.trim() || null : undefined,
+        og_title:
+          existingPost.type === "link" && (url !== undefined || !hasStoredLinkPreview(existingPost))
+            ? (linkPreview?.og_title ?? null)
+            : undefined,
+        og_description:
+          existingPost.type === "link" && (url !== undefined || !hasStoredLinkPreview(existingPost))
+            ? (linkPreview?.og_description ?? null)
+            : undefined,
+        og_image_url:
+          existingPost.type === "link" && (url !== undefined || !hasStoredLinkPreview(existingPost))
+            ? (linkPreview?.og_image_url ?? null)
+            : undefined,
+        og_site_name:
+          existingPost.type === "link" && (url !== undefined || !hasStoredLinkPreview(existingPost))
+            ? (linkPreview?.og_site_name ?? null)
+            : undefined,
         source_id,
         tags,
         banner_image_id,
@@ -939,6 +1052,23 @@ registerProtectedRoute(
     const existingPost = getPostBySlug(slug);
     if (!existingPost) {
       return c.json({ error: "Post not found" }, 404);
+    }
+
+    if (existingPost.type === "link" && existingPost.url && !hasStoredLinkPreview(existingPost)) {
+      try {
+        const linkPreview = await getLinkPreviewData(existingPost.url);
+        updatePost(existingPost.id, {
+          og_title: linkPreview?.og_title ?? null,
+          og_description: linkPreview?.og_description ?? null,
+          og_image_url: linkPreview?.og_image_url ?? null,
+          og_site_name: linkPreview?.og_site_name ?? null,
+        });
+      } catch (error) {
+        logger.warn("link-preview", "Failed to backfill link preview on publish", {
+          postId: existingPost.id,
+          error: String(error),
+        });
+      }
     }
 
     const post = publishPost(existingPost.id);
