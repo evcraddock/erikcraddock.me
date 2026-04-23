@@ -614,7 +614,7 @@ describe("pages routes", () => {
       expect(html).toContain('property="og:url" content="https://example.com/article"');
     });
 
-    it("renders an OG preview card for link posts", async () => {
+    it("renders an OG preview card for link posts at the top of the page", async () => {
       const app = getApp();
       const res = await app.request("/posts/test-link");
 
@@ -626,6 +626,12 @@ describe("pages routes", () => {
       expect(html).toContain("Example Site");
       expect(html).toContain('src="https://example.com/preview.jpg"');
       expect(html).toContain('href="https://example.com/article"');
+
+      expect(html.indexOf('src="https://example.com/preview.jpg"')).toBeLessThan(
+        html.indexOf(
+          '<h1 class="text-3xl font-bold text-gray-900 dark:text-gray-100 mb-4">Test Link Post'
+        )
+      );
     });
 
     it("backfills OG preview metadata for older link posts during page render", async () => {
