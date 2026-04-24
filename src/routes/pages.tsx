@@ -418,6 +418,53 @@ function FeedProfileCard() {
   );
 }
 
+function FeedLinkPreview({ post }: { post: PostWithSource }) {
+  if (!post.url) {
+    return null;
+  }
+
+  const siteLabel = getLinkPreviewSiteLabel(post.url, post.og_site_name);
+  const hasPreview = Boolean(
+    post.og_title || post.og_description || post.og_image_url || siteLabel
+  );
+
+  if (!hasPreview) {
+    return null;
+  }
+
+  return (
+    <a
+      href={post.url}
+      target="_blank"
+      rel="noopener noreferrer"
+      class="mt-4 block overflow-hidden rounded-2xl border border-gray-200 bg-white transition hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-900 dark:hover:bg-gray-800/50"
+    >
+      {post.og_image_url && (
+        <img
+          src={post.og_image_url}
+          alt={post.og_title || "Link preview image"}
+          class="aspect-video w-full object-cover"
+        />
+      )}
+      <div class="p-4">
+        {siteLabel && (
+          <p class="mb-1 truncate text-sm text-gray-500 dark:text-gray-400">{siteLabel}</p>
+        )}
+        {post.og_title && (
+          <h3 class="line-clamp-2 font-semibold text-gray-950 dark:text-gray-50">
+            {post.og_title}
+          </h3>
+        )}
+        {post.og_description && (
+          <p class="mt-2 line-clamp-3 text-sm leading-6 text-gray-600 dark:text-gray-300">
+            {post.og_description}
+          </p>
+        )}
+      </div>
+    </a>
+  );
+}
+
 function FeedPostMeta({ post, tags: postTags }: { post: PostWithSource; tags: Tag[] }) {
   const formattedDate = post.published_at
     ? new Date(post.published_at).toLocaleDateString("en-US", {
@@ -522,6 +569,8 @@ function FeedPost({ post, tags: postTags = [] }: { post: PostWithSource; tags?: 
               {raw(renderMarkdown(post.content))}
             </div>
           )}
+
+          {isLink && <FeedLinkPreview post={post} />}
 
           <FeedPostMeta post={post} tags={postTags} />
         </div>

@@ -393,6 +393,17 @@ describe("pages routes", () => {
       expect(html).toContain("rounded-full");
     });
 
+    it("shows stored link previews in feed items", async () => {
+      const app = getApp();
+      const res = await app.request("/feed");
+      const html = await res.text();
+
+      expect(html).toContain("Example Site");
+      expect(html).toContain("Example Article");
+      expect(html).toContain("A rich preview description.");
+      expect(html).toContain("https://example.com/preview.jpg");
+    });
+
     it("includes dark mode classes", async () => {
       const app = getApp();
       const res = await app.request("/feed");
