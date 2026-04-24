@@ -370,141 +370,161 @@ function Pagination({
   );
 }
 
-/** Feed post component - renders differently based on post type */
-function FeedPost({ post, tags: postTags = [] }: { post: PostWithSource; tags?: Tag[] }) {
+function FeedActorAvatar({ className = "" }: { className?: string }) {
+  return (
+    <img
+      src="/images/erik-logo.png"
+      alt="Erik Craddock"
+      class={`rounded-full bg-gray-200 object-cover ring-2 ring-white dark:bg-gray-700 dark:ring-gray-900 ${className}`}
+    />
+  );
+}
+
+function FeedProfileCard() {
+  return (
+    <section class="border-b border-gray-200 bg-white dark:border-gray-800 dark:bg-gray-950">
+      <div class="h-32 bg-gradient-to-br from-teal-500 via-blue-500 to-purple-600 sm:h-40" />
+      <div class="px-4 pb-5 sm:px-6">
+        <div class="-mt-12 flex items-end justify-between gap-4 sm:-mt-16">
+          <FeedActorAvatar className="h-24 w-24 border-4 border-white dark:border-gray-950 sm:h-32 sm:w-32" />
+          <a
+            href="/about"
+            class="mb-2 rounded-full border border-gray-300 px-4 py-2 text-sm font-semibold text-gray-900 transition hover:bg-gray-100 dark:border-gray-600 dark:text-gray-100 dark:hover:bg-gray-800"
+          >
+            About
+          </a>
+        </div>
+        <div class="mt-4">
+          <h2 class="text-2xl font-bold text-gray-950 dark:text-gray-50">Erik Craddock</h2>
+          <p class="text-gray-500 dark:text-gray-400">@erik@erikcraddock.me</p>
+          <p class="mt-4 text-gray-800 dark:text-gray-200">
+            Writer, coder, and musician — not always in that order. This is my haphazard living
+            autobiography.
+          </p>
+          <div class="mt-4 flex flex-wrap gap-x-5 gap-y-2 text-sm text-gray-500 dark:text-gray-400">
+            <a href="/feed.xml" class="hover:text-teal-600 dark:hover:text-teal-400">
+              RSS feed
+            </a>
+            <a href="/articles" class="hover:text-teal-600 dark:hover:text-teal-400">
+              Articles
+            </a>
+            <a href="/about" class="hover:text-teal-600 dark:hover:text-teal-400">
+              Follow on the Fediverse
+            </a>
+          </div>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function FeedPostMeta({ post, tags: postTags }: { post: PostWithSource; tags: Tag[] }) {
   const formattedDate = post.published_at
     ? new Date(post.published_at).toLocaleDateString("en-US", {
         year: "numeric",
         month: "long",
         day: "numeric",
       })
-    : null;
+    : "Draft";
 
-  // Note: full content, left border
-  if (post.type === "note") {
-    return (
-      <article class="bg-gray-50 dark:bg-transparent border-l-4 border-gray-400 dark:border-gray-600 pl-4 py-4 pr-4 rounded-r-lg">
-        <div class="prose prose-gray dark:prose-invert max-w-none mb-3">
-          {raw(renderMarkdown(post.content))}
-        </div>
-        <div class="flex flex-wrap items-center gap-3 text-sm text-gray-500 dark:text-gray-400">
-          <time>{formattedDate}</time>
-          <span class="text-gray-300 dark:text-gray-600">•</span>
-          <span class="text-gray-400 dark:text-gray-500">Note</span>
-          {postTags.length > 0 && (
-            <>
-              <span class="text-gray-300 dark:text-gray-600">•</span>
-              <TagBadges tags={postTags} />
-            </>
-          )}
-        </div>
-      </article>
-    );
-  }
-
-  // Link: full content, source attribution (similar to articles but with full content)
-  if (post.type === "link") {
-    return (
-      <article class="bg-white dark:bg-transparent border border-gray-200 dark:border-gray-700 rounded-lg p-6">
-        {/* Title if present */}
-        {post.title && (
-          <h2 class="text-xl font-semibold text-gray-900 dark:text-gray-100 mb-2">
-            <a href={`/posts/${post.slug}`} class="hover:text-blue-600 dark:hover:text-blue-400">
-              {post.title}
-            </a>
-          </h2>
-        )}
-
-        {/* Source link under title */}
-        {post.url && (
-          <a
-            href={post.url}
-            target="_blank"
-            rel="noopener noreferrer"
-            class="text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300 text-sm mb-3 inline-flex items-center gap-1"
-          >
-            <span class="truncate max-w-md">{new URL(post.url).hostname}</span>
-            <svg
-              class="w-3 h-3 flex-shrink-0"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-            >
-              <path
-                stroke-linecap="round"
-                stroke-linejoin="round"
-                stroke-width="2"
-                d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"
-              />
-            </svg>
-          </a>
-        )}
-
-        {/* Full content */}
-        <div class="prose prose-gray dark:prose-invert max-w-none mb-4">
-          {raw(renderMarkdown(post.content))}
-        </div>
-
-        {/* Meta */}
-        <div class="flex flex-wrap items-center gap-3 text-sm text-gray-500 dark:text-gray-400">
-          <time>{formattedDate}</time>
-          <span class="text-gray-300 dark:text-gray-600">•</span>
-          <span class="text-gray-400 dark:text-gray-500">Link</span>
-          {post.source && (
-            <>
-              <span class="text-gray-300 dark:text-gray-600">•</span>
-              <span>
-                via{" "}
-                <a
-                  href={post.source.url}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  class="hover:text-gray-700 dark:hover:text-gray-300"
-                >
-                  {post.source.name}
-                </a>
-              </span>
-            </>
-          )}
-          {postTags.length > 0 && (
-            <>
-              <span class="text-gray-300 dark:text-gray-600">•</span>
-              <TagBadges tags={postTags} />
-            </>
-          )}
-        </div>
-      </article>
-    );
-  }
-
-  // Article: title + excerpt + "Read more" link
   return (
-    <article class="bg-white dark:bg-transparent border border-gray-200 dark:border-gray-700 rounded-lg p-6">
-      <a href={`/posts/${post.slug}`} class="block group">
-        <h2 class="text-xl font-semibold text-gray-900 dark:text-gray-100 group-hover:text-blue-600 dark:group-hover:text-blue-400 mb-2">
-          {post.title}
-        </h2>
-        <p class="text-gray-600 dark:text-gray-400 mb-3">
-          {post.excerpt || truncate(post.content, 200)}
-        </p>
-      </a>
-      <div class="flex flex-wrap items-center gap-3 text-sm text-gray-500 dark:text-gray-400">
-        <time>{formattedDate}</time>
-        <span class="text-gray-300 dark:text-gray-600">•</span>
-        <span class="text-gray-400 dark:text-gray-500">Article</span>
-        <span class="text-gray-300 dark:text-gray-600">•</span>
-        <a
-          href={`/posts/${post.slug}`}
-          class="text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300"
-        >
-          Read more →
+    <div class="mt-4 flex flex-wrap items-center gap-2 text-sm text-gray-500 dark:text-gray-400">
+      <time>{formattedDate}</time>
+      <span aria-hidden="true">·</span>
+      <span class="capitalize">{post.type}</span>
+      {post.source && (
+        <>
+          <span aria-hidden="true">·</span>
+          <span>
+            via{" "}
+            <a
+              href={post.source.url}
+              target="_blank"
+              rel="noopener noreferrer"
+              class="hover:text-gray-700 dark:hover:text-gray-300"
+            >
+              {post.source.name}
+            </a>
+          </span>
+        </>
+      )}
+      {postTags.length > 0 && (
+        <>
+          <span aria-hidden="true">·</span>
+          <TagBadges tags={postTags} />
+        </>
+      )}
+    </div>
+  );
+}
+
+/** Feed post component - renders differently based on post type */
+function FeedPost({ post, tags: postTags = [] }: { post: PostWithSource; tags?: Tag[] }) {
+  const isArticle = post.type === "article";
+  const isLink = post.type === "link";
+
+  return (
+    <article class="border-b border-gray-200 bg-white px-4 py-5 transition hover:bg-gray-50 dark:border-gray-800 dark:bg-gray-950 dark:hover:bg-gray-900/70 sm:px-6">
+      <div class="flex gap-3 sm:gap-4">
+        <a href="/about" aria-label="Erik Craddock profile" class="shrink-0">
+          <FeedActorAvatar className="h-11 w-11 sm:h-12 sm:w-12" />
         </a>
-        {postTags.length > 0 && (
-          <>
-            <span class="text-gray-300 dark:text-gray-600">•</span>
-            <TagBadges tags={postTags} />
-          </>
-        )}
+        <div class="min-w-0 flex-1">
+          <div class="mb-2 flex flex-wrap items-baseline gap-x-2 gap-y-1">
+            <a href="/about" class="font-semibold text-gray-950 hover:underline dark:text-gray-50">
+              Erik Craddock
+            </a>
+            <span class="text-sm text-gray-500 dark:text-gray-400">@erik</span>
+            <span class="text-sm text-gray-400 dark:text-gray-600" aria-hidden="true">
+              ·
+            </span>
+            <span class="text-sm capitalize text-gray-500 dark:text-gray-400">{post.type}</span>
+          </div>
+
+          {post.title && (
+            <a href={`/posts/${post.slug}`} class="group block">
+              <h2 class="mb-2 text-xl font-semibold text-gray-950 group-hover:text-teal-600 dark:text-gray-50 dark:group-hover:text-teal-400">
+                {post.title}
+              </h2>
+            </a>
+          )}
+
+          {isLink && post.url && (
+            <a
+              href={post.url}
+              target="_blank"
+              rel="noopener noreferrer"
+              class="mb-3 inline-flex max-w-full items-center gap-1 rounded-full border border-gray-200 px-3 py-1 text-sm text-teal-700 hover:bg-teal-50 dark:border-gray-700 dark:text-teal-300 dark:hover:bg-teal-950/40"
+            >
+              <span class="truncate">{new URL(post.url).hostname}</span>
+              <svg class="h-3 w-3 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  stroke-width="2"
+                  d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"
+                />
+              </svg>
+            </a>
+          )}
+
+          {isArticle ? (
+            <a href={`/posts/${post.slug}`} class="group block">
+              <p class="text-gray-700 dark:text-gray-300">
+                {post.excerpt || truncate(post.content, 200)}
+              </p>
+              <span class="mt-3 inline-block text-sm font-medium text-teal-600 group-hover:text-teal-700 dark:text-teal-400 dark:group-hover:text-teal-300">
+                Read more →
+              </span>
+            </a>
+          ) : (
+            <div class="prose prose-gray max-w-none dark:prose-invert">
+              {raw(renderMarkdown(post.content))}
+            </div>
+          )}
+
+          <FeedPostMeta post={post} tags={postTags} />
+        </div>
       </div>
     </article>
   );
@@ -878,8 +898,15 @@ export function createPagesRoutes(db: Database): Hono {
     if (totalPosts === 0) {
       return c.html(
         <Layout title="Feed | erikcraddock.me">
-          <h1 class="text-3xl font-bold text-gray-900 dark:text-gray-100 mb-8">Feed</h1>
-          <p class="text-gray-600 dark:text-gray-400">No posts yet.</p>
+          <div class="mx-auto max-w-2xl overflow-hidden border-x border-gray-200 bg-white dark:border-gray-800 dark:bg-gray-950 sm:rounded-2xl sm:border">
+            <header class="sticky top-0 z-10 border-b border-gray-200 bg-white/90 px-4 py-4 backdrop-blur dark:border-gray-800 dark:bg-gray-950/90 sm:px-6">
+              <h1 class="text-xl font-bold text-gray-950 dark:text-gray-50">Feed</h1>
+            </header>
+            <FeedProfileCard />
+            <div class="px-4 py-10 text-center text-gray-600 dark:text-gray-400 sm:px-6">
+              No posts yet.
+            </div>
+          </div>
         </Layout>
       );
     }
@@ -939,26 +966,27 @@ export function createPagesRoutes(db: Database): Hono {
 
     return c.html(
       <Layout title={`Feed${page > 1 ? ` - Page ${page}` : ""} | erikcraddock.me`}>
-        <h1 class="text-3xl font-bold text-gray-900 dark:text-gray-100 mb-8">Feed</h1>
-
-        {/* Page indicator at top */}
-        {totalPages > 1 && (
-          <p class="text-center text-gray-600 dark:text-gray-400 mb-6">
-            Page {page} of {totalPages}
-          </p>
-        )}
-
-        {/* Posts list */}
-        <div class="space-y-8">
-          {pagePosts.map((post) => (
-            <FeedPost key={post.id} post={post} tags={getTagsForPost(post.id)} />
-          ))}
+        <div class="mx-auto max-w-2xl overflow-hidden border-x border-gray-200 bg-white dark:border-gray-800 dark:bg-gray-950 sm:rounded-2xl sm:border">
+          <header class="sticky top-0 z-10 border-b border-gray-200 bg-white/90 px-4 py-4 backdrop-blur dark:border-gray-800 dark:bg-gray-950/90 sm:px-6">
+            <h1 class="text-xl font-bold text-gray-950 dark:text-gray-50">Feed</h1>
+            {totalPages > 1 && (
+              <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">
+                Page {page} of {totalPages}
+              </p>
+            )}
+          </header>
+          <FeedProfileCard />
+          <div>
+            {pagePosts.map((post) => (
+              <FeedPost key={post.id} post={post} tags={getTagsForPost(post.id)} />
+            ))}
+          </div>
+          {totalPages > 1 && (
+            <div class="border-t border-gray-200 px-4 pb-6 dark:border-gray-800 sm:px-6">
+              <Pagination currentPage={page} totalPages={totalPages} baseUrl="/feed" />
+            </div>
+          )}
         </div>
-
-        {/* Pagination */}
-        {totalPages > 1 && (
-          <Pagination currentPage={page} totalPages={totalPages} baseUrl="/feed" />
-        )}
       </Layout>
     );
   });

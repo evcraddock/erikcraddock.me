@@ -382,12 +382,15 @@ describe("pages routes", () => {
       expect(html).toContain('href="/posts/test-post"');
     });
 
-    it("shows note posts with left border styling", async () => {
+    it("shows Mastodon-style actor/profile elements", async () => {
       const app = getApp();
       const res = await app.request("/feed");
       const html = await res.text();
 
-      expect(html).toContain("border-l-4");
+      expect(html).toContain("@erik@erikcraddock.me");
+      expect(html).toContain("Follow on the Fediverse");
+      expect(html).toContain('aria-label="Erik Craddock profile"');
+      expect(html).toContain("rounded-full");
     });
 
     it("includes dark mode classes", async () => {
