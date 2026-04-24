@@ -382,11 +382,11 @@ function FeedActorAvatar({ className = "" }: { className?: string }) {
 
 function FeedProfileCard() {
   return (
-    <section class="border-b border-gray-200 bg-white dark:border-gray-800 dark:bg-gray-950">
+    <section class="border-b border-gray-200 bg-white dark:border-gray-800 dark:bg-gray-900">
       <div class="h-32 bg-gradient-to-br from-teal-500 via-blue-500 to-purple-600 sm:h-40" />
       <div class="px-4 pb-5 sm:px-6">
         <div class="-mt-12 flex items-end justify-between gap-4 sm:-mt-16">
-          <FeedActorAvatar className="h-24 w-24 border-4 border-white dark:border-gray-950 sm:h-32 sm:w-32" />
+          <FeedActorAvatar className="h-24 w-24 border-4 border-white dark:border-gray-900 sm:h-32 sm:w-32" />
           <a
             href="/about"
             class="mb-2 rounded-full border border-gray-300 px-4 py-2 text-sm font-semibold text-gray-900 transition hover:bg-gray-100 dark:border-gray-600 dark:text-gray-100 dark:hover:bg-gray-800"
@@ -464,7 +464,7 @@ function FeedPost({ post, tags: postTags = [] }: { post: PostWithSource; tags?: 
   const isLink = post.type === "link";
 
   return (
-    <article class="border-b border-gray-200 bg-white px-4 py-5 transition hover:bg-gray-50 dark:border-gray-800 dark:bg-gray-950 dark:hover:bg-gray-900/70 sm:px-6">
+    <article class="border-b border-gray-200 bg-white px-4 py-5 transition hover:bg-gray-50 dark:border-gray-800 dark:bg-gray-900 dark:hover:bg-gray-800/50 sm:px-6">
       <div class="flex gap-3 sm:gap-4">
         <a href="/about" aria-label="Erik Craddock profile" class="shrink-0">
           <FeedActorAvatar className="h-11 w-11 sm:h-12 sm:w-12" />
@@ -898,8 +898,8 @@ export function createPagesRoutes(db: Database): Hono {
     if (totalPosts === 0) {
       return c.html(
         <Layout title="Feed | erikcraddock.me">
-          <div class="mx-auto max-w-2xl overflow-hidden border-x border-gray-200 bg-white dark:border-gray-800 dark:bg-gray-950 sm:rounded-2xl sm:border">
-            <header class="sticky top-0 z-10 border-b border-gray-200 bg-white/90 px-4 py-4 backdrop-blur dark:border-gray-800 dark:bg-gray-950/90 sm:px-6">
+          <div class="mx-auto max-w-2xl overflow-hidden border-x border-gray-200 bg-white dark:border-gray-800 dark:bg-gray-900 sm:rounded-2xl sm:border">
+            <header class="sticky top-0 z-10 border-b border-gray-200 bg-white/90 px-4 py-4 backdrop-blur dark:border-gray-800 dark:bg-gray-900/90 sm:px-6">
               <h1 class="text-xl font-bold text-gray-950 dark:text-gray-50">Feed</h1>
             </header>
             <FeedProfileCard />
@@ -966,8 +966,8 @@ export function createPagesRoutes(db: Database): Hono {
 
     return c.html(
       <Layout title={`Feed${page > 1 ? ` - Page ${page}` : ""} | erikcraddock.me`}>
-        <div class="mx-auto max-w-2xl overflow-hidden border-x border-gray-200 bg-white dark:border-gray-800 dark:bg-gray-950 sm:rounded-2xl sm:border">
-          <header class="sticky top-0 z-10 border-b border-gray-200 bg-white/90 px-4 py-4 backdrop-blur dark:border-gray-800 dark:bg-gray-950/90 sm:px-6">
+        <div class="mx-auto max-w-2xl overflow-hidden border-x border-gray-200 bg-white dark:border-gray-800 dark:bg-gray-900 sm:rounded-2xl sm:border">
+          <header class="sticky top-0 z-10 border-b border-gray-200 bg-white/90 px-4 py-4 backdrop-blur dark:border-gray-800 dark:bg-gray-900/90 sm:px-6">
             <h1 class="text-xl font-bold text-gray-950 dark:text-gray-50">Feed</h1>
             {totalPages > 1 && (
               <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">
