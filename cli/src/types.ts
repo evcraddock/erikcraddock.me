@@ -57,12 +57,19 @@ export interface Media {
   url: string;
 }
 
+export interface SourceAuthor {
+  id: number;
+  name: string;
+  url: string | null;
+  sort_order: number;
+}
+
 export interface Source {
   id: number;
   name: string;
   url: string;
   feed_url: string | null;
-  author: string | null;
+  authors: SourceAuthor[];
 }
 
 export interface TagWithCount {

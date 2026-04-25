@@ -6,11 +6,11 @@ interface CreateOptions {
   name?: string;
   url?: string;
   feedUrl?: string;
-  author?: string;
+  authors: string[];
 }
 
 function parseCreateArgs(args: string[]): { options: CreateOptions; help: boolean } {
-  const options: CreateOptions = {};
+  const options: CreateOptions = { authors: [] };
   let help = false;
 
   let i = 0;
@@ -32,9 +32,9 @@ function parseCreateArgs(args: string[]): { options: CreateOptions; help: boolea
     } else if (arg.startsWith("--feed-url=")) {
       options.feedUrl = arg.split("=").slice(1).join("=");
     } else if (arg === "--author" && args[i + 1]) {
-      options.author = args[++i];
+      options.authors.push(args[++i]);
     } else if (arg.startsWith("--author=")) {
-      options.author = arg.split("=").slice(1).join("=");
+      options.authors.push(arg.split("=").slice(1).join("="));
     }
 
     i++;
@@ -54,13 +54,14 @@ Required:
 
 Options:
   --feed-url <url>    RSS/Atom feed URL (optional)
-  --author <name>     Source author name (optional)
+  --author <name>     Source author name (can be repeated)
   --json              Output as JSON
   --help, -h          Show this help message
 
 Examples:
   ec source create --name "Hacker News" --url "https://news.ycombinator.com"
   ec source create --name "One Useful Thing" --url "https://www.oneusefulthing.org/" --author "Ethan Mollick" --feed-url "https://www.oneusefulthing.org/feed"
+  ec source create --name "Team Blog" --url "https://example.com" --author "Alice" --author "Bob"
 `);
 }
 
@@ -98,7 +99,7 @@ export async function create(args: string[], globalOptions: GlobalOptions): Prom
     name: options.name,
     url: options.url,
     feed_url: options.feedUrl,
-    author: options.author,
+    authors: options.authors.map((name) => ({ name })),
   });
 
   if (result.error) {

@@ -19,13 +19,21 @@ bun src/index.ts --config dev-config.yaml source create --name "Hacker News" --u
 
 **Expected:** Success message with source ID.
 
+## Create with Multiple Authors
+
+```bash
+bun src/index.ts --config dev-config.yaml source create --name "Team Blog" --url "https://team.example.com" --author "Alice" --author "Bob"
+```
+
+**Expected:** Success message with source ID.
+
 ## Create with JSON Output
 
 ```bash
-bun src/index.ts --config dev-config.yaml source create --name "JSON Test" --url "https://json.example.com" --json
+bun src/index.ts --config dev-config.yaml source create --name "JSON Test" --url "https://json.example.com" --author "Alice" --json
 ```
 
-**Expected:** JSON object with id, name, url, feed_url fields.
+**Expected:** JSON object with id, name, url, feed_url, and authors fields.
 
 ## Error: Missing Name
 

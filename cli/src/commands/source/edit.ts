@@ -6,7 +6,7 @@ interface EditOptions {
   name?: string;
   url?: string;
   feedUrl?: string | null;
-  author?: string | null;
+  authors?: string[];
 }
 
 function parseEditArgs(args: string[]): { id: number | null; options: EditOptions; help: boolean } {
@@ -35,11 +35,11 @@ function parseEditArgs(args: string[]): { id: number | null; options: EditOption
     } else if (arg === "--no-feed-url") {
       options.feedUrl = null;
     } else if (arg === "--author" && args[i + 1]) {
-      options.author = args[++i];
+      options.authors = [...(options.authors ?? []), args[++i]];
     } else if (arg.startsWith("--author=")) {
-      options.author = arg.split("=").slice(1).join("=");
-    } else if (arg === "--no-author") {
-      options.author = null;
+      options.authors = [...(options.authors ?? []), arg.split("=").slice(1).join("=")];
+    } else if (arg === "--no-authors") {
+      options.authors = [];
     } else if (!arg.startsWith("-") && id === null) {
       const parsed = parseInt(arg, 10);
       if (!isNaN(parsed)) {
@@ -66,8 +66,8 @@ Options:
   --url <url>         Update source URL
   --feed-url <url>    Update RSS/Atom feed URL
   --no-feed-url       Remove feed URL
-  --author <name>     Update source author name
-  --no-author         Remove source author name
+  --author <name>     Replace source authors (can be repeated)
+  --no-authors        Remove all source authors
   --json              Output as JSON
   --help, -h          Show this help message
 
@@ -76,8 +76,9 @@ Examples:
   ec source edit 1 --url "https://hn.algolia.com"
   ec source edit 1 --feed-url "https://hnrss.org/frontpage"
   ec source edit 1 --author "Paul Graham"
+  ec source edit 1 --author "Alice" --author "Bob"
   ec source edit 1 --no-feed-url
-  ec source edit 1 --no-author
+  ec source edit 1 --no-authors
 `);
 }
 
@@ -100,12 +101,12 @@ export async function edit(args: string[], globalOptions: GlobalOptions): Promis
     options.name !== undefined ||
     options.url !== undefined ||
     options.feedUrl !== undefined ||
-    options.author !== undefined;
+    options.authors !== undefined;
 
   if (!hasUpdates) {
     console.error("❌ No update options provided.");
     console.error(
-      "Specify at least one of: --name, --url, --feed-url, --no-feed-url, --author, --no-author"
+      "Specify at least one of: --name, --url, --feed-url, --no-feed-url, --author, --no-authors"
     );
     process.exit(1);
   }
@@ -124,7 +125,7 @@ export async function edit(args: string[], globalOptions: GlobalOptions): Promis
     name: options.name,
     url: options.url,
     feed_url: options.feedUrl,
-    author: options.author,
+    authors: options.authors?.map((name) => ({ name })),
   });
 
   if (result.error) {

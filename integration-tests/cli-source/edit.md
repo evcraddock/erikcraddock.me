@@ -49,6 +49,34 @@ bun src/index.ts --config dev-config.yaml source show <id>
 
 **Expected:** Feed URL shows the new value.
 
+## Replace Authors
+
+```bash
+bun src/index.ts --config dev-config.yaml source edit <id> --author "Alice" --author "Bob"
+```
+
+**Expected:** Success message.
+
+```bash
+bun src/index.ts --config dev-config.yaml source show <id>
+```
+
+**Expected:** Authors show "Alice, Bob".
+
+## Clear Authors
+
+```bash
+bun src/index.ts --config dev-config.yaml source edit <id> --no-authors
+```
+
+**Expected:** Success message.
+
+```bash
+bun src/index.ts --config dev-config.yaml source show <id>
+```
+
+**Expected:** Authors show "-".
+
 ## Remove Feed URL
 
 ```bash

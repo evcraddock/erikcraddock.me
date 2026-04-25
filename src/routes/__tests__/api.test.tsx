@@ -2,7 +2,7 @@
 import { describe, it, expect, beforeAll, beforeEach } from "bun:test";
 import { mock } from "bun:test";
 import { createTestDb } from "../../db/test-utils";
-import { posts, sources, tags, postTags } from "../../db/schema";
+import { posts, sources, sourceAuthors, people, tags, postTags } from "../../db/schema";
 import { eq } from "drizzle-orm";
 
 // Create test db immediately
@@ -65,6 +65,8 @@ beforeEach(() => {
   testDb.delete(postTags).run();
   testDb.delete(tags).run();
   testDb.delete(posts).run();
+  testDb.delete(sourceAuthors).run();
+  testDb.delete(people).run();
   testDb.delete(sources).run();
   global.fetch = originalFetch;
   mockFederatePost.mockClear();
@@ -787,36 +789,76 @@ describe("POST /api/sources", () => {
     api = module.api;
   });
 
-  it("creates source with optional author", async () => {
+  it("creates source with multiple authors", async () => {
     const res = await api.request("/sources", {
       method: "POST",
       headers: { ...authHeader, "Content-Type": "application/json" },
       body: JSON.stringify({
-        name: "One Useful Thing",
-        url: "https://www.oneusefulthing.org/",
-        feed_url: "https://www.oneusefulthing.org/feed",
-        author: "Ethan Mollick",
+        name: "Team Blog",
+        url: "https://team.example.com/",
+        feed_url: "https://team.example.com/feed",
+        authors: ["Alice", { name: "Bob", url: "https://bob.example.com" }],
       }),
     });
 
     expect(res.status).toBe(201);
     const json = await res.json();
-    expect(json.data.author).toBe("Ethan Mollick");
+    expect(json.data.authors.map((author: { name: string }) => author.name)).toEqual([
+      "Alice",
+      "Bob",
+    ]);
+    expect(json.data.authors[1].url).toBe("https://bob.example.com");
 
-    const source = testDb.select().from(sources).where(eq(sources.id, json.data.id)).get();
-    expect(source?.author).toBe("Ethan Mollick");
+    const persistedAuthors = testDb
+      .select()
+      .from(sourceAuthors)
+      .where(eq(sourceAuthors.source_id, json.data.id))
+      .all();
+    expect(persistedAuthors).toHaveLength(2);
+
+    const persistedPeople = testDb.select().from(people).all();
+    expect(persistedPeople.map((person) => person.name)).toEqual(["Alice", "Bob"]);
   });
 
-  it("creates source without author", async () => {
+  it("creates source without authors", async () => {
     const res = await api.request("/sources", {
       method: "POST",
       headers: { ...authHeader, "Content-Type": "application/json" },
-      body: JSON.stringify({ name: "No Author", url: "https://example.com" }),
+      body: JSON.stringify({ name: "No Authors", url: "https://example.com" }),
     });
 
     expect(res.status).toBe(201);
     const json = await res.json();
-    expect(json.data.author).toBeNull();
+    expect(json.data.authors).toEqual([]);
+  });
+
+  it("reuses people for authors across sources", async () => {
+    for (const [name, url] of [
+      ["First Source", "https://first.example.com"],
+      ["Second Source", "https://second.example.com"],
+    ]) {
+      const res = await api.request("/sources", {
+        method: "POST",
+        headers: { ...authHeader, "Content-Type": "application/json" },
+        body: JSON.stringify({ name, url, authors: ["Shared Author"] }),
+      });
+      expect(res.status).toBe(201);
+    }
+
+    const sharedPeople = testDb.select().from(people).where(eq(people.name, "Shared Author")).all();
+    expect(sharedPeople).toHaveLength(1);
+  });
+
+  it("rejects malformed authors", async () => {
+    const res = await api.request("/sources", {
+      method: "POST",
+      headers: { ...authHeader, "Content-Type": "application/json" },
+      body: JSON.stringify({ name: "Bad", url: "https://example.com", authors: "Alice" }),
+    });
+
+    expect(res.status).toBe(400);
+    const json = await res.json();
+    expect(JSON.stringify(json.error)).toContain("expected array");
   });
 });
 
@@ -883,40 +925,55 @@ describe("PUT /api/sources/:id", () => {
     expect(json.data.feed_url).toBeNull();
   });
 
-  it("updates author", async () => {
+  it("replaces authors", async () => {
     const source = testDb
       .insert(sources)
       .values({ name: "Test", url: "https://example.com" })
       .returning()
       .get();
 
+    const originalPerson = testDb.insert(people).values({ name: "Original" }).returning().get();
+    testDb
+      .insert(sourceAuthors)
+      .values({ source_id: source.id, person_id: originalPerson.id })
+      .run();
+
     const res = await api.request(`/sources/${source.id}`, {
       method: "PUT",
       headers: { ...authHeader, "Content-Type": "application/json" },
-      body: JSON.stringify({ author: "Updated Author" }),
+      body: JSON.stringify({ authors: ["Alice", "Bob"] }),
     });
 
     expect(res.status).toBe(200);
     const json = await res.json();
-    expect(json.data.author).toBe("Updated Author");
+    expect(json.data.authors.map((author: { name: string }) => author.name)).toEqual([
+      "Alice",
+      "Bob",
+    ]);
   });
 
-  it("updates author to null", async () => {
+  it("clears authors", async () => {
     const source = testDb
       .insert(sources)
-      .values({ name: "Test", url: "https://example.com", author: "Original Author" })
+      .values({ name: "Test", url: "https://example.com" })
       .returning()
       .get();
 
+    const originalPerson = testDb.insert(people).values({ name: "Original" }).returning().get();
+    testDb
+      .insert(sourceAuthors)
+      .values({ source_id: source.id, person_id: originalPerson.id })
+      .run();
+
     const res = await api.request(`/sources/${source.id}`, {
       method: "PUT",
       headers: { ...authHeader, "Content-Type": "application/json" },
-      body: JSON.stringify({ author: null }),
+      body: JSON.stringify({ authors: [] }),
     });
 
     expect(res.status).toBe(200);
     const json = await res.json();
-    expect(json.data.author).toBeNull();
+    expect(json.data.authors).toEqual([]);
   });
 
   it("returns 404 for non-existent source", async () => {

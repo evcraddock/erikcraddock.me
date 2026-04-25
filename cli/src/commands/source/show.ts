@@ -38,11 +38,16 @@ Examples:
 `);
 }
 
+function formatAuthors(source: Source): string {
+  if (source.authors.length === 0) return "-";
+  return source.authors.map((author) => author.name).join(", ");
+}
+
 function formatSource(source: Source): void {
   console.log(`ID:        ${source.id}`);
   console.log(`Name:      ${source.name}`);
   console.log(`URL:       ${source.url}`);
-  console.log(`Author:    ${source.author || "-"}`);
+  console.log(`Authors:   ${formatAuthors(source)}`);
   console.log(`Feed URL:  ${source.feed_url || "-"}`);
 }
 

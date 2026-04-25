@@ -50,6 +50,13 @@
       "when": 1777145488638,
       "tag": "0006_magenta_hemingway",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "6",
+      "when": 1777148148270,
+      "tag": "0007_certain_bishop",
+      "breakpoints": true
     }
   ]
 }

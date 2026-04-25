@@ -1,40 +1,114 @@
-import { eq } from "drizzle-orm";
-import { db, sources } from "@/db";
+import { asc, eq } from "drizzle-orm";
+import { db, people, sourceAuthors, sources } from "@/db";
+
+export interface SourceAuthor {
+  id: number;
+  name: string;
+  url: string | null;
+  sort_order: number;
+}
 
 export interface Source {
   id: number;
   name: string;
   url: string;
   feed_url: string | null;
-  author: string | null;
+  authors: SourceAuthor[];
+}
+
+export interface SourceAuthorInput {
+  name: string;
+  url?: string | null;
+}
+
+type SourceRecord = typeof sources.$inferSelect;
+
+function listAuthorsForSource(sourceId: number): SourceAuthor[] {
+  return db
+    .select({
+      id: people.id,
+      name: people.name,
+      url: people.url,
+      sort_order: sourceAuthors.sort_order,
+    })
+    .from(sourceAuthors)
+    .innerJoin(people, eq(sourceAuthors.person_id, people.id))
+    .where(eq(sourceAuthors.source_id, sourceId))
+    .orderBy(asc(sourceAuthors.sort_order), asc(sourceAuthors.id))
+    .all();
+}
+
+function attachAuthors(source: SourceRecord): Source {
+  return { ...source, authors: listAuthorsForSource(source.id) };
+}
+
+function getOrCreatePerson(author: SourceAuthorInput): number {
+  const existing = db.select().from(people).where(eq(people.name, author.name)).get();
+  if (existing) {
+    if (author.url && !existing.url) {
+      db.update(people).set({ url: author.url }).where(eq(people.id, existing.id)).run();
+    }
+    return existing.id;
+  }
+
+  const person = db
+    .insert(people)
+    .values({ name: author.name, url: author.url ?? null })
+    .returning()
+    .get();
+
+  return person.id;
+}
+
+function replaceSourceAuthors(sourceId: number, authors: SourceAuthorInput[]): void {
+  db.delete(sourceAuthors).where(eq(sourceAuthors.source_id, sourceId)).run();
+
+  if (authors.length === 0) {
+    return;
+  }
+
+  db.insert(sourceAuthors)
+    .values(
+      authors.map((author, index) => ({
+        source_id: sourceId,
+        person_id: getOrCreatePerson(author),
+        sort_order: index,
+      }))
+    )
+    .run();
 }
 
 /**
  * List all sources
  */
 export function listSources(): Source[] {
-  return db.select().from(sources).all();
+  return db
+    .select()
+    .from(sources)
+    .all()
+    .map((source) => attachAuthors(source));
 }
 
 /**
  * Get a single source by ID
  */
 export function getSource(id: number): Source | null {
-  return db.select().from(sources).where(eq(sources.id, id)).get() ?? null;
+  const source = db.select().from(sources).where(eq(sources.id, id)).get();
+  return source ? attachAuthors(source) : null;
 }
 
 export interface CreateSourceInput {
   name: string;
   url: string;
   feed_url?: string | null;
-  author?: string | null;
+  authors?: SourceAuthorInput[];
 }
 
 /**
  * Create a new source
  */
 export function createSource(input: CreateSourceInput): Source {
-  const { name, url, feed_url, author } = input;
+  const { name, url, feed_url, authors } = input;
 
   const source = db
     .insert(sources)
@@ -42,19 +116,20 @@ export function createSource(input: CreateSourceInput): Source {
       name,
       url,
       feed_url: feed_url ?? null,
-      author: author ?? null,
     })
     .returning()
     .get();
 
-  return source;
+  replaceSourceAuthors(source.id, authors ?? []);
+
+  return attachAuthors(source);
 }
 
 export interface UpdateSourceInput {
   name?: string;
   url?: string;
   feed_url?: string | null;
-  author?: string | null;
+  authors?: SourceAuthorInput[];
 }
 
 /**
@@ -70,7 +145,6 @@ export function updateSource(id: number, input: UpdateSourceInput): Source | nul
     name: string;
     url: string;
     feed_url: string | null;
-    author: string | null;
   }> = {};
 
   if (input.name !== undefined) {
@@ -82,17 +156,16 @@ export function updateSource(id: number, input: UpdateSourceInput): Source | nul
   if (input.feed_url !== undefined) {
     updates.feed_url = input.feed_url;
   }
-  if (input.author !== undefined) {
-    updates.author = input.author;
+
+  if (Object.keys(updates).length > 0) {
+    db.update(sources).set(updates).where(eq(sources.id, id)).returning().get();
   }
 
-  if (Object.keys(updates).length === 0) {
-    return existing;
+  if (input.authors !== undefined) {
+    replaceSourceAuthors(id, input.authors);
   }
 
-  const source = db.update(sources).set(updates).where(eq(sources.id, id)).returning().get();
-
-  return source ?? null;
+  return getSource(id);
 }
 
 /**

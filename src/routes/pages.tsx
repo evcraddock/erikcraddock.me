@@ -1,7 +1,17 @@
 import { Hono } from "hono";
 import { raw } from "hono/html";
-import { desc, eq, isNotNull, and } from "drizzle-orm";
-import { db as defaultDb, posts, tags, postTags, sources, media, followers } from "../db";
+import { asc, desc, eq, isNotNull, and } from "drizzle-orm";
+import {
+  db as defaultDb,
+  posts,
+  tags,
+  postTags,
+  sources,
+  sourceAuthors,
+  people,
+  media,
+  followers,
+} from "../db";
 import { Layout } from "../templates/layout";
 import { NotFound } from "../templates/not-found";
 import { truncate } from "../utils/text";
@@ -19,6 +29,13 @@ type Database = typeof defaultDb;
 // Post type for the card component (with optional source)
 type Post = typeof posts.$inferSelect;
 type Source = typeof sources.$inferSelect;
+type SourceAuthor = {
+  id: number;
+  name: string;
+  url: string | null;
+  sort_order: number;
+};
+type SourceWithAuthors = Source & { authors: SourceAuthor[] };
 type Tag = { id: number; name: string; slug: string };
 type PostWithSource = Post & { source?: Source | null };
 
@@ -93,6 +110,24 @@ function normalizeFediverseServer(input: string): string | null {
   } catch {
     return null;
   }
+}
+
+function formatAuthorByline(authors: SourceAuthor[]): string | null {
+  const names = authors.map((author) => author.name);
+
+  if (names.length === 0) {
+    return null;
+  }
+
+  if (names.length === 1) {
+    return names[0];
+  }
+
+  if (names.length === 2) {
+    return `${names[0]} and ${names[1]}`;
+  }
+
+  return `${names.slice(0, -1).join(", ")}, and ${names[names.length - 1]}`;
 }
 
 function buildRemoteFollowUrl(serverOrigin: string): string {
@@ -1412,7 +1447,36 @@ export function createPagesRoutes(db: Database): Hono {
 
   // Sources / Blogroll page
   pages.get("/sources", (c) => {
-    const allSources = db.select().from(sources).orderBy(sources.name).all();
+    const allSourceRows = db.select().from(sources).orderBy(sources.name).all();
+    const allSourceAuthors = db
+      .select({
+        sourceId: sourceAuthors.source_id,
+        id: people.id,
+        name: people.name,
+        url: people.url,
+        sort_order: sourceAuthors.sort_order,
+      })
+      .from(sourceAuthors)
+      .innerJoin(people, eq(sourceAuthors.person_id, people.id))
+      .orderBy(asc(sourceAuthors.source_id), asc(sourceAuthors.sort_order), asc(sourceAuthors.id))
+      .all();
+
+    const authorsBySourceId = new Map<number, SourceAuthor[]>();
+    for (const author of allSourceAuthors) {
+      const existing = authorsBySourceId.get(author.sourceId) ?? [];
+      existing.push({
+        id: author.id,
+        name: author.name,
+        url: author.url,
+        sort_order: author.sort_order,
+      });
+      authorsBySourceId.set(author.sourceId, existing);
+    }
+
+    const allSources: SourceWithAuthors[] = allSourceRows.map((source) => ({
+      ...source,
+      authors: authorsBySourceId.get(source.id) ?? [],
+    }));
 
     return c.html(
       <Layout title="Sources | erikcraddock.me">
@@ -1437,11 +1501,11 @@ export function createPagesRoutes(db: Database): Hono {
                 >
                   {source.name}
                 </a>
-                {source.author ? (
+                {formatAuthorByline(source.authors) ? (
                   <>
                     {" "}
                     <span class="ml-2 text-sm text-gray-500 dark:text-gray-400">
-                      by {source.author}
+                      by {formatAuthorByline(source.authors)}
                     </span>
                   </>
                 ) : null}

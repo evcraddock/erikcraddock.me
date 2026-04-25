@@ -24,6 +24,7 @@ import {
   createSource,
   updateSource,
   deleteSource,
+  type SourceAuthorInput,
 } from "@/services/sources";
 import { listTags } from "@/services/tags";
 import { fetchLinkPreview } from "@/services/link-preview";
@@ -95,12 +96,21 @@ const ApiPingSchema = z
   })
   .openapi("ApiPing");
 
+const SourceAuthorSchema = z
+  .object({
+    id: z.number().int().openapi({ example: 1 }),
+    name: z.string().openapi({ example: "Paul Graham" }),
+    url: NullableStringSchema.openapi({ example: "https://paulgraham.com" }),
+    sort_order: z.number().int().openapi({ example: 0 }),
+  })
+  .openapi("SourceAuthor");
+
 const SourceSummarySchema = z
   .object({
     id: z.number().int().openapi({ example: 1 }),
     name: z.string().openapi({ example: "Hacker News" }),
     url: z.string().url().openapi({ example: "https://news.ycombinator.com" }),
-    author: NullableStringSchema.openapi({ example: "Paul Graham" }),
+    authors: z.array(SourceAuthorSchema),
   })
   .openapi("SourceSummary");
 
@@ -231,12 +241,20 @@ const UpdatePostBodySchema = z
   })
   .openapi("UpdatePostBody");
 
+const SourceAuthorInputSchema = z.union([
+  z.string().openapi({ example: "Paul Graham" }),
+  z.object({
+    name: z.string().openapi({ example: "Paul Graham" }),
+    url: z.string().optional().nullable().openapi({ example: "https://paulgraham.com" }),
+  }),
+]);
+
 const CreateSourceBodySchema = z
   .object({
     name: z.string().openapi({ example: "Hacker News" }),
     url: z.string().openapi({ example: "https://news.ycombinator.com" }),
     feed_url: z.string().optional().nullable().openapi({ example: "https://hnrss.org/frontpage" }),
-    author: z.string().optional().nullable().openapi({ example: "Paul Graham" }),
+    authors: z.array(SourceAuthorInputSchema).optional().nullable(),
   })
   .openapi("CreateSourceBody");
 
@@ -245,9 +263,61 @@ const UpdateSourceBodySchema = z
     name: z.string().optional().nullable(),
     url: z.string().optional().nullable(),
     feed_url: z.string().optional().nullable(),
-    author: z.string().optional().nullable(),
+    authors: z.array(SourceAuthorInputSchema).optional().nullable(),
   })
   .openapi("UpdateSourceBody");
+
+function parseSourceAuthors(input: unknown): SourceAuthorInput[] | string | undefined {
+  if (input === undefined) {
+    return undefined;
+  }
+
+  if (input === null) {
+    return [];
+  }
+
+  if (!Array.isArray(input)) {
+    return "Authors must be an array";
+  }
+
+  const authors: SourceAuthorInput[] = [];
+
+  for (const [index, author] of input.entries()) {
+    if (typeof author === "string") {
+      const name = author.trim();
+      if (!name) {
+        return `Author at index ${index} must have a name`;
+      }
+      authors.push({ name });
+      continue;
+    }
+
+    if (!author || typeof author !== "object" || Array.isArray(author)) {
+      return `Author at index ${index} must be a string or object`;
+    }
+
+    const authorRecord = author as { name?: unknown; url?: unknown };
+    if (typeof authorRecord.name !== "string" || authorRecord.name.trim().length === 0) {
+      return `Author at index ${index} must have a name`;
+    }
+
+    if (
+      authorRecord.url !== undefined &&
+      authorRecord.url !== null &&
+      typeof authorRecord.url !== "string"
+    ) {
+      return `Author URL at index ${index} must be a string`;
+    }
+
+    const authorUrl = typeof authorRecord.url === "string" ? authorRecord.url.trim() || null : null;
+    authors.push({
+      name: authorRecord.name.trim(),
+      url: authorUrl,
+    });
+  }
+
+  return authors;
+}
 
 const DeleteUriBodySchema = z
   .object({
@@ -1290,7 +1360,7 @@ registerProtectedRoute(
   }),
   async (c: Context) => {
     const body = await c.req.json();
-    const { name, url, feed_url, author } = body;
+    const { name, url, feed_url, authors } = body;
 
     if (!name || typeof name !== "string" || name.trim().length === 0) {
       return c.json({ error: "Name is required" }, 400);
@@ -1300,8 +1370,9 @@ registerProtectedRoute(
       return c.json({ error: "URL is required" }, 400);
     }
 
-    if (author !== undefined && author !== null && typeof author !== "string") {
-      return c.json({ error: "Author must be a string" }, 400);
+    const parsedAuthors = parseSourceAuthors(authors);
+    if (typeof parsedAuthors === "string") {
+      return c.json({ error: parsedAuthors }, 400);
     }
 
     try {
@@ -1309,7 +1380,7 @@ registerProtectedRoute(
         name: name.trim(),
         url: url.trim(),
         feed_url: feed_url?.trim() || null,
-        author: author?.trim() || null,
+        authors: parsedAuthors,
       });
 
       return c.json({ data: source }, 201);
@@ -1362,7 +1433,7 @@ registerProtectedRoute(
     }
 
     const body = await c.req.json();
-    const { name, url, feed_url, author } = body;
+    const { name, url, feed_url, authors } = body;
 
     if (name !== undefined && (typeof name !== "string" || name.trim().length === 0)) {
       return c.json({ error: "Name cannot be empty" }, 400);
@@ -1372,8 +1443,9 @@ registerProtectedRoute(
       return c.json({ error: "URL cannot be empty" }, 400);
     }
 
-    if (author !== undefined && author !== null && typeof author !== "string") {
-      return c.json({ error: "Author must be a string" }, 400);
+    const parsedAuthors = parseSourceAuthors(authors);
+    if (typeof parsedAuthors === "string") {
+      return c.json({ error: parsedAuthors }, 400);
     }
 
     try {
@@ -1381,7 +1453,7 @@ registerProtectedRoute(
         name: name?.trim(),
         url: url?.trim(),
         feed_url: feed_url !== undefined ? feed_url?.trim() || null : undefined,
-        author: author !== undefined ? author?.trim() || null : undefined,
+        authors: parsedAuthors,
       });
 
       if (!source) {

@@ -24,6 +24,7 @@ bun src/index.ts --config dev-config.yaml source show <id>
 - ID: <id>
 - Name: Show Test
 - URL: https://show.example.com
+- Authors: -
 - Feed URL: https://show.example.com/rss
 
 ## Show as JSON

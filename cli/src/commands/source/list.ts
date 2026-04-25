@@ -38,14 +38,14 @@ function formatTable(sources: Source[]): void {
   // Calculate column widths
   const idWidth = Math.max(2, ...sources.map((s) => String(s.id).length));
   const nameWidth = Math.min(30, Math.max(4, ...sources.map((s) => s.name.length)));
-  const authorWidth = Math.min(25, Math.max(6, ...sources.map((s) => (s.author ?? "-").length)));
+  const authorWidth = Math.min(25, Math.max(7, ...sources.map((s) => formatAuthors(s).length)));
   const urlWidth = Math.min(50, Math.max(3, ...sources.map((s) => s.url.length)));
 
   // Header
   const header = [
     "ID".padEnd(idWidth),
     "NAME".padEnd(nameWidth),
-    "AUTHOR".padEnd(authorWidth),
+    "AUTHORS".padEnd(authorWidth),
     "URL".padEnd(urlWidth),
   ].join("  ");
 
@@ -56,7 +56,7 @@ function formatTable(sources: Source[]): void {
     const row = [
       String(source.id).padEnd(idWidth),
       truncate(source.name, nameWidth).padEnd(nameWidth),
-      truncate(source.author ?? "-", authorWidth).padEnd(authorWidth),
+      truncate(formatAuthors(source), authorWidth).padEnd(authorWidth),
       truncate(source.url, urlWidth).padEnd(urlWidth),
     ].join("  ");
 
@@ -64,6 +64,11 @@ function formatTable(sources: Source[]): void {
   }
 
   console.log(`\nTotal: ${sources.length} sources`);
+}
+
+function formatAuthors(source: Source): string {
+  if (source.authors.length === 0) return "-";
+  return source.authors.map((author) => author.name).join(", ");
 }
 
 function truncate(str: string, maxLen: number): string {
