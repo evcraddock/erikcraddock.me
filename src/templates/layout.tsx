@@ -67,7 +67,7 @@ export function Layout({ title, children, ogImage, description, canonicalUrl }: 
         />
       </head>
       <body class="min-h-screen flex flex-col bg-gray-50 text-gray-900 dark:bg-gray-900 dark:text-gray-100">
-        <header class="bg-white shadow-sm dark:bg-gray-800 dark:shadow-gray-900/50">
+        <header class="sticky top-0 z-50 bg-white shadow-sm dark:bg-gray-800 dark:shadow-gray-900/50">
           <nav class="max-w-6xl mx-auto px-4 py-4 flex items-center justify-between">
             <a
               href="/"

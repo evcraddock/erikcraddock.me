@@ -373,21 +373,39 @@ describe("pages routes", () => {
       expect(html).toContain("Short note content");
     });
 
-    it("shows article posts with Read more link", async () => {
+    it("shows article posts as linked preview cards", async () => {
       const app = getApp();
       const res = await app.request("/feed");
       const html = await res.text();
 
-      expect(html).toContain("Read more →");
       expect(html).toContain('href="/posts/test-post"');
+      expect(html).toContain("Test Post");
+      expect(html).toContain("This is test content");
+      expect(html).not.toContain("Read more →");
     });
 
-    it("shows note posts with left border styling", async () => {
+    it("shows Mastodon-style actor/profile elements", async () => {
       const app = getApp();
       const res = await app.request("/feed");
       const html = await res.text();
 
-      expect(html).toContain("border-l-4");
+      expect(html).toContain("@erik@erikcraddock.me");
+      expect(html).toContain("Followers");
+      expect(html).toContain("Following");
+      expect(html).toContain("Posts");
+      expect(html).toContain('aria-label="Erik Craddock profile"');
+      expect(html).toContain("rounded-full");
+    });
+
+    it("shows stored link previews in feed items", async () => {
+      const app = getApp();
+      const res = await app.request("/feed");
+      const html = await res.text();
+
+      expect(html).toContain("Example Site");
+      expect(html).toContain("Example Article");
+      expect(html).toContain("A rich preview description.");
+      expect(html).toContain("https://example.com/preview.jpg");
     });
 
     it("includes dark mode classes", async () => {
@@ -480,13 +498,13 @@ describe("pages routes", () => {
       expect(html).toContain("TypeScript");
     });
 
-    it("includes back link to home", async () => {
+    it("includes back link to feed", async () => {
       const app = getApp();
       const res = await app.request("/posts/test-post");
       const html = await res.text();
 
-      expect(html).toContain('href="/"');
-      expect(html).toContain("Back to home");
+      expect(html).toContain('href="/feed"');
+      expect(html).toContain("← Feed");
     });
 
     it("includes dark mode classes", async () => {
@@ -494,8 +512,8 @@ describe("pages routes", () => {
       const res = await app.request("/posts/test-post");
       const html = await res.text();
 
-      expect(html).toContain("dark:text-blue-400");
-      expect(html).toContain("dark:bg-gray-700");
+      expect(html).toContain("dark:text-teal-400");
+      expect(html).toContain("dark:bg-gray-900");
       expect(html).toContain("dark:text-gray-300");
     });
 
@@ -614,7 +632,7 @@ describe("pages routes", () => {
       expect(html).toContain('property="og:url" content="https://example.com/article"');
     });
 
-    it("renders an OG preview card for link posts at the top of the page", async () => {
+    it("renders an OG preview card for link posts", async () => {
       const app = getApp();
       const res = await app.request("/posts/test-link");
 
@@ -626,12 +644,6 @@ describe("pages routes", () => {
       expect(html).toContain("Example Site");
       expect(html).toContain('src="https://example.com/preview.jpg"');
       expect(html).toContain('href="https://example.com/article"');
-
-      expect(html.indexOf('src="https://example.com/preview.jpg"')).toBeLessThan(
-        html.indexOf(
-          '<h1 class="text-3xl font-bold text-gray-900 dark:text-gray-100 mb-4">Test Link Post'
-        )
-      );
     });
 
     it("backfills OG preview metadata for older link posts during page render", async () => {
@@ -815,14 +827,14 @@ describe("pages routes", () => {
     // Notes are accessible via /posts/:slug but not listed on home page.
 
     describe("GET /posts/:slug (single note page)", () => {
-      it("displays note with left border styling", async () => {
+      it("displays note in the single-post feed layout", async () => {
         const app = getApp();
         const res = await app.request("/posts/short-note");
         const html = await res.text();
 
         expect(res.status).toBe(200);
-        expect(html).toContain("border-l-4");
-        expect(html).toContain("border-l-gray-300");
+        expect(html).toContain("Post");
+        expect(html).toContain("@erik@erikcraddock.me");
       });
 
       it("displays full note content", async () => {
@@ -841,12 +853,12 @@ describe("pages routes", () => {
         expect(html).toContain("<title>Note | erikcraddock.me</title>");
       });
 
-      it("does not display title heading for notes", async () => {
+      it("does not display a note title heading", async () => {
         const app = getApp();
         const res = await app.request("/posts/short-note");
         const html = await res.text();
 
-        expect(html).not.toContain("<h1");
+        expect(html).not.toContain("Short Note");
       });
     });
   });
