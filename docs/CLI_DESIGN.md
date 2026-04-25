@@ -89,8 +89,8 @@ Sources provide attribution for links (e.g., "via Hacker News").
 ```bash
 ec source list
 ec source show <id>
-ec source create --name "..." --url "..." [--feed-url "..."] [--author "..."]
-ec source edit <id> [--name "..."] [--url "..."] [--feed-url "..."] [--author "..."] [--no-author]
+ec source create --name "..." --url "..." [--feed-url "..."] [--author "..."]...
+ec source edit <id> [--name "..."] [--url "..."] [--feed-url "..."] [--author "..."]... [--no-authors]
 ec source delete <id>
 ```
 

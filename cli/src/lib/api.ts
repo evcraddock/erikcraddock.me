@@ -183,7 +183,7 @@ export class ApiClient {
     name: string;
     url: string;
     feed_url?: string;
-    author?: string;
+    authors?: Array<{ name: string }>;
   }): Promise<ApiResponse<Source>> {
     return this.request<Source>("POST", "/sources", data);
   }
@@ -194,7 +194,7 @@ export class ApiClient {
       name?: string;
       url?: string;
       feed_url?: string | null;
-      author?: string | null;
+      authors?: Array<{ name: string }>;
     }
   ): Promise<ApiResponse<Source>> {
     return this.request<Source>("PUT", `/sources/${id}`, data);

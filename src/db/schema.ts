@@ -47,7 +47,23 @@ export const sources = sqliteTable("sources", {
   name: text("name").notNull(),
   url: text("url").notNull(),
   feed_url: text("feed_url"),
-  author: text("author"),
+});
+
+export const people = sqliteTable("people", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  name: text("name").notNull(),
+  url: text("url"),
+});
+
+export const sourceAuthors = sqliteTable("source_authors", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  source_id: integer("source_id")
+    .notNull()
+    .references(() => sources.id, { onDelete: "cascade" }),
+  person_id: integer("person_id")
+    .notNull()
+    .references(() => people.id, { onDelete: "cascade" }),
+  sort_order: integer("sort_order").notNull().default(0),
 });
 
 // ActivityPub followers

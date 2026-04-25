@@ -43,7 +43,7 @@ ec link create --url "..." --slug my-link --content "Commentary"
 ec note create --slug thought --content "A quick note"
 
 ec source list                  # List sources (blogroll)
-ec source create --name "HN" --url "https://news.ycombinator.com" --author "Paul Graham"
+ec source create --name "HN" --url "https://news.ycombinator.com" --author "Paul Graham" --author "Jessica Livingston"
 
 ec tag list                     # List tags with counts
 

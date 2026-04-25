@@ -1,5 +1,5 @@
-import { eq, desc, and, isNotNull, isNull } from "drizzle-orm";
-import { db, posts, tags, postTags, media, sources } from "@/db";
+import { asc, eq, desc, and, isNotNull, isNull } from "drizzle-orm";
+import { db, posts, tags, postTags, media, sources, sourceAuthors, people } from "@/db";
 import { mediaUrl } from "./media";
 
 export type PostType = "article" | "link" | "note";
@@ -15,6 +15,40 @@ export interface PostListItem {
 }
 
 export type PostStatus = "draft" | "published" | "all";
+
+type SourceSummary = {
+  id: number;
+  name: string;
+  url: string;
+  authors: Array<{
+    id: number;
+    name: string;
+    url: string | null;
+    sort_order: number;
+  }>;
+};
+
+function getSourceSummary(sourceId: number): SourceSummary | null {
+  const sourceRecord = db.select().from(sources).where(eq(sources.id, sourceId)).get();
+  if (!sourceRecord) {
+    return null;
+  }
+
+  const authors = db
+    .select({
+      id: people.id,
+      name: people.name,
+      url: people.url,
+      sort_order: sourceAuthors.sort_order,
+    })
+    .from(sourceAuthors)
+    .innerJoin(people, eq(sourceAuthors.person_id, people.id))
+    .where(eq(sourceAuthors.source_id, sourceRecord.id))
+    .orderBy(asc(sourceAuthors.sort_order), asc(sourceAuthors.id))
+    .all();
+
+  return { id: sourceRecord.id, name: sourceRecord.name, url: sourceRecord.url, authors };
+}
 
 export interface ListPostsOptions {
   type?: PostType;
@@ -269,13 +303,7 @@ export function createPost(input: CreatePostInput) {
   }
 
   // Get source info if source_id is set
-  let source: { id: number; name: string; url: string } | null = null;
-  if (post.source_id) {
-    const sourceRecord = db.select().from(sources).where(eq(sources.id, post.source_id)).get();
-    if (sourceRecord) {
-      source = { id: sourceRecord.id, name: sourceRecord.name, url: sourceRecord.url };
-    }
-  }
+  const source = post.source_id ? getSourceSummary(post.source_id) : null;
 
   return {
     ...post,
@@ -471,13 +499,7 @@ export function getPost(id: number) {
   }
 
   // Get source info if source_id is set
-  let source: { id: number; name: string; url: string } | null = null;
-  if (post.source_id) {
-    const sourceRecord = db.select().from(sources).where(eq(sources.id, post.source_id)).get();
-    if (sourceRecord) {
-      source = { id: sourceRecord.id, name: sourceRecord.name, url: sourceRecord.url };
-    }
-  }
+  const source = post.source_id ? getSourceSummary(post.source_id) : null;
 
   return {
     ...post,
@@ -517,13 +539,7 @@ export function getPostBySlug(slug: string) {
   }
 
   // Get source info if source_id is set
-  let source: { id: number; name: string; url: string } | null = null;
-  if (post.source_id) {
-    const sourceRecord = db.select().from(sources).where(eq(sources.id, post.source_id)).get();
-    if (sourceRecord) {
-      source = { id: sourceRecord.id, name: sourceRecord.name, url: sourceRecord.url };
-    }
-  }
+  const source = post.source_id ? getSourceSummary(post.source_id) : null;
 
   return {
     ...post,

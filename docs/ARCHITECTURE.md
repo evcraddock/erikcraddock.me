@@ -51,7 +51,13 @@ post_tags
   post_id, tag_id
 
 sources (link attribution)
-  id, name, url, feed_url, author
+  id, name, url, feed_url
+
+people (public attribution identities)
+  id, name, url
+
+source_authors (source bylines)
+  id, source_id, person_id, sort_order
 
 followers
   id, actor_uri, inbox_uri, shared_inbox_uri, followed_at

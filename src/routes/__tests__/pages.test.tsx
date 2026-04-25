@@ -9,7 +9,7 @@ afterEach(() => {
   global.fetch = originalFetch;
 });
 import { createTestDb } from "../../db/test-utils";
-import { posts, tags, postTags, sources, media } from "../../db/schema";
+import { posts, tags, postTags, sources, sourceAuthors, people, media } from "../../db/schema";
 
 // Create test db immediately
 const testDb = createTestDb();
@@ -120,9 +120,32 @@ testDb
       name: "Test Blog",
       url: "https://example.com",
       feed_url: "https://example.com/feed.xml",
-      author: "Test Author",
     },
     { id: 2, name: "Another Site", url: "https://another.example.com", feed_url: null },
+    { id: 3, name: "Team Blog", url: "https://team.example.com", feed_url: null },
+    { id: 4, name: "Group Blog", url: "https://group.example.com", feed_url: null },
+  ])
+  .run();
+
+testDb
+  .insert(people)
+  .values([
+    { id: 1, name: "Test Author" },
+    { id: 2, name: "Alice" },
+    { id: 3, name: "Bob" },
+    { id: 4, name: "Carol" },
+  ])
+  .run();
+
+testDb
+  .insert(sourceAuthors)
+  .values([
+    { source_id: 1, person_id: 1, sort_order: 0 },
+    { source_id: 3, person_id: 2, sort_order: 0 },
+    { source_id: 3, person_id: 3, sort_order: 1 },
+    { source_id: 4, person_id: 2, sort_order: 0 },
+    { source_id: 4, person_id: 3, sort_order: 1 },
+    { source_id: 4, person_id: 4, sort_order: 2 },
   ])
   .run();
 
@@ -526,6 +549,22 @@ describe("pages routes", () => {
       const html = await res.text();
 
       expect(html).toContain("by Test Author");
+    });
+
+    it("formats two source authors naturally", async () => {
+      const app = getApp();
+      const res = await app.request("/sources");
+      const html = await res.text();
+
+      expect(html).toContain("by Alice and Bob");
+    });
+
+    it("formats three or more source authors naturally", async () => {
+      const app = getApp();
+      const res = await app.request("/sources");
+      const html = await res.text();
+
+      expect(html).toContain("by Alice, Bob, and Carol");
     });
 
     it("includes dark mode classes", async () => {

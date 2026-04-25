@@ -18,7 +18,7 @@ bun src/index.ts --config dev-config.yaml source create --name "Source Two" --ur
 bun src/index.ts --config dev-config.yaml source list
 ```
 
-**Expected:** Table with ID, NAME, URL columns showing both sources.
+**Expected:** Table with ID, NAME, AUTHORS, URL columns showing both sources.
 
 ## List as JSON
 
@@ -26,7 +26,7 @@ bun src/index.ts --config dev-config.yaml source list
 bun src/index.ts --config dev-config.yaml source list --json
 ```
 
-**Expected:** JSON array of source objects with id, name, url, feed_url fields.
+**Expected:** JSON array of source objects with id, name, url, feed_url, and authors fields.
 
 ## Empty List
 
