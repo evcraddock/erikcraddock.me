@@ -1,7 +1,7 @@
 import { Hono } from "hono";
 import { raw } from "hono/html";
 import { desc, eq, isNotNull, and } from "drizzle-orm";
-import { db as defaultDb, posts, tags, postTags, sources, media } from "../db";
+import { db as defaultDb, posts, tags, postTags, sources, media, followers } from "../db";
 import { Layout } from "../templates/layout";
 import { NotFound } from "../templates/not-found";
 import { truncate } from "../utils/text";
@@ -380,10 +380,18 @@ function FeedActorAvatar({ className = "" }: { className?: string }) {
   );
 }
 
-function FeedProfileCard() {
+function FeedProfileCard({
+  followerCount,
+  followingCount,
+  postCount,
+}: {
+  followerCount: number;
+  followingCount: number;
+  postCount: number;
+}) {
   return (
     <section class="border-b border-gray-200 bg-white dark:border-gray-800 dark:bg-gray-900">
-      <div class="h-32 bg-gradient-to-br from-teal-500 via-blue-500 to-purple-600 sm:h-40" />
+      <img src="/images/banner.png" alt="" class="h-32 w-full object-cover sm:h-40" />
       <div class="px-4 pb-5 sm:px-6">
         <div class="-mt-12 flex items-end justify-between gap-4 sm:-mt-16">
           <FeedActorAvatar className="h-24 w-24 border-4 border-white dark:border-gray-900 sm:h-32 sm:w-32" />
@@ -398,23 +406,58 @@ function FeedProfileCard() {
           <h2 class="text-2xl font-bold text-gray-950 dark:text-gray-50">Erik Craddock</h2>
           <p class="text-gray-500 dark:text-gray-400">@erik@erikcraddock.me</p>
           <p class="mt-4 text-gray-800 dark:text-gray-200">
-            Writer, coder, and musician — not always in that order. This is my haphazard living
-            autobiography.
+            Writer, coder, and musician — not always in that order.
           </p>
-          <div class="mt-4 flex flex-wrap gap-x-5 gap-y-2 text-sm text-gray-500 dark:text-gray-400">
-            <a href="/feed.xml" class="hover:text-teal-600 dark:hover:text-teal-400">
-              RSS feed
-            </a>
-            <a href="/articles" class="hover:text-teal-600 dark:hover:text-teal-400">
-              Articles
-            </a>
-            <a href="/about" class="hover:text-teal-600 dark:hover:text-teal-400">
-              Follow on the Fediverse
-            </a>
-          </div>
+          <dl class="mt-4 grid grid-cols-3 gap-4 text-sm">
+            <div>
+              <dt class="text-gray-500 dark:text-gray-400">Followers</dt>
+              <dd class="font-semibold text-gray-950 dark:text-gray-50">{followerCount}</dd>
+            </div>
+            <div>
+              <dt class="text-gray-500 dark:text-gray-400">Following</dt>
+              <dd class="font-semibold text-gray-950 dark:text-gray-50">{followingCount}</dd>
+            </div>
+            <div>
+              <dt class="text-gray-500 dark:text-gray-400">Posts</dt>
+              <dd class="font-semibold text-gray-950 dark:text-gray-50">{postCount}</dd>
+            </div>
+          </dl>
         </div>
       </div>
     </section>
+  );
+}
+
+function FeedArticlePreview({
+  post,
+  bannerUrl,
+}: {
+  post: PostWithSource;
+  bannerUrl?: string | null;
+}) {
+  return (
+    <a
+      href={`/posts/${post.slug}`}
+      class="group mt-3 block overflow-hidden rounded-2xl border border-gray-200 bg-white transition hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-900 dark:hover:bg-gray-800/50"
+    >
+      {bannerUrl && (
+        <img
+          src={bannerUrl}
+          alt={post.title || "Article banner"}
+          class="aspect-video w-full object-cover"
+        />
+      )}
+      <div class="p-4">
+        {post.title && (
+          <h2 class="line-clamp-2 text-2xl font-bold text-gray-950 group-hover:text-teal-600 dark:text-gray-50 dark:group-hover:text-teal-400">
+            {post.title}
+          </h2>
+        )}
+        <p class="mt-4 line-clamp-3 leading-6 text-gray-700 dark:text-gray-300">
+          {post.excerpt || truncate(post.content, 200)}
+        </p>
+      </div>
+    </a>
   );
 }
 
@@ -506,18 +549,26 @@ function FeedPostMeta({ post, tags: postTags }: { post: PostWithSource; tags: Ta
 }
 
 /** Feed post component - renders differently based on post type */
-function FeedPost({ post, tags: postTags = [] }: { post: PostWithSource; tags?: Tag[] }) {
+function FeedPost({
+  post,
+  tags: postTags = [],
+  bannerUrl,
+}: {
+  post: PostWithSource;
+  tags?: Tag[];
+  bannerUrl?: string | null;
+}) {
   const isArticle = post.type === "article";
   const isLink = post.type === "link";
 
   return (
     <article class="border-b border-gray-200 bg-white px-4 py-5 transition hover:bg-gray-50 dark:border-gray-800 dark:bg-gray-900 dark:hover:bg-gray-800/50 sm:px-6">
-      <div class="flex gap-3 sm:gap-4">
+      <div class="mb-3 flex items-center gap-3 sm:gap-4">
         <a href="/about" aria-label="Erik Craddock profile" class="shrink-0">
           <FeedActorAvatar className="h-11 w-11 sm:h-12 sm:w-12" />
         </a>
         <div class="min-w-0 flex-1">
-          <div class="mb-2 flex flex-wrap items-baseline gap-x-2 gap-y-1">
+          <div class="flex flex-wrap items-baseline gap-x-2 gap-y-1">
             <a href="/about" class="font-semibold text-gray-950 hover:underline dark:text-gray-50">
               Erik Craddock
             </a>
@@ -527,54 +578,83 @@ function FeedPost({ post, tags: postTags = [] }: { post: PostWithSource; tags?: 
             </span>
             <span class="text-sm capitalize text-gray-500 dark:text-gray-400">{post.type}</span>
           </div>
+        </div>
+      </div>
 
+      {isArticle ? (
+        <FeedArticlePreview post={post} bannerUrl={bannerUrl} />
+      ) : (
+        <>
           {post.title && (
             <a href={`/posts/${post.slug}`} class="group block">
-              <h2 class="mb-2 text-xl font-semibold text-gray-950 group-hover:text-teal-600 dark:text-gray-50 dark:group-hover:text-teal-400">
+              <h2 class="mb-4 text-2xl font-bold text-gray-950 group-hover:text-teal-600 dark:text-gray-50 dark:group-hover:text-teal-400">
                 {post.title}
               </h2>
             </a>
           )}
+          <div class="prose prose-gray max-w-none dark:prose-invert">
+            {raw(renderMarkdown(post.content))}
+          </div>
+        </>
+      )}
 
-          {isLink && post.url && (
-            <a
-              href={post.url}
-              target="_blank"
-              rel="noopener noreferrer"
-              class="mb-3 inline-flex max-w-full items-center gap-1 rounded-full border border-gray-200 px-3 py-1 text-sm text-teal-700 hover:bg-teal-50 dark:border-gray-700 dark:text-teal-300 dark:hover:bg-teal-950/40"
-            >
-              <span class="truncate">{new URL(post.url).hostname}</span>
-              <svg class="h-3 w-3 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path
-                  stroke-linecap="round"
-                  stroke-linejoin="round"
-                  stroke-width="2"
-                  d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"
-                />
-              </svg>
+      {isLink && <FeedLinkPreview post={post} />}
+
+      <FeedPostMeta post={post} tags={postTags} />
+    </article>
+  );
+}
+
+function SingleFeedPost({
+  post,
+  tags: postTags = [],
+  bannerUrl,
+}: {
+  post: PostWithSource;
+  tags?: Tag[];
+  bannerUrl?: string | null;
+}) {
+  const isLink = post.type === "link";
+
+  return (
+    <article class="bg-white px-4 py-5 dark:bg-gray-900 sm:px-6">
+      <div class="mb-3 flex items-center gap-3 sm:gap-4">
+        <a href="/about" aria-label="Erik Craddock profile" class="shrink-0">
+          <FeedActorAvatar className="h-11 w-11 sm:h-12 sm:w-12" />
+        </a>
+        <div class="min-w-0 flex-1">
+          <div class="flex flex-wrap items-baseline gap-x-2 gap-y-1">
+            <a href="/about" class="font-semibold text-gray-950 hover:underline dark:text-gray-50">
+              Erik Craddock
             </a>
-          )}
-
-          {isArticle ? (
-            <a href={`/posts/${post.slug}`} class="group block">
-              <p class="text-gray-700 dark:text-gray-300">
-                {post.excerpt || truncate(post.content, 200)}
-              </p>
-              <span class="mt-3 inline-block text-sm font-medium text-teal-600 group-hover:text-teal-700 dark:text-teal-400 dark:group-hover:text-teal-300">
-                Read more →
-              </span>
-            </a>
-          ) : (
-            <div class="prose prose-gray max-w-none dark:prose-invert">
-              {raw(renderMarkdown(post.content))}
-            </div>
-          )}
-
-          {isLink && <FeedLinkPreview post={post} />}
-
-          <FeedPostMeta post={post} tags={postTags} />
+            <span class="text-sm text-gray-500 dark:text-gray-400">@erik</span>
+            <span class="text-sm text-gray-400 dark:text-gray-600" aria-hidden="true">
+              ·
+            </span>
+            <span class="text-sm capitalize text-gray-500 dark:text-gray-400">{post.type}</span>
+          </div>
         </div>
       </div>
+
+      {bannerUrl && (
+        <img
+          src={bannerUrl}
+          alt={post.title || "Post banner"}
+          class="mb-4 aspect-video w-full rounded-2xl object-cover"
+        />
+      )}
+
+      {post.title && (
+        <h1 class="mb-4 text-2xl font-bold text-gray-950 dark:text-gray-50">{post.title}</h1>
+      )}
+
+      <div class="prose prose-gray max-w-none dark:prose-invert">
+        {raw(renderMarkdown(post.content))}
+      </div>
+
+      {isLink && <FeedLinkPreview post={post} />}
+
+      <FeedPostMeta post={post} tags={postTags} />
     </article>
   );
 }
@@ -942,18 +1022,28 @@ export function createPagesRoutes(db: Database): Hono {
       .all();
     const totalPosts = countResult.length;
     const totalPages = Math.ceil(totalPosts / FEED_POSTS_PER_PAGE);
+    const followerCount = db.select().from(followers).all().length;
+    const followingCount = 0;
 
     // Handle no posts
     if (totalPosts === 0) {
       return c.html(
         <Layout title="Feed | erikcraddock.me">
-          <div class="mx-auto max-w-2xl overflow-hidden border-x border-gray-200 bg-white dark:border-gray-800 dark:bg-gray-900 sm:rounded-2xl sm:border">
-            <header class="sticky top-0 z-10 border-b border-gray-200 bg-white/90 px-4 py-4 backdrop-blur dark:border-gray-800 dark:bg-gray-900/90 sm:px-6">
-              <h1 class="text-xl font-bold text-gray-950 dark:text-gray-50">Feed</h1>
-            </header>
-            <FeedProfileCard />
-            <div class="px-4 py-10 text-center text-gray-600 dark:text-gray-400 sm:px-6">
-              No posts yet.
+          <div class="mx-auto grid max-w-6xl gap-6 lg:grid-cols-[20rem_minmax(0,42rem)] lg:items-start lg:justify-center">
+            <aside class="lg:sticky lg:top-24">
+              <FeedProfileCard
+                followerCount={followerCount}
+                followingCount={followingCount}
+                postCount={totalPosts}
+              />
+            </aside>
+            <div class="overflow-hidden border-x border-gray-200 bg-white dark:border-gray-800 dark:bg-gray-900 sm:rounded-2xl sm:border">
+              <header class="border-b border-gray-200 bg-white/90 px-4 py-4 backdrop-blur dark:border-gray-800 dark:bg-gray-900/90 sm:px-6">
+                <h1 class="text-xl font-bold text-gray-950 dark:text-gray-50">Feed</h1>
+              </header>
+              <div class="px-4 py-10 text-center text-gray-600 dark:text-gray-400 sm:px-6">
+                No posts yet.
+              </div>
             </div>
           </div>
         </Layout>
@@ -1013,28 +1103,60 @@ export function createPagesRoutes(db: Database): Hono {
     // Helper function to get tags for a post
     const getTagsForPost = (postId: number) => feedTagsMap.get(postId) || [];
 
+    const bannerIds = pagePosts
+      .map((post) => post.banner_image_id)
+      .filter((id): id is number => id !== null);
+    const bannerMedia =
+      bannerIds.length > 0
+        ? db
+            .select()
+            .from(media)
+            .where(isNotNull(media.id))
+            .all()
+            .filter((m) => bannerIds.includes(m.id))
+        : [];
+    const bannerUrlMap = new Map<number, string>();
+    for (const m of bannerMedia) {
+      bannerUrlMap.set(m.id, mediaUrl(m.s3_key));
+    }
+    const getBannerUrl = (post: PostWithSource) =>
+      post.banner_image_id ? bannerUrlMap.get(post.banner_image_id) || null : null;
+
     return c.html(
       <Layout title={`Feed${page > 1 ? ` - Page ${page}` : ""} | erikcraddock.me`}>
-        <div class="mx-auto max-w-2xl overflow-hidden border-x border-gray-200 bg-white dark:border-gray-800 dark:bg-gray-900 sm:rounded-2xl sm:border">
-          <header class="sticky top-0 z-10 border-b border-gray-200 bg-white/90 px-4 py-4 backdrop-blur dark:border-gray-800 dark:bg-gray-900/90 sm:px-6">
-            <h1 class="text-xl font-bold text-gray-950 dark:text-gray-50">Feed</h1>
-            {totalPages > 1 && (
-              <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">
-                Page {page} of {totalPages}
-              </p>
-            )}
-          </header>
-          <FeedProfileCard />
-          <div>
-            {pagePosts.map((post) => (
-              <FeedPost key={post.id} post={post} tags={getTagsForPost(post.id)} />
-            ))}
-          </div>
-          {totalPages > 1 && (
-            <div class="border-t border-gray-200 px-4 pb-6 dark:border-gray-800 sm:px-6">
-              <Pagination currentPage={page} totalPages={totalPages} baseUrl="/feed" />
+        <div class="mx-auto grid max-w-6xl gap-6 lg:grid-cols-[20rem_minmax(0,42rem)] lg:items-start lg:justify-center">
+          <aside class="lg:sticky lg:top-24">
+            <FeedProfileCard
+              followerCount={followerCount}
+              followingCount={followingCount}
+              postCount={totalPosts}
+            />
+          </aside>
+          <div class="overflow-hidden border-x border-gray-200 bg-white dark:border-gray-800 dark:bg-gray-900 sm:rounded-2xl sm:border">
+            <header class="flex items-center justify-between gap-4 border-b border-gray-200 bg-white/90 px-4 py-4 backdrop-blur dark:border-gray-800 dark:bg-gray-900/90 sm:px-6">
+              <h1 class="text-xl font-bold text-gray-950 dark:text-gray-50">Feed</h1>
+              {totalPages > 1 && (
+                <p class="text-sm text-gray-500 dark:text-gray-400">
+                  Page {page} of {totalPages}
+                </p>
+              )}
+            </header>
+            <div>
+              {pagePosts.map((post) => (
+                <FeedPost
+                  key={post.id}
+                  post={post}
+                  tags={getTagsForPost(post.id)}
+                  bannerUrl={getBannerUrl(post)}
+                />
+              ))}
             </div>
-          )}
+            {totalPages > 1 && (
+              <div class="border-t border-gray-200 px-4 pb-6 dark:border-gray-800 sm:px-6">
+                <Pagination currentPage={page} totalPages={totalPages} baseUrl="/feed" />
+              </div>
+            )}
+          </div>
         </div>
       </Layout>
     );
@@ -1333,12 +1455,16 @@ export function createPagesRoutes(db: Database): Hono {
 
     const title = post.title || (isNote ? "Note" : "Post");
     const description = post.excerpt || truncate(post.content, 160);
-    const linkPreviewSiteLabel = getLinkPreviewSiteLabel(post.url, post.og_site_name);
-    const hasLinkPreview = Boolean(
-      isLink && (post.og_title || post.og_description || post.og_image_url || linkPreviewSiteLabel)
-    );
     // For link posts, use external URL for OG tags so Mastodon generates correct preview
     const canonicalUrl = post.type === "link" && post.url ? post.url : `/posts/${slug}`;
+    const totalPosts = db
+      .select({ count: posts.id })
+      .from(posts)
+      .where(isNotNull(posts.published_at))
+      .all().length;
+    const followerCount = db.select().from(followers).all().length;
+    const followingCount = 0;
+    const feedPost: PostWithSource = { ...post, source };
 
     return c.html(
       <Layout
@@ -1347,112 +1473,26 @@ export function createPagesRoutes(db: Database): Hono {
         description={description}
         canonicalUrl={canonicalUrl}
       >
-        <article
-          class={`max-w-none ${isNote ? "pl-4 border-l-4 border-l-gray-300 dark:border-l-gray-600" : ""}`}
-        >
-          {/* Back link */}
-          <a
-            href="/"
-            class="text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300 text-sm mb-6 inline-block"
-          >
-            ← Back to home
-          </a>
-
-          {isLink && post.url && hasLinkPreview && (
-            <a
-              href={post.url}
-              target="_blank"
-              rel="noopener noreferrer"
-              class="group mb-8 block overflow-hidden rounded-xl border border-gray-200 bg-white transition hover:border-gray-300 hover:shadow-md dark:border-gray-700 dark:bg-gray-800 dark:hover:border-gray-600"
-            >
-              {post.og_image_url && (
-                <img
-                  src={post.og_image_url}
-                  alt={post.og_title || "Link preview image"}
-                  class="h-56 w-full object-cover"
-                />
-              )}
-              <div class="p-4">
-                {linkPreviewSiteLabel && (
-                  <p class="mb-2 text-sm uppercase tracking-wide text-gray-500 dark:text-gray-400">
-                    {linkPreviewSiteLabel}
-                  </p>
-                )}
-                {post.og_title && (
-                  <h2 class="mb-2 text-xl font-semibold text-gray-900 group-hover:text-blue-600 dark:text-gray-100 dark:group-hover:text-blue-400">
-                    {post.og_title}
-                  </h2>
-                )}
-                {post.og_description && (
-                  <p class="text-sm leading-6 text-gray-600 dark:text-gray-300">
-                    {post.og_description}
-                  </p>
-                )}
-              </div>
-            </a>
-          )}
-
-          {/* Banner image */}
-          {bannerUrl && (
-            <img
-              src={bannerUrl}
-              alt={post.title || "Post banner"}
-              class="w-full aspect-[1200/630] object-cover rounded-lg mb-6"
+        <div class="mx-auto grid max-w-6xl gap-6 lg:grid-cols-[20rem_minmax(0,42rem)] lg:items-start lg:justify-center">
+          <aside class="lg:sticky lg:top-24">
+            <FeedProfileCard
+              followerCount={followerCount}
+              followingCount={followingCount}
+              postCount={totalPosts}
             />
-          )}
-
-          {/* Post header */}
-          {post.title ? (
-            <h1 class="text-3xl font-bold text-gray-900 dark:text-gray-100 mb-4">{post.title}</h1>
-          ) : null}
-
-          {/* Meta: date, source, and tags */}
-          <div class="flex flex-wrap items-center gap-4 text-sm text-gray-500 dark:text-gray-400 mb-8">
-            {post.published_at ? (
-              <time>
-                {new Date(post.published_at).toLocaleDateString("en-US", {
-                  year: "numeric",
-                  month: "long",
-                  day: "numeric",
-                })}
-              </time>
-            ) : (
-              <span class="text-yellow-600 dark:text-yellow-500">Draft</span>
-            )}
-
-            {/* Source attribution for link posts */}
-            {isLink && source && (
-              <span>
-                via{" "}
-                <a
-                  href={source.url}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  class="text-gray-600 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200"
-                >
-                  {source.name}
-                </a>
-              </span>
-            )}
-
-            {/* Link to original for link posts */}
-            {isLink && post.url && (
+          </aside>
+          <div class="overflow-hidden border-x border-gray-200 bg-white dark:border-gray-800 dark:bg-gray-900 sm:rounded-2xl sm:border">
+            <header class="border-b border-gray-200 bg-white/90 px-4 py-4 backdrop-blur dark:border-gray-800 dark:bg-gray-900/90 sm:px-6">
               <a
-                href={post.url}
-                target="_blank"
-                rel="noopener noreferrer"
-                class="text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300"
+                href="/feed"
+                class="text-xl font-bold text-gray-950 hover:text-teal-600 dark:text-gray-50 dark:hover:text-teal-400"
               >
-                → original
+                ← Feed
               </a>
-            )}
-
-            {postTagsResult.length > 0 && <TagBadges tags={postTagsResult} />}
+            </header>
+            <SingleFeedPost post={feedPost} tags={postTagsResult} bannerUrl={bannerUrl} />
           </div>
-
-          {/* Post content */}
-          <div class="prose prose-gray max-w-none">{raw(renderMarkdown(post.content))}</div>
-        </article>
+        </div>
       </Layout>
     );
   });
