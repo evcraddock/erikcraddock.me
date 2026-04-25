@@ -23,7 +23,7 @@ Options:
 Examples:
   ec source list
   ec source show 1
-  ec source create --name "Hacker News" --url "https://news.ycombinator.com"
+  ec source create --name "Hacker News" --url "https://news.ycombinator.com" --author "Paul Graham"
   ec source edit 1 --name "HN"
   ec source delete 1
 `);

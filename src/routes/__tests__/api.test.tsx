@@ -779,6 +779,47 @@ describe("GET /api/posts - status filter", () => {
   });
 });
 
+describe("POST /api/sources", () => {
+  let api: typeof import("../api").api;
+
+  beforeAll(async () => {
+    const module = await import("../api");
+    api = module.api;
+  });
+
+  it("creates source with optional author", async () => {
+    const res = await api.request("/sources", {
+      method: "POST",
+      headers: { ...authHeader, "Content-Type": "application/json" },
+      body: JSON.stringify({
+        name: "One Useful Thing",
+        url: "https://www.oneusefulthing.org/",
+        feed_url: "https://www.oneusefulthing.org/feed",
+        author: "Ethan Mollick",
+      }),
+    });
+
+    expect(res.status).toBe(201);
+    const json = await res.json();
+    expect(json.data.author).toBe("Ethan Mollick");
+
+    const source = testDb.select().from(sources).where(eq(sources.id, json.data.id)).get();
+    expect(source?.author).toBe("Ethan Mollick");
+  });
+
+  it("creates source without author", async () => {
+    const res = await api.request("/sources", {
+      method: "POST",
+      headers: { ...authHeader, "Content-Type": "application/json" },
+      body: JSON.stringify({ name: "No Author", url: "https://example.com" }),
+    });
+
+    expect(res.status).toBe(201);
+    const json = await res.json();
+    expect(json.data.author).toBeNull();
+  });
+});
+
 describe("PUT /api/sources/:id", () => {
   let api: typeof import("../api").api;
 
@@ -840,6 +881,42 @@ describe("PUT /api/sources/:id", () => {
     expect(res.status).toBe(200);
     const json = await res.json();
     expect(json.data.feed_url).toBeNull();
+  });
+
+  it("updates author", async () => {
+    const source = testDb
+      .insert(sources)
+      .values({ name: "Test", url: "https://example.com" })
+      .returning()
+      .get();
+
+    const res = await api.request(`/sources/${source.id}`, {
+      method: "PUT",
+      headers: { ...authHeader, "Content-Type": "application/json" },
+      body: JSON.stringify({ author: "Updated Author" }),
+    });
+
+    expect(res.status).toBe(200);
+    const json = await res.json();
+    expect(json.data.author).toBe("Updated Author");
+  });
+
+  it("updates author to null", async () => {
+    const source = testDb
+      .insert(sources)
+      .values({ name: "Test", url: "https://example.com", author: "Original Author" })
+      .returning()
+      .get();
+
+    const res = await api.request(`/sources/${source.id}`, {
+      method: "PUT",
+      headers: { ...authHeader, "Content-Type": "application/json" },
+      body: JSON.stringify({ author: null }),
+    });
+
+    expect(res.status).toBe(200);
+    const json = await res.json();
+    expect(json.data.author).toBeNull();
   });
 
   it("returns 404 for non-existent source", async () => {

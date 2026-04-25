@@ -120,6 +120,7 @@ testDb
       name: "Test Blog",
       url: "https://example.com",
       feed_url: "https://example.com/feed.xml",
+      author: "Test Author",
     },
     { id: 2, name: "Another Site", url: "https://another.example.com", feed_url: null },
   ])
@@ -517,6 +518,14 @@ describe("pages routes", () => {
 
       expect(html).toContain("RSS");
       expect(html).toContain("https://example.com/feed.xml");
+    });
+
+    it("shows source authors when present", async () => {
+      const app = getApp();
+      const res = await app.request("/sources");
+      const html = await res.text();
+
+      expect(html).toContain("by Test Author");
     });
 
     it("includes dark mode classes", async () => {

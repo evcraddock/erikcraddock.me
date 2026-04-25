@@ -100,6 +100,7 @@ const SourceSummarySchema = z
     id: z.number().int().openapi({ example: 1 }),
     name: z.string().openapi({ example: "Hacker News" }),
     url: z.string().url().openapi({ example: "https://news.ycombinator.com" }),
+    author: NullableStringSchema.openapi({ example: "Paul Graham" }),
   })
   .openapi("SourceSummary");
 
@@ -235,6 +236,7 @@ const CreateSourceBodySchema = z
     name: z.string().openapi({ example: "Hacker News" }),
     url: z.string().openapi({ example: "https://news.ycombinator.com" }),
     feed_url: z.string().optional().nullable().openapi({ example: "https://hnrss.org/frontpage" }),
+    author: z.string().optional().nullable().openapi({ example: "Paul Graham" }),
   })
   .openapi("CreateSourceBody");
 
@@ -243,6 +245,7 @@ const UpdateSourceBodySchema = z
     name: z.string().optional().nullable(),
     url: z.string().optional().nullable(),
     feed_url: z.string().optional().nullable(),
+    author: z.string().optional().nullable(),
   })
   .openapi("UpdateSourceBody");
 
@@ -1287,7 +1290,7 @@ registerProtectedRoute(
   }),
   async (c: Context) => {
     const body = await c.req.json();
-    const { name, url, feed_url } = body;
+    const { name, url, feed_url, author } = body;
 
     if (!name || typeof name !== "string" || name.trim().length === 0) {
       return c.json({ error: "Name is required" }, 400);
@@ -1297,11 +1300,16 @@ registerProtectedRoute(
       return c.json({ error: "URL is required" }, 400);
     }
 
+    if (author !== undefined && author !== null && typeof author !== "string") {
+      return c.json({ error: "Author must be a string" }, 400);
+    }
+
     try {
       const source = createSource({
         name: name.trim(),
         url: url.trim(),
         feed_url: feed_url?.trim() || null,
+        author: author?.trim() || null,
       });
 
       return c.json({ data: source }, 201);
@@ -1354,7 +1362,7 @@ registerProtectedRoute(
     }
 
     const body = await c.req.json();
-    const { name, url, feed_url } = body;
+    const { name, url, feed_url, author } = body;
 
     if (name !== undefined && (typeof name !== "string" || name.trim().length === 0)) {
       return c.json({ error: "Name cannot be empty" }, 400);
@@ -1364,11 +1372,16 @@ registerProtectedRoute(
       return c.json({ error: "URL cannot be empty" }, 400);
     }
 
+    if (author !== undefined && author !== null && typeof author !== "string") {
+      return c.json({ error: "Author must be a string" }, 400);
+    }
+
     try {
       const source = updateSource(id, {
         name: name?.trim(),
         url: url?.trim(),
         feed_url: feed_url !== undefined ? feed_url?.trim() || null : undefined,
+        author: author !== undefined ? author?.trim() || null : undefined,
       });
 
       if (!source) {

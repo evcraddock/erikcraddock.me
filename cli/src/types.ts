@@ -62,6 +62,7 @@ export interface Source {
   name: string;
   url: string;
   feed_url: string | null;
+  author: string | null;
 }
 
 export interface TagWithCount {
