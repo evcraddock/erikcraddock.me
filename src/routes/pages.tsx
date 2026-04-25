@@ -130,6 +130,56 @@ function formatAuthorByline(authors: SourceAuthor[]): string | null {
   return `${names.slice(0, -1).join(", ")}, and ${names[names.length - 1]}`;
 }
 
+function SourceCard({ source }: { source: SourceWithAuthors }) {
+  const hostname = getLinkPreviewSiteLabel(source.url, null) ?? source.url;
+
+  return (
+    <article class="flex h-full flex-col rounded-2xl border border-gray-200 bg-white p-5 shadow-sm transition-colors hover:border-teal-200 hover:bg-teal-50/40 dark:border-gray-800 dark:bg-gray-900 dark:hover:border-teal-900/60 dark:hover:bg-teal-950/20">
+      <div class="flex items-start gap-4">
+        <a
+          href={source.url}
+          target="_blank"
+          rel="noopener noreferrer"
+          aria-label={`${source.name} website`}
+          class="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-teal-100 text-lg font-bold text-teal-700 dark:bg-teal-900/40 dark:text-teal-300"
+        >
+          {source.name.charAt(0).toUpperCase()}
+        </a>
+        <div class="min-w-0 flex-1">
+          <a
+            href={source.url}
+            target="_blank"
+            rel="noopener noreferrer"
+            class="line-clamp-2 font-semibold text-gray-950 hover:text-teal-600 dark:text-gray-50 dark:hover:text-teal-400"
+          >
+            {source.name}
+          </a>
+          <p class="mt-1 truncate text-sm text-gray-500 dark:text-gray-400">{hostname}</p>
+        </div>
+      </div>
+
+      {source.authors.length > 0 ? (
+        <p class="mt-4 text-sm text-gray-600 dark:text-gray-300">
+          by {formatAuthorByline(source.authors)}
+        </p>
+      ) : null}
+
+      {source.feed_url ? (
+        <div class="mt-auto pt-5 text-sm font-medium">
+          <a
+            href={source.feed_url}
+            target="_blank"
+            rel="noopener noreferrer"
+            class="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
+          >
+            RSS
+          </a>
+        </div>
+      ) : null}
+    </article>
+  );
+}
+
 function buildRemoteFollowUrl(serverOrigin: string): string {
   const url = new URL("/authorize_interaction", serverOrigin);
   url.searchParams.set("uri", ACTOR_URI);
@@ -1479,57 +1529,28 @@ export function createPagesRoutes(db: Database): Hono {
     }));
 
     return c.html(
-      <Layout title="Sources | erikcraddock.me">
-        <h1 class="text-3xl font-bold text-gray-900 dark:text-gray-100 mb-4">Sources</h1>
+      <Layout title="Recommended Sites | erikcraddock.me">
+        <div class="mx-auto max-w-6xl">
+          <div class="mb-8">
+            <h1 class="text-3xl font-bold text-gray-950 dark:text-gray-50">Recommended Sites</h1>
+            <p class="mt-2 max-w-2xl text-gray-600 dark:text-gray-400">
+              The following are websites which I found interesting enough to share links from at
+              some point in the past.
+            </p>
+          </div>
 
-        <p class="text-gray-600 dark:text-gray-400 mb-8">
-          Blogs and websites I read and recommend. These are the sources that inspire my thinking
-          and writing.
-        </p>
-
-        {allSources.length === 0 ? (
-          <p class="text-gray-600 dark:text-gray-400">No sources yet.</p>
-        ) : (
-          <ul class="space-y-4">
-            {allSources.map((source) => (
-              <li key={source.id} class="border-b border-gray-200 dark:border-gray-700 pb-4">
-                <a
-                  href={source.url}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  class="text-lg font-medium text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300"
-                >
-                  {source.name}
-                </a>
-                {formatAuthorByline(source.authors) ? (
-                  <>
-                    {" "}
-                    <span class="ml-2 text-sm text-gray-500 dark:text-gray-400">
-                      by {formatAuthorByline(source.authors)}
-                    </span>
-                  </>
-                ) : null}
-                {source.feed_url ? (
-                  <>
-                    {" "}
-                    <span class="ml-2 text-sm text-gray-400 dark:text-gray-500">
-                      (
-                      <a
-                        href={source.feed_url}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        class="hover:text-gray-600 dark:hover:text-gray-300"
-                      >
-                        RSS
-                      </a>
-                      )
-                    </span>
-                  </>
-                ) : null}
-              </li>
-            ))}
-          </ul>
-        )}
+          {allSources.length === 0 ? (
+            <div class="rounded-2xl border border-gray-200 bg-white px-4 py-10 text-center text-gray-600 dark:border-gray-800 dark:bg-gray-900 dark:text-gray-400 sm:px-6">
+              No sources yet.
+            </div>
+          ) : (
+            <div class="grid gap-5 md:grid-cols-2 lg:grid-cols-3">
+              {allSources.map((source) => (
+                <SourceCard key={source.id} source={source} />
+              ))}
+            </div>
+          )}
+        </div>
       </Layout>
     );
   });

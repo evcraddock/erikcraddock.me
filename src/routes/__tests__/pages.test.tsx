@@ -521,7 +521,7 @@ describe("pages routes", () => {
       expect(res.status).toBe(200);
 
       const html = await res.text();
-      expect(html).toContain("Sources");
+      expect(html).toContain("Recommended Sites");
     });
 
     it("lists sources from database", async () => {
@@ -574,7 +574,7 @@ describe("pages routes", () => {
 
       expect(html).toContain("dark:bg-gray-900");
       expect(html).toContain("dark:text-gray-100");
-      expect(html).toContain("dark:text-blue-400");
+      expect(html).toContain("dark:text-teal-400");
     });
   });
 
