@@ -47,6 +47,7 @@ export const sources = sqliteTable("sources", {
   name: text("name").notNull(),
   url: text("url").notNull(),
   feed_url: text("feed_url"),
+  author: text("author"),
 });
 
 // ActivityPub followers

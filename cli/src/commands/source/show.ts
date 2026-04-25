@@ -42,6 +42,7 @@ function formatSource(source: Source): void {
   console.log(`ID:        ${source.id}`);
   console.log(`Name:      ${source.name}`);
   console.log(`URL:       ${source.url}`);
+  console.log(`Author:    ${source.author || "-"}`);
   console.log(`Feed URL:  ${source.feed_url || "-"}`);
 }
 

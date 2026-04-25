@@ -1437,19 +1437,30 @@ export function createPagesRoutes(db: Database): Hono {
                 >
                   {source.name}
                 </a>
+                {source.author ? (
+                  <>
+                    {" "}
+                    <span class="ml-2 text-sm text-gray-500 dark:text-gray-400">
+                      by {source.author}
+                    </span>
+                  </>
+                ) : null}
                 {source.feed_url ? (
-                  <span class="ml-2 text-sm text-gray-400 dark:text-gray-500">
-                    (
-                    <a
-                      href={source.feed_url}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      class="hover:text-gray-600 dark:hover:text-gray-300"
-                    >
-                      RSS
-                    </a>
-                    )
-                  </span>
+                  <>
+                    {" "}
+                    <span class="ml-2 text-sm text-gray-400 dark:text-gray-500">
+                      (
+                      <a
+                        href={source.feed_url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        class="hover:text-gray-600 dark:hover:text-gray-300"
+                      >
+                        RSS
+                      </a>
+                      )
+                    </span>
+                  </>
                 ) : null}
               </li>
             ))}

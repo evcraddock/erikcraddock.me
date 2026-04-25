@@ -43,6 +43,13 @@
       "when": 1776905887006,
       "tag": "0005_unusual_hellcat",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "6",
+      "when": 1777145488638,
+      "tag": "0006_magenta_hemingway",
+      "breakpoints": true
     }
   ]
 }

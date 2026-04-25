@@ -6,6 +6,7 @@ export interface Source {
   name: string;
   url: string;
   feed_url: string | null;
+  author: string | null;
 }
 
 /**
@@ -26,13 +27,14 @@ export interface CreateSourceInput {
   name: string;
   url: string;
   feed_url?: string | null;
+  author?: string | null;
 }
 
 /**
  * Create a new source
  */
 export function createSource(input: CreateSourceInput): Source {
-  const { name, url, feed_url } = input;
+  const { name, url, feed_url, author } = input;
 
   const source = db
     .insert(sources)
@@ -40,6 +42,7 @@ export function createSource(input: CreateSourceInput): Source {
       name,
       url,
       feed_url: feed_url ?? null,
+      author: author ?? null,
     })
     .returning()
     .get();
@@ -51,6 +54,7 @@ export interface UpdateSourceInput {
   name?: string;
   url?: string;
   feed_url?: string | null;
+  author?: string | null;
 }
 
 /**
@@ -62,7 +66,12 @@ export function updateSource(id: number, input: UpdateSourceInput): Source | nul
     return null;
   }
 
-  const updates: Partial<{ name: string; url: string; feed_url: string | null }> = {};
+  const updates: Partial<{
+    name: string;
+    url: string;
+    feed_url: string | null;
+    author: string | null;
+  }> = {};
 
   if (input.name !== undefined) {
     updates.name = input.name;
@@ -72,6 +81,9 @@ export function updateSource(id: number, input: UpdateSourceInput): Source | nul
   }
   if (input.feed_url !== undefined) {
     updates.feed_url = input.feed_url;
+  }
+  if (input.author !== undefined) {
+    updates.author = input.author;
   }
 
   if (Object.keys(updates).length === 0) {
