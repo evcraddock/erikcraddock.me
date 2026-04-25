@@ -8,6 +8,11 @@ import { eq } from "drizzle-orm";
 // Create test db immediately
 const testDb = createTestDb();
 const originalFetch = global.fetch;
+const mockFederatePost = mock(async () => true);
+const mockSendDeleteActivity = mock(async () => true);
+const mockSendDeleteActivityForUri = mock(async () => true);
+const mockSendUpdateActivity = mock(async () => true);
+const mockSendActorUpdateActivity = mock(async () => true);
 
 // Mock modules
 mock.module("@/db", () => ({
@@ -21,6 +26,14 @@ mock.module("@/federation/setup", () => ({
     sendActivity: mock(() => {}),
   },
   createFedifyFederation: mock(() => {}),
+}));
+
+mock.module("@/federation/publish", () => ({
+  federatePost: mockFederatePost,
+  sendDeleteActivity: mockSendDeleteActivity,
+  sendDeleteActivityForUri: mockSendDeleteActivityForUri,
+  sendUpdateActivity: mockSendUpdateActivity,
+  sendActorUpdateActivity: mockSendActorUpdateActivity,
 }));
 
 // Only mock the requireApiKey middleware to bypass auth in tests
@@ -54,6 +67,11 @@ beforeEach(() => {
   testDb.delete(posts).run();
   testDb.delete(sources).run();
   global.fetch = originalFetch;
+  mockFederatePost.mockClear();
+  mockSendDeleteActivity.mockClear();
+  mockSendDeleteActivityForUri.mockClear();
+  mockSendUpdateActivity.mockClear();
+  mockSendActorUpdateActivity.mockClear();
 });
 
 const authHeader = { Authorization: "Bearer ek_test" };
@@ -423,6 +441,73 @@ describe("PUT /api/posts/by-slug/:slug", () => {
     const json = await res.json();
     expect(json.data.title).toBe("Updated Title");
     expect(json.data.content).toBe("Updated content");
+  });
+
+  it("does not federate when only missing preview metadata changes", async () => {
+    const now = new Date("2026-01-01T00:00:00Z");
+    testDb
+      .insert(posts)
+      .values({
+        slug: "metadata-only-link",
+        type: "link",
+        title: "Metadata Only Link",
+        content: "Original content",
+        excerpt: "Original excerpt",
+        url: "https://example.com/metadata-only",
+        created_at: now,
+        updated_at: now,
+        published_at: now,
+      })
+      .run();
+
+    global.fetch = mock(async () => {
+      return new Response(
+        `<!doctype html><html><head>
+          <meta property="og:title" content="Fetched title" />
+          <meta property="og:description" content="Fetched description" />
+          <meta property="og:image" content="https://example.com/preview.jpg" />
+          <meta property="og:site_name" content="Example Site" />
+        </head></html>`,
+        { headers: { "content-type": "text/html" } }
+      );
+    }) as unknown as typeof fetch;
+
+    const res = await api.request("/posts/by-slug/metadata-only-link", {
+      method: "PUT",
+      headers: { ...authHeader, "Content-Type": "application/json" },
+      body: JSON.stringify({ url: "https://example.com/metadata-only" }),
+    });
+
+    expect(res.status).toBe(200);
+    const post = testDb.select().from(posts).where(eq(posts.slug, "metadata-only-link")).get();
+    expect(post?.og_title).toBe("Fetched title");
+    expect(mockSendUpdateActivity).not.toHaveBeenCalled();
+  });
+
+  it("federates when published post content changes", async () => {
+    const now = new Date("2026-01-01T00:00:00Z");
+    const post = testDb
+      .insert(posts)
+      .values({
+        slug: "federated-content-change",
+        type: "article",
+        title: "Federated Content Change",
+        content: "Original content",
+        created_at: now,
+        updated_at: now,
+        published_at: now,
+      })
+      .returning()
+      .get();
+
+    const res = await api.request("/posts/by-slug/federated-content-change", {
+      method: "PUT",
+      headers: { ...authHeader, "Content-Type": "application/json" },
+      body: JSON.stringify({ content: "Updated content" }),
+    });
+
+    expect(res.status).toBe(200);
+    expect(mockSendUpdateActivity).toHaveBeenCalledWith(post.id);
   });
 
   it("returns 404 for non-existent slug", async () => {

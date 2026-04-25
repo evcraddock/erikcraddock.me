@@ -303,6 +303,55 @@ async function getLinkPreviewData(url: string | null | undefined): Promise<{
   };
 }
 
+function hasFederatedPostChanges(
+  existingPost: {
+    title: string | null;
+    content: string;
+    excerpt: string | null;
+    url: string | null;
+    source_id: number | null;
+    banner_image_id: number | null;
+  },
+  input: {
+    title?: string | null;
+    content?: string;
+    excerpt?: string | null;
+    url?: string | null;
+    source_id?: number | null;
+    tags?: string[];
+    banner_image_id?: number | null;
+  }
+): boolean {
+  if (input.title !== undefined && (input.title?.trim() || null) !== existingPost.title) {
+    return true;
+  }
+
+  if (input.content !== undefined && input.content.trim() !== existingPost.content) {
+    return true;
+  }
+
+  if (input.excerpt !== undefined && (input.excerpt?.trim() || null) !== existingPost.excerpt) {
+    return true;
+  }
+
+  if (input.url !== undefined && (input.url?.trim() || null) !== existingPost.url) {
+    return true;
+  }
+
+  if (input.source_id !== undefined && input.source_id !== existingPost.source_id) {
+    return true;
+  }
+
+  if (
+    input.banner_image_id !== undefined &&
+    input.banner_image_id !== existingPost.banner_image_id
+  ) {
+    return true;
+  }
+
+  return input.tags !== undefined;
+}
+
 registerProtectedRoute(
   protectedRoute({
     method: "get",
@@ -374,8 +423,8 @@ registerProtectedRoute(
       return c.json({ error: "Invalid type. Must be article, link, or note" }, 400);
     }
 
-    if (limit !== undefined && (isNaN(limit) || limit < 1 || limit > 100)) {
-      return c.json({ error: "Invalid limit. Must be between 1 and 100" }, 400);
+    if (limit !== undefined && (isNaN(limit) || limit < 1)) {
+      return c.json({ error: "Invalid limit. Must be 1 or greater" }, 400);
     }
 
     if (status && !["draft", "published", "all"].includes(status)) {
@@ -634,9 +683,22 @@ registerProtectedRoute(
 
     try {
       const existingPost = getPost(id);
-      const nextUrl = url !== undefined ? url?.trim() || null : existingPost?.url;
+      if (!existingPost) {
+        return c.json({ error: "Post not found" }, 404);
+      }
+
+      const shouldFederateUpdate = hasFederatedPostChanges(existingPost, {
+        title,
+        content,
+        excerpt,
+        url,
+        source_id,
+        tags,
+        banner_image_id,
+      });
+      const nextUrl = url !== undefined ? url?.trim() || null : existingPost.url;
       const linkPreview =
-        existingPost?.type === "link" && (url !== undefined || !hasStoredLinkPreview(existingPost))
+        existingPost.type === "link" && (url !== undefined || !hasStoredLinkPreview(existingPost))
           ? await getLinkPreviewData(nextUrl)
           : null;
       const post = updatePost(id, {
@@ -673,7 +735,7 @@ registerProtectedRoute(
         return c.json({ error: "Post not found" }, 404);
       }
 
-      if (post.published_at) {
+      if (post.published_at && shouldFederateUpdate) {
         await sendUpdateActivity(post.id);
       }
 
@@ -935,6 +997,15 @@ registerProtectedRoute(
     }
 
     try {
+      const shouldFederateUpdate = hasFederatedPostChanges(existingPost, {
+        title,
+        content,
+        excerpt,
+        url,
+        source_id,
+        tags,
+        banner_image_id,
+      });
       const nextUrl = url !== undefined ? url?.trim() || null : existingPost.url;
       const linkPreview =
         existingPost.type === "link" && (url !== undefined || !hasStoredLinkPreview(existingPost))
@@ -970,7 +1041,7 @@ registerProtectedRoute(
         return c.json({ error: "Post not found" }, 404);
       }
 
-      if (post.published_at) {
+      if (post.published_at && shouldFederateUpdate) {
         await sendUpdateActivity(post.id);
       }
 
