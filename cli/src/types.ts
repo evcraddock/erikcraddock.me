@@ -69,6 +69,11 @@ export interface Source {
   name: string;
   url: string;
   feed_url: string | null;
+  preview_title: string | null;
+  preview_description: string | null;
+  preview_image_url: string | null;
+  preview_site_name: string | null;
+  favicon_url: string | null;
   authors: SourceAuthor[];
 }
 

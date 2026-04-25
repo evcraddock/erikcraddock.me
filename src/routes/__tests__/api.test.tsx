@@ -78,6 +78,29 @@ beforeEach(() => {
 
 const authHeader = { Authorization: "Bearer ek_test" };
 
+function mockSourcePreviewFetch(): void {
+  global.fetch = mock(
+    async () =>
+      new Response(
+        `
+          <html>
+            <head>
+              <title>Source Preview Title</title>
+              <meta name="description" content="Source preview description" />
+              <meta property="og:site_name" content="Source Site" />
+              <meta property="og:image" content="/source-preview.jpg" />
+              <link rel="icon" href="/favicon.ico" />
+            </head>
+          </html>
+        `,
+        {
+          status: 200,
+          headers: { "content-type": "text/html; charset=utf-8" },
+        }
+      )
+  ) as unknown as typeof fetch;
+}
+
 describe("API docs", () => {
   let api: typeof import("../api").api;
 
@@ -789,6 +812,10 @@ describe("POST /api/sources", () => {
     api = module.api;
   });
 
+  beforeEach(() => {
+    mockSourcePreviewFetch();
+  });
+
   it("creates source with multiple authors", async () => {
     const res = await api.request("/sources", {
       method: "POST",
@@ -832,6 +859,22 @@ describe("POST /api/sources", () => {
     expect(json.data.authors).toEqual([]);
   });
 
+  it("stores source preview metadata and favicon", async () => {
+    const res = await api.request("/sources", {
+      method: "POST",
+      headers: { ...authHeader, "Content-Type": "application/json" },
+      body: JSON.stringify({ name: "Preview Source", url: "https://preview.example.com" }),
+    });
+
+    expect(res.status).toBe(201);
+    const json = await res.json();
+    expect(json.data.preview_title).toBe("Source Preview Title");
+    expect(json.data.preview_description).toBe("Source preview description");
+    expect(json.data.preview_image_url).toBe("https://preview.example.com/source-preview.jpg");
+    expect(json.data.preview_site_name).toBe("Source Site");
+    expect(json.data.favicon_url).toBe("https://preview.example.com/favicon.ico");
+  });
+
   it("reuses people for authors across sources", async () => {
     for (const [name, url] of [
       ["First Source", "https://first.example.com"],
@@ -868,6 +911,10 @@ describe("PUT /api/sources/:id", () => {
   beforeAll(async () => {
     const module = await import("../api");
     api = module.api;
+  });
+
+  beforeEach(() => {
+    mockSourcePreviewFetch();
   });
 
   it("updates source name", async () => {

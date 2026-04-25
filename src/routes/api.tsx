@@ -110,6 +110,11 @@ const SourceSummarySchema = z
     id: z.number().int().openapi({ example: 1 }),
     name: z.string().openapi({ example: "Hacker News" }),
     url: z.string().url().openapi({ example: "https://news.ycombinator.com" }),
+    preview_title: NullableStringSchema,
+    preview_description: NullableStringSchema,
+    preview_image_url: NullableStringSchema,
+    preview_site_name: NullableStringSchema,
+    favicon_url: NullableStringSchema,
     authors: z.array(SourceAuthorSchema),
   })
   .openapi("SourceSummary");
@@ -249,12 +254,21 @@ const SourceAuthorInputSchema = z.union([
   }),
 ]);
 
+const SourceMetadataBodySchema = {
+  preview_title: z.string().optional().nullable(),
+  preview_description: z.string().optional().nullable(),
+  preview_image_url: z.string().optional().nullable(),
+  preview_site_name: z.string().optional().nullable(),
+  favicon_url: z.string().optional().nullable(),
+};
+
 const CreateSourceBodySchema = z
   .object({
     name: z.string().openapi({ example: "Hacker News" }),
     url: z.string().openapi({ example: "https://news.ycombinator.com" }),
     feed_url: z.string().optional().nullable().openapi({ example: "https://hnrss.org/frontpage" }),
     authors: z.array(SourceAuthorInputSchema).optional().nullable(),
+    ...SourceMetadataBodySchema,
   })
   .openapi("CreateSourceBody");
 
@@ -264,8 +278,17 @@ const UpdateSourceBodySchema = z
     url: z.string().optional().nullable(),
     feed_url: z.string().optional().nullable(),
     authors: z.array(SourceAuthorInputSchema).optional().nullable(),
+    ...SourceMetadataBodySchema,
   })
   .openapi("UpdateSourceBody");
+
+function parseNullableString(input: unknown): string | null | undefined {
+  if (input === undefined) {
+    return undefined;
+  }
+
+  return typeof input === "string" ? input.trim() || null : null;
+}
 
 function parseSourceAuthors(input: unknown): SourceAuthorInput[] | string | undefined {
   if (input === undefined) {
@@ -373,6 +396,27 @@ async function getLinkPreviewData(url: string | null | undefined): Promise<{
     og_description: preview.description,
     og_image_url: preview.imageUrl,
     og_site_name: preview.siteName,
+  };
+}
+
+async function getSourcePreviewData(url: string): Promise<{
+  preview_title: string | null;
+  preview_description: string | null;
+  preview_image_url: string | null;
+  preview_site_name: string | null;
+  favicon_url: string | null;
+} | null> {
+  const preview = await fetchLinkPreview(url);
+  if (!preview) {
+    return null;
+  }
+
+  return {
+    preview_title: preview.title,
+    preview_description: preview.description,
+    preview_image_url: preview.imageUrl,
+    preview_site_name: preview.siteName,
+    favicon_url: preview.faviconUrl,
   };
 }
 
@@ -1360,7 +1404,17 @@ registerProtectedRoute(
   }),
   async (c: Context) => {
     const body = await c.req.json();
-    const { name, url, feed_url, authors } = body;
+    const {
+      name,
+      url,
+      feed_url,
+      authors,
+      preview_title,
+      preview_description,
+      preview_image_url,
+      preview_site_name,
+      favicon_url,
+    } = body;
 
     if (!name || typeof name !== "string" || name.trim().length === 0) {
       return c.json({ error: "Name is required" }, 400);
@@ -1376,11 +1430,21 @@ registerProtectedRoute(
     }
 
     try {
+      const sourceUrl = url.trim();
+      const fetchedPreview = await getSourcePreviewData(sourceUrl);
       const source = createSource({
         name: name.trim(),
-        url: url.trim(),
+        url: sourceUrl,
         feed_url: feed_url?.trim() || null,
         authors: parsedAuthors,
+        preview_title: parseNullableString(preview_title) ?? fetchedPreview?.preview_title ?? null,
+        preview_description:
+          parseNullableString(preview_description) ?? fetchedPreview?.preview_description ?? null,
+        preview_image_url:
+          parseNullableString(preview_image_url) ?? fetchedPreview?.preview_image_url ?? null,
+        preview_site_name:
+          parseNullableString(preview_site_name) ?? fetchedPreview?.preview_site_name ?? null,
+        favicon_url: parseNullableString(favicon_url) ?? fetchedPreview?.favicon_url ?? null,
       });
 
       return c.json({ data: source }, 201);
@@ -1433,7 +1497,17 @@ registerProtectedRoute(
     }
 
     const body = await c.req.json();
-    const { name, url, feed_url, authors } = body;
+    const {
+      name,
+      url,
+      feed_url,
+      authors,
+      preview_title,
+      preview_description,
+      preview_image_url,
+      preview_site_name,
+      favicon_url,
+    } = body;
 
     if (name !== undefined && (typeof name !== "string" || name.trim().length === 0)) {
       return c.json({ error: "Name cannot be empty" }, 400);
@@ -1449,11 +1523,35 @@ registerProtectedRoute(
     }
 
     try {
+      const existingSource = getSource(id);
+      const sourceUrl = url?.trim() || existingSource?.url;
+      const fetchedPreview =
+        url !== undefined && sourceUrl ? await getSourcePreviewData(sourceUrl) : null;
       const source = updateSource(id, {
         name: name?.trim(),
         url: url?.trim(),
         feed_url: feed_url !== undefined ? feed_url?.trim() || null : undefined,
         authors: parsedAuthors,
+        preview_title:
+          preview_title !== undefined
+            ? parseNullableString(preview_title)
+            : (fetchedPreview?.preview_title ?? undefined),
+        preview_description:
+          preview_description !== undefined
+            ? parseNullableString(preview_description)
+            : (fetchedPreview?.preview_description ?? undefined),
+        preview_image_url:
+          preview_image_url !== undefined
+            ? parseNullableString(preview_image_url)
+            : (fetchedPreview?.preview_image_url ?? undefined),
+        preview_site_name:
+          preview_site_name !== undefined
+            ? parseNullableString(preview_site_name)
+            : (fetchedPreview?.preview_site_name ?? undefined),
+        favicon_url:
+          favicon_url !== undefined
+            ? parseNullableString(favicon_url)
+            : (fetchedPreview?.favicon_url ?? undefined),
       });
 
       if (!source) {

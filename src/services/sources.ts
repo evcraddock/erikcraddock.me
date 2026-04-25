@@ -13,6 +13,11 @@ export interface Source {
   name: string;
   url: string;
   feed_url: string | null;
+  preview_title: string | null;
+  preview_description: string | null;
+  preview_image_url: string | null;
+  preview_site_name: string | null;
+  favicon_url: string | null;
   authors: SourceAuthor[];
 }
 
@@ -97,7 +102,15 @@ export function getSource(id: number): Source | null {
   return source ? attachAuthors(source) : null;
 }
 
-export interface CreateSourceInput {
+export interface SourceMetadataInput {
+  preview_title?: string | null;
+  preview_description?: string | null;
+  preview_image_url?: string | null;
+  preview_site_name?: string | null;
+  favicon_url?: string | null;
+}
+
+export interface CreateSourceInput extends SourceMetadataInput {
   name: string;
   url: string;
   feed_url?: string | null;
@@ -108,7 +121,17 @@ export interface CreateSourceInput {
  * Create a new source
  */
 export function createSource(input: CreateSourceInput): Source {
-  const { name, url, feed_url, authors } = input;
+  const {
+    name,
+    url,
+    feed_url,
+    authors,
+    preview_title,
+    preview_description,
+    preview_image_url,
+    preview_site_name,
+    favicon_url,
+  } = input;
 
   const source = db
     .insert(sources)
@@ -116,6 +139,11 @@ export function createSource(input: CreateSourceInput): Source {
       name,
       url,
       feed_url: feed_url ?? null,
+      preview_title: preview_title ?? null,
+      preview_description: preview_description ?? null,
+      preview_image_url: preview_image_url ?? null,
+      preview_site_name: preview_site_name ?? null,
+      favicon_url: favicon_url ?? null,
     })
     .returning()
     .get();
@@ -125,7 +153,7 @@ export function createSource(input: CreateSourceInput): Source {
   return attachAuthors(source);
 }
 
-export interface UpdateSourceInput {
+export interface UpdateSourceInput extends SourceMetadataInput {
   name?: string;
   url?: string;
   feed_url?: string | null;
@@ -145,6 +173,11 @@ export function updateSource(id: number, input: UpdateSourceInput): Source | nul
     name: string;
     url: string;
     feed_url: string | null;
+    preview_title: string | null;
+    preview_description: string | null;
+    preview_image_url: string | null;
+    preview_site_name: string | null;
+    favicon_url: string | null;
   }> = {};
 
   if (input.name !== undefined) {
@@ -155,6 +188,21 @@ export function updateSource(id: number, input: UpdateSourceInput): Source | nul
   }
   if (input.feed_url !== undefined) {
     updates.feed_url = input.feed_url;
+  }
+  if (input.preview_title !== undefined) {
+    updates.preview_title = input.preview_title;
+  }
+  if (input.preview_description !== undefined) {
+    updates.preview_description = input.preview_description;
+  }
+  if (input.preview_image_url !== undefined) {
+    updates.preview_image_url = input.preview_image_url;
+  }
+  if (input.preview_site_name !== undefined) {
+    updates.preview_site_name = input.preview_site_name;
+  }
+  if (input.favicon_url !== undefined) {
+    updates.favicon_url = input.favicon_url;
   }
 
   if (Object.keys(updates).length > 0) {

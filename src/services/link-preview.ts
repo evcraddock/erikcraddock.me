@@ -5,6 +5,7 @@ export interface LinkPreview {
   description: string | null;
   imageUrl: string | null;
   siteName: string | null;
+  faviconUrl: string | null;
 }
 
 function extractMetaContent(html: string, name: string): string | null {
@@ -32,6 +33,25 @@ function extractMetaContent(html: string, name: string): string | null {
 function extractTitleTag(html: string): string | null {
   const match = html.match(/<title[^>]*>([^<]+)<\/title>/i);
   return match?.[1] ? decodeHtmlEntities(match[1].trim()) : null;
+}
+
+function extractLinkHref(html: string, rel: string): string | null {
+  const linkTags = html.match(/<link\s+[^>]*>/gi) ?? [];
+  const relPattern = new RegExp(`\\b${escapeRegExp(rel)}\\b`, "i");
+
+  for (const tag of linkTags) {
+    const relMatch = tag.match(/\srel=["']([^"']+)["']/i);
+    if (!relMatch?.[1] || !relPattern.test(relMatch[1])) {
+      continue;
+    }
+
+    const hrefMatch = tag.match(/\shref=["']([^"']+)["']/i);
+    if (hrefMatch?.[1]) {
+      return decodeHtmlEntities(hrefMatch[1].trim());
+    }
+  }
+
+  return null;
 }
 
 function decodeHtmlEntities(value: string): string {
@@ -107,8 +127,15 @@ export async function fetchLinkPreview(url: string): Promise<LinkPreview | null>
       finalUrl
     );
     const siteName = extractMetaContent(html, "og:site_name") ?? getFallbackSiteName(finalUrl);
+    const faviconUrl = resolveUrl(
+      extractLinkHref(html, "icon") ??
+        extractLinkHref(html, "shortcut icon") ??
+        extractLinkHref(html, "apple-touch-icon") ??
+        "/favicon.ico",
+      finalUrl
+    );
 
-    if (!title && !description && !imageUrl && !siteName) {
+    if (!title && !description && !imageUrl && !siteName && !faviconUrl) {
       return null;
     }
 
@@ -117,6 +144,7 @@ export async function fetchLinkPreview(url: string): Promise<LinkPreview | null>
       description,
       imageUrl,
       siteName,
+      faviconUrl,
     };
   } catch (error) {
     logger.warn("link-preview", "Error fetching link preview", {

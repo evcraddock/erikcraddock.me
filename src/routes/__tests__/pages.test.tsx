@@ -120,6 +120,8 @@ testDb
       name: "Test Blog",
       url: "https://example.com",
       feed_url: "https://example.com/feed.xml",
+      favicon_url: "https://example.com/favicon.ico",
+      preview_description: "A test source preview description.",
     },
     { id: 2, name: "Another Site", url: "https://another.example.com", feed_url: null },
     { id: 3, name: "Team Blog", url: "https://team.example.com", feed_url: null },
@@ -541,6 +543,23 @@ describe("pages routes", () => {
 
       expect(html).toContain("RSS");
       expect(html).toContain("https://example.com/feed.xml");
+    });
+
+    it("shows source favicons when present", async () => {
+      const app = getApp();
+      const res = await app.request("/sources");
+      const html = await res.text();
+
+      expect(html).toContain('src="https://example.com/favicon.ico"');
+      expect(html).toContain('class="h-full w-full object-cover"');
+    });
+
+    it("shows source preview descriptions when present", async () => {
+      const app = getApp();
+      const res = await app.request("/sources");
+      const html = await res.text();
+
+      expect(html).toContain("A test source preview description.");
     });
 
     it("shows source authors when present", async () => {
