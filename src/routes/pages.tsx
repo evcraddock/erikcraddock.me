@@ -24,6 +24,16 @@ type PostWithSource = Post & { source?: Source | null };
 
 /** Max length for showing full note content inline */
 const NOTE_INLINE_MAX_LENGTH = 280;
+const ACTOR_HANDLE = "@erik@erikcraddock.me";
+const ACTOR_URI = new URL("/users/erik", baseUrl).toString();
+const WEBFINGER_SUBSCRIBE_REL = "http://ostatus.org/schema/1.0/subscribe";
+
+interface WebFingerResponse {
+  links?: Array<{
+    rel?: string;
+    template?: string;
+  }>;
+}
 
 function hasStoredLinkPreview(post: {
   og_title?: string | null;
@@ -48,6 +58,83 @@ function getLinkPreviewSiteLabel(url: string | null, siteName: string | null): s
   } catch {
     return null;
   }
+}
+
+function parseFediverseAccount(input: string): { username: string; host: string } | null {
+  const account = input.trim().replace(/^@/, "");
+  if (account.includes("://")) {
+    return null;
+  }
+
+  const [username, host, extra] = account.split("@");
+  if (!username || !host || extra) {
+    return null;
+  }
+
+  return { username, host };
+}
+
+function normalizeFediverseServer(input: string): string | null {
+  const trimmedInput = input.trim();
+  if (!trimmedInput) {
+    return null;
+  }
+
+  const account = parseFediverseAccount(trimmedInput);
+  const hostInput = account?.host ?? trimmedInput;
+
+  try {
+    const url = new URL(hostInput.includes("://") ? hostInput : `https://${hostInput}`);
+    if (url.protocol !== "https:") {
+      return null;
+    }
+
+    return url.origin;
+  } catch {
+    return null;
+  }
+}
+
+function buildRemoteFollowUrl(serverOrigin: string): string {
+  const url = new URL("/authorize_interaction", serverOrigin);
+  url.searchParams.set("uri", ACTOR_URI);
+  return url.toString();
+}
+
+async function getSubscribeTemplateFollowUrl(input: string): Promise<string | null> {
+  const account = parseFediverseAccount(input);
+  if (!account) {
+    return null;
+  }
+
+  try {
+    const resource = `acct:${account.username}@${account.host}`;
+    const webFingerUrl = new URL("/.well-known/webfinger", `https://${account.host}`);
+    webFingerUrl.searchParams.set("resource", resource);
+    const response = await fetch(webFingerUrl, { headers: { accept: "application/jrd+json" } });
+    if (!response.ok) {
+      return null;
+    }
+
+    const data = (await response.json()) as WebFingerResponse;
+    const template = data.links?.find((link) => link.rel === WEBFINGER_SUBSCRIBE_REL)?.template;
+    return template?.includes("{uri}")
+      ? template.replace("{uri}", encodeURIComponent(ACTOR_URI))
+      : null;
+  } catch {
+    return null;
+  }
+}
+
+async function buildFediverseFollowUrl(input: string): Promise<string | null> {
+  // Fediverse servers advertise remote-follow URLs via the WebFinger subscribe relation.
+  const subscribeUrl = await getSubscribeTemplateFollowUrl(input);
+  if (subscribeUrl) {
+    return subscribeUrl;
+  }
+
+  const serverOrigin = normalizeFediverseServer(input);
+  return serverOrigin ? buildRemoteFollowUrl(serverOrigin) : null;
 }
 
 /** Social link icons */
@@ -396,15 +483,15 @@ function FeedProfileCard({
         <div class="-mt-12 flex items-end justify-between gap-4 sm:-mt-16">
           <FeedActorAvatar className="h-24 w-24 border-4 border-white dark:border-gray-900 sm:h-32 sm:w-32" />
           <a
-            href="/about"
+            href="/follow"
             class="mb-2 rounded-full border border-gray-300 px-4 py-2 text-sm font-semibold text-gray-900 transition hover:bg-gray-100 dark:border-gray-600 dark:text-gray-100 dark:hover:bg-gray-800"
           >
-            About
+            Follow
           </a>
         </div>
         <div class="mt-4">
           <h2 class="text-2xl font-bold text-gray-950 dark:text-gray-50">Erik Craddock</h2>
-          <p class="text-gray-500 dark:text-gray-400">@erik@erikcraddock.me</p>
+          <p class="text-gray-500 dark:text-gray-400">{ACTOR_HANDLE}</p>
           <p class="mt-4 text-gray-800 dark:text-gray-200">
             Writer, coder, and musician — not always in that order.
           </p>
@@ -1157,6 +1244,66 @@ export function createPagesRoutes(db: Database): Hono {
               </div>
             )}
           </div>
+        </div>
+      </Layout>
+    );
+  });
+
+  pages.get("/follow", async (c) => {
+    const server = c.req.query("server");
+    const error = c.req.query("error");
+
+    if (server !== undefined) {
+      const followUrl = await buildFediverseFollowUrl(server);
+      if (followUrl) {
+        return c.redirect(followUrl);
+      }
+
+      return c.redirect("/follow?error=invalid-server");
+    }
+
+    return c.html(
+      <Layout title="Follow | erikcraddock.me">
+        <div class="mx-auto max-w-2xl rounded-2xl border border-gray-200 bg-white p-6 shadow-sm dark:border-gray-800 dark:bg-gray-900 sm:p-8">
+          <h1 class="text-3xl font-bold text-gray-950 dark:text-gray-50">Follow Erik Craddock</h1>
+          <p class="mt-4 text-gray-700 dark:text-gray-300">
+            Follow <code>{ACTOR_HANDLE}</code> from Mastodon or another Fediverse server.
+          </p>
+          <form action="/follow" method="get" class="mt-6 space-y-4">
+            <div>
+              <label
+                for="server"
+                class="block text-sm font-semibold text-gray-900 dark:text-gray-100"
+              >
+                Your Fediverse server or account
+              </label>
+              <input
+                id="server"
+                name="server"
+                type="text"
+                required
+                placeholder="mastodon.social or @you@mastodon.social"
+                class="mt-2 w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-gray-900 shadow-sm focus:border-teal-500 focus:outline-none focus:ring-2 focus:ring-teal-500/30 dark:border-gray-700 dark:bg-gray-950 dark:text-gray-100"
+              />
+            </div>
+            {error === "invalid-server" && (
+              <p class="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700 dark:bg-red-950/40 dark:text-red-300">
+                Enter a valid Fediverse server, such as mastodon.social, or an account handle like
+                @you@mastodon.social.
+              </p>
+            )}
+            <button
+              type="submit"
+              class="rounded-full bg-teal-600 px-5 py-2 text-sm font-semibold text-white transition hover:bg-teal-700 focus:outline-none focus:ring-2 focus:ring-teal-500 focus:ring-offset-2 dark:focus:ring-offset-gray-900"
+            >
+              Continue to Follow
+            </button>
+          </form>
+          <p class="mt-5 text-sm text-gray-500 dark:text-gray-400">
+            This uses your account's WebFinger subscribe template when available, with a
+            Mastodon-compatible remote-follow URL as a fallback. If your server does not support it,
+            search for <code>{ACTOR_HANDLE}</code> in your Fediverse app.
+          </p>
         </div>
       </Layout>
     );

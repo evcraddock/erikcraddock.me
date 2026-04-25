@@ -251,6 +251,60 @@ describe("pages routes", () => {
     });
   });
 
+  describe("GET /follow", () => {
+    it("renders a Fediverse follow form", async () => {
+      const app = getApp();
+      const res = await app.request("/follow");
+      const html = await res.text();
+
+      expect(res.status).toBe(200);
+      expect(html).toContain("Follow Erik Craddock");
+      expect(html).toContain('name="server"');
+      expect(html).toContain("@erik@erikcraddock.me");
+    });
+
+    it("redirects a server domain to the remote follow endpoint", async () => {
+      const app = getApp();
+      const res = await app.request("/follow?server=mastodon.social");
+
+      expect(res.status).toBe(302);
+      const location = new URL(res.headers.get("Location") ?? "");
+      expect(location.origin).toBe("https://mastodon.social");
+      expect(location.pathname).toBe("/authorize_interaction");
+      expect(location.searchParams.get("uri")).toContain("/users/erik");
+    });
+
+    it("uses a WebFinger subscribe template for account handles", async () => {
+      global.fetch = mock(async () => {
+        return Response.json({
+          links: [
+            {
+              rel: "http://ostatus.org/schema/1.0/subscribe",
+              template: "https://fosstodon.org/authorize_interaction?uri={uri}",
+            },
+          ],
+        });
+      }) as unknown as typeof fetch;
+
+      const app = getApp();
+      const res = await app.request("/follow?server=%40you%40fosstodon.org");
+
+      expect(res.status).toBe(302);
+      const location = new URL(res.headers.get("Location") ?? "");
+      expect(location.origin).toBe("https://fosstodon.org");
+      expect(location.pathname).toBe("/authorize_interaction");
+      expect(location.searchParams.get("uri")).toContain("/users/erik");
+    });
+
+    it("handles invalid server input gracefully", async () => {
+      const app = getApp();
+      const res = await app.request("/follow?server=not%20a%20server");
+
+      expect(res.status).toBe(302);
+      expect(res.headers.get("Location")).toBe("/follow?error=invalid-server");
+    });
+  });
+
   describe("GET /about", () => {
     it("returns 200 and displays about page", async () => {
       const app = getApp();
@@ -395,6 +449,15 @@ describe("pages routes", () => {
       expect(html).toContain("Posts");
       expect(html).toContain('aria-label="Erik Craddock profile"');
       expect(html).toContain("rounded-full");
+    });
+
+    it("links the actor card follow button to the Fediverse follow flow", async () => {
+      const app = getApp();
+      const res = await app.request("/feed");
+      const html = await res.text();
+
+      expect(html).toContain('href="/follow"');
+      expect(html).toContain("Follow");
     });
 
     it("shows stored link previews in feed items", async () => {
