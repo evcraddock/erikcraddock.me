@@ -2,6 +2,8 @@ import type { GlobalOptions, PostListItem } from "../../types";
 import { ApiClient } from "../../lib/api";
 import { loadConfig } from "../../lib/config";
 
+const ALL_LINKS_LIMIT = 2_147_483_647;
+
 interface ListOptions {
   limit?: number;
   tag?: string;
@@ -44,7 +46,7 @@ function showListHelp(): void {
 Usage: ec link list [options]
 
 Options:
-  --limit <n>       Maximum number of links (default: 50, max: 100)
+  --limit <n>       Maximum number of links (default: all)
   --tag <tag>       Filter by tag slug
   --status <status> Filter by status: draft, published, all (default: all)
   --json            Output as JSON
@@ -129,7 +131,7 @@ export async function list(args: string[], globalOptions: GlobalOptions): Promis
 
   const client = new ApiClient(apiUrl, apiKey);
   const result = await client.listPosts({
-    limit: options.limit,
+    limit: options.limit ?? ALL_LINKS_LIMIT,
     tag: options.tag,
     status: options.status || "all",
     type: "link",
