@@ -10,6 +10,8 @@
 
 The preflight ensures you understand the task, check dependencies, and follow project guidelines.
 
+After preflight passes and the implementation plan is approved, set the task status to `inprogress` before making code changes.
+
 ## Required Reading
 
 Before working, read and follow:
@@ -201,6 +203,7 @@ CLI integration tests are in `integration-tests/cli-*/`. These tests assume `EC_
 ## Task Lifecycle
 
 - **Starting**: ALWAYS run `task-start-preflight` skill first
+- **Before work begins**: After preflight passes and the user approves the plan, move the task to `inprogress` before making code changes
 - **Closing**: Run `task-close-preflight` skill
 
 ## PR Workflow
