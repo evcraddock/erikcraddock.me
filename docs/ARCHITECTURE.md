@@ -51,7 +51,7 @@ post_tags
   post_id, tag_id
 
 sources (link attribution)
-  id, name, url, feed_url
+  id, name, url, feed_url, preview_title, preview_description, preview_image_url, preview_site_name, favicon_url
 
 people (public attribution identities)
   id, name, url

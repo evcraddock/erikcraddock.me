@@ -20,6 +20,11 @@ type SourceSummary = {
   id: number;
   name: string;
   url: string;
+  preview_title: string | null;
+  preview_description: string | null;
+  preview_image_url: string | null;
+  preview_site_name: string | null;
+  favicon_url: string | null;
   authors: Array<{
     id: number;
     name: string;
@@ -47,7 +52,17 @@ function getSourceSummary(sourceId: number): SourceSummary | null {
     .orderBy(asc(sourceAuthors.sort_order), asc(sourceAuthors.id))
     .all();
 
-  return { id: sourceRecord.id, name: sourceRecord.name, url: sourceRecord.url, authors };
+  return {
+    id: sourceRecord.id,
+    name: sourceRecord.name,
+    url: sourceRecord.url,
+    preview_title: sourceRecord.preview_title,
+    preview_description: sourceRecord.preview_description,
+    preview_image_url: sourceRecord.preview_image_url,
+    preview_site_name: sourceRecord.preview_site_name,
+    favicon_url: sourceRecord.favicon_url,
+    authors,
+  };
 }
 
 export interface ListPostsOptions {

@@ -183,6 +183,11 @@ export class ApiClient {
     name: string;
     url: string;
     feed_url?: string;
+    preview_title?: string | null;
+    preview_description?: string | null;
+    preview_image_url?: string | null;
+    preview_site_name?: string | null;
+    favicon_url?: string | null;
     authors?: Array<{ name: string }>;
   }): Promise<ApiResponse<Source>> {
     return this.request<Source>("POST", "/sources", data);
@@ -194,6 +199,11 @@ export class ApiClient {
       name?: string;
       url?: string;
       feed_url?: string | null;
+      preview_title?: string | null;
+      preview_description?: string | null;
+      preview_image_url?: string | null;
+      preview_site_name?: string | null;
+      favicon_url?: string | null;
       authors?: Array<{ name: string }>;
     }
   ): Promise<ApiResponse<Source>> {

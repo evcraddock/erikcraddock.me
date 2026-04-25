@@ -141,9 +141,18 @@ function SourceCard({ source }: { source: SourceWithAuthors }) {
           target="_blank"
           rel="noopener noreferrer"
           aria-label={`${source.name} website`}
-          class="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-teal-100 text-lg font-bold text-teal-700 dark:bg-teal-900/40 dark:text-teal-300"
+          class="flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-2xl bg-teal-100 text-lg font-bold text-teal-700 dark:bg-teal-900/40 dark:text-teal-300"
         >
-          {source.name.charAt(0).toUpperCase()}
+          {source.favicon_url ? (
+            <img
+              src={source.favicon_url}
+              alt=""
+              class="h-full w-full object-cover"
+              loading="lazy"
+            />
+          ) : (
+            source.name.charAt(0).toUpperCase()
+          )}
         </a>
         <div class="min-w-0 flex-1">
           <a
@@ -157,6 +166,12 @@ function SourceCard({ source }: { source: SourceWithAuthors }) {
           <p class="mt-1 truncate text-sm text-gray-500 dark:text-gray-400">{hostname}</p>
         </div>
       </div>
+
+      {source.preview_description ? (
+        <p class="mt-4 line-clamp-3 text-sm leading-6 text-gray-600 dark:text-gray-300">
+          {source.preview_description}
+        </p>
+      ) : null}
 
       {source.authors.length > 0 ? (
         <p class="mt-4 text-sm text-gray-600 dark:text-gray-300">

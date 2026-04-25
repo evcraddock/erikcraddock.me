@@ -38,6 +38,7 @@ describe("fetchLinkPreview", () => {
       description: "An example description",
       imageUrl: "https://example.com/images/card.jpg",
       siteName: "Example Site",
+      faviconUrl: "https://example.com/favicon.ico",
     });
   });
 
@@ -50,6 +51,7 @@ describe("fetchLinkPreview", () => {
             <head>
               <title>Fallback Title</title>
               <meta name="description" content="Fallback description" />
+              <link rel="icon" href="/custom.ico" />
             </head>
           </html>
         `,
@@ -69,6 +71,7 @@ describe("fetchLinkPreview", () => {
       description: "Fallback description",
       imageUrl: null,
       siteName: "example.com",
+      faviconUrl: "https://www.example.com/custom.ico",
     });
   });
 

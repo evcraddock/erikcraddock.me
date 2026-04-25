@@ -47,6 +47,11 @@ export const sources = sqliteTable("sources", {
   name: text("name").notNull(),
   url: text("url").notNull(),
   feed_url: text("feed_url"),
+  preview_title: text("preview_title"),
+  preview_description: text("preview_description"),
+  preview_image_url: text("preview_image_url"),
+  preview_site_name: text("preview_site_name"),
+  favicon_url: text("favicon_url"),
 });
 
 export const people = sqliteTable("people", {
