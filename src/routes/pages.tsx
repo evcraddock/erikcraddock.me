@@ -156,9 +156,7 @@ function SourceCard({ source }: { source: SourceWithAuthors }) {
         </a>
         <div class="min-w-0 flex-1">
           <a
-            href={source.url}
-            target="_blank"
-            rel="noopener noreferrer"
+            href={`/sources/${source.id}`}
             class="line-clamp-2 font-semibold text-gray-950 hover:text-teal-600 dark:text-gray-50 dark:hover:text-teal-400"
           >
             {source.name}
@@ -715,9 +713,7 @@ function FeedPostMeta({ post, tags: postTags }: { post: PostWithSource; tags: Ta
           <span>
             via{" "}
             <a
-              href={post.source.url}
-              target="_blank"
-              rel="noopener noreferrer"
+              href={`/sources/${post.source.id}`}
               class="hover:text-gray-700 dark:hover:text-gray-300"
             >
               {post.source.name}
@@ -914,9 +910,7 @@ function PostCard({ post, tags: postTags = [] }: { post: PostWithSource; tags?: 
             <span class="ml-2">
               • via{" "}
               <a
-                href={post.source.url}
-                target="_blank"
-                rel="noopener noreferrer"
+                href={`/sources/${post.source.id}`}
                 class="text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300"
                 onClick={(e) => e.stopPropagation()}
               >
@@ -961,6 +955,34 @@ function PostList({
       )}
     </div>
   );
+}
+
+function getSourceAuthors(db: Database, sourceId: number): SourceAuthor[] {
+  return db
+    .select({
+      id: people.id,
+      name: people.name,
+      url: people.url,
+      sort_order: sourceAuthors.sort_order,
+    })
+    .from(sourceAuthors)
+    .innerJoin(people, eq(sourceAuthors.person_id, people.id))
+    .where(eq(sourceAuthors.source_id, sourceId))
+    .orderBy(asc(sourceAuthors.sort_order), asc(sourceAuthors.id))
+    .all();
+}
+
+function getSourceWithAuthors(db: Database, sourceId: number): SourceWithAuthors | null {
+  const source = db.select().from(sources).where(eq(sources.id, sourceId)).get();
+
+  if (!source) {
+    return null;
+  }
+
+  return {
+    ...source,
+    authors: getSourceAuthors(db, source.id),
+  };
 }
 
 /**
@@ -1565,6 +1587,73 @@ export function createPagesRoutes(db: Database): Hono {
               ))}
             </div>
           )}
+        </div>
+      </Layout>
+    );
+  });
+
+  // Source detail page
+  pages.get("/sources/:id", (c) => {
+    const id = parseInt(c.req.param("id") ?? "", 10);
+
+    if (isNaN(id)) {
+      return c.html(
+        <NotFound
+          title="Source Not Found"
+          message="The source you're looking for doesn't exist."
+        />,
+        404
+      );
+    }
+
+    const source = getSourceWithAuthors(db, id);
+
+    if (!source) {
+      return c.html(
+        <NotFound
+          title="Source Not Found"
+          message="The source you're looking for doesn't exist."
+        />,
+        404
+      );
+    }
+
+    const sourceLinks: PostWithSource[] = db
+      .select()
+      .from(posts)
+      .where(
+        and(eq(posts.source_id, source.id), eq(posts.type, "link"), isNotNull(posts.published_at))
+      )
+      .orderBy(desc(posts.published_at))
+      .all()
+      .map((post) => ({ ...post, source }));
+
+    return c.html(
+      <Layout
+        title={`${source.name} | erikcraddock.me`}
+        description={source.preview_description ?? undefined}
+      >
+        <div class="mx-auto grid max-w-6xl gap-6 lg:grid-cols-[20rem_minmax(0,42rem)] lg:items-start lg:justify-center">
+          <aside class="lg:sticky lg:top-24">
+            <SourceCard source={source} />
+          </aside>
+          <div class="overflow-hidden border-x border-gray-200 bg-white dark:border-gray-800 dark:bg-gray-900 sm:rounded-2xl sm:border">
+            <header class="border-b border-gray-200 bg-white/90 px-4 py-4 backdrop-blur dark:border-gray-800 dark:bg-gray-900/90 sm:px-6">
+              <a
+                href="/sources"
+                class="text-xl font-bold text-gray-950 hover:text-teal-600 dark:text-gray-50 dark:hover:text-teal-400"
+              >
+                ← Recommended Sites
+              </a>
+            </header>
+            <div class="px-4 py-5 dark:bg-gray-900 sm:px-6">
+              {sourceLinks.length === 0 ? (
+                <p class="text-gray-600 dark:text-gray-400">No links from this source yet.</p>
+              ) : (
+                sourceLinks.map((post) => <FeedLinkPreview key={post.id} post={post} />)
+              )}
+            </div>
+          </div>
         </div>
       </Layout>
     );

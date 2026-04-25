@@ -1,6 +1,7 @@
 /* eslint-disable @typescript-eslint/no-require-imports */
 import { describe, it, expect, beforeAll, afterEach } from "bun:test";
 import { mock } from "bun:test";
+import { eq } from "drizzle-orm";
 import { Hono } from "hono";
 
 const originalFetch = global.fetch;
@@ -128,6 +129,8 @@ testDb
     { id: 4, name: "Group Blog", url: "https://group.example.com", feed_url: null },
   ])
   .run();
+
+testDb.update(posts).set({ source_id: 1 }).where(eq(posts.id, 6)).run();
 
 testDb
   .insert(people)
@@ -536,6 +539,14 @@ describe("pages routes", () => {
       expect(html).toContain("Another Site");
     });
 
+    it("links source cards to source detail pages", async () => {
+      const app = getApp();
+      const res = await app.request("/sources");
+      const html = await res.text();
+
+      expect(html).toContain('href="/sources/1"');
+    });
+
     it("shows RSS link for sources with feed_url", async () => {
       const app = getApp();
       const res = await app.request("/sources");
@@ -594,6 +605,61 @@ describe("pages routes", () => {
       expect(html).toContain("dark:bg-gray-900");
       expect(html).toContain("dark:text-gray-100");
       expect(html).toContain("dark:text-teal-400");
+    });
+  });
+
+  describe("GET /sources/:id", () => {
+    it("returns 200 and displays the source detail page", async () => {
+      const app = getApp();
+      const res = await app.request("/sources/1");
+
+      expect(res.status).toBe(200);
+
+      const html = await res.text();
+      expect(html).toContain("Test Blog");
+      expect(html).toContain("← Recommended Sites");
+    });
+
+    it("uses the link post page layout style without the Erik profile card", async () => {
+      const app = getApp();
+      const res = await app.request("/sources/1");
+      const html = await res.text();
+
+      expect(html).toContain("lg:grid-cols-[20rem_minmax(0,42rem)]");
+      expect(html).toContain("sm:rounded-2xl sm:border");
+      expect(html).not.toContain("Writer, coder, and musician");
+      expect(html).not.toContain("Followers");
+    });
+
+    it("shows the selected source card on the left side", async () => {
+      const app = getApp();
+      const res = await app.request("/sources/1");
+      const html = await res.text();
+
+      expect(html).toContain("A test source preview description.");
+      expect(html).toContain("by Test Author");
+      expect(html).toContain('src="https://example.com/favicon.ico"');
+    });
+
+    it("shows links from the selected source as preview links", async () => {
+      const app = getApp();
+      const res = await app.request("/sources/1");
+      const html = await res.text();
+
+      expect(html).toContain('href="https://example.com/article"');
+      expect(html).toContain("Example Article");
+      expect(html).toContain("A rich preview description.");
+      expect(html).toContain('src="https://example.com/preview.jpg"');
+    });
+
+    it("returns 404 for missing sources", async () => {
+      const app = getApp();
+      const res = await app.request("/sources/999");
+
+      expect(res.status).toBe(404);
+
+      const html = await res.text();
+      expect(html).toContain("Source Not Found");
     });
   });
 
@@ -774,6 +840,18 @@ describe("pages routes", () => {
       expect(html).toContain("Example Site");
       expect(html).toContain('src="https://example.com/preview.jpg"');
       expect(html).toContain('href="https://example.com/article"');
+    });
+
+    it("links source attribution to the source detail page", async () => {
+      const app = getApp();
+      const res = await app.request("/posts/test-link");
+
+      expect(res.status).toBe(200);
+
+      const html = await res.text();
+      expect(html).toContain("via");
+      expect(html).toContain('href="/sources/1"');
+      expect(html).toContain("Test Blog");
     });
 
     it("backfills OG preview metadata for older link posts during page render", async () => {
