@@ -136,7 +136,7 @@ testDb
   .insert(people)
   .values([
     { id: 1, name: "Test Author" },
-    { id: 2, name: "Alice" },
+    { id: 2, name: "Alice", url: "https://alice.example.com" },
     { id: 3, name: "Bob" },
     { id: 4, name: "Carol" },
   ])
@@ -364,8 +364,9 @@ describe("pages routes", () => {
 
       expect(html).toContain("Recommended Sites");
       expect(html).toContain('href="/sources"');
+      expect(html).toContain('href="/people"');
       expect(html).toContain("websites, publications, and");
-      expect(html).toContain("reading log and part blogroll");
+      expect(html).toContain("reading log and");
     });
 
     it("includes dark mode classes", async () => {
@@ -551,6 +552,75 @@ describe("pages routes", () => {
 
       expect(res.status).toBe(302);
       expect(res.headers.get("Location")).toBe("/feed");
+    });
+  });
+
+  describe("GET /people", () => {
+    it("returns 200 and displays people page", async () => {
+      const app = getApp();
+      const res = await app.request("/people");
+
+      expect(res.status).toBe(200);
+
+      const html = await res.text();
+      expect(html).toContain("People");
+      expect(html).toContain("Search people");
+    });
+
+    it("lists people from database", async () => {
+      const app = getApp();
+      const res = await app.request("/people");
+      const html = await res.text();
+
+      expect(html).toContain("Test Author");
+      expect(html).toContain("Alice");
+      expect(html).toContain("https://alice.example.com");
+      expect(html).toContain("No website listed");
+    });
+
+    it("uses the sources page card grid pattern", async () => {
+      const app = getApp();
+      const res = await app.request("/people");
+      const html = await res.text();
+
+      expect(html).toContain("mx-auto max-w-6xl");
+      expect(html).toContain("grid gap-5 md:grid-cols-2 lg:grid-cols-3");
+      expect(html).toContain("rounded-2xl border border-gray-200 bg-white p-5 shadow-sm");
+    });
+
+    it("filters people by search query", async () => {
+      const app = getApp();
+      const res = await app.request("/people?q=Alice");
+      const html = await res.text();
+
+      expect(html).toContain("Alice");
+      expect(html).not.toContain("Test Author");
+      expect(html).toContain("matching “Alice”");
+    });
+
+    it("paginates people", async () => {
+      const manyPeopleDb = createTestDb();
+      for (let i = 1; i <= 25; i++) {
+        manyPeopleDb
+          .insert(people)
+          .values({
+            id: i,
+            name: `Person ${String(i).padStart(2, "0")}`,
+            url: `https://person-${i}.example.com`,
+          })
+          .run();
+      }
+      const app = createPagesRoutes(
+        manyPeopleDb as unknown as Parameters<typeof createPagesRoutes>[0]
+      );
+
+      const pageOne = await app.request("/people");
+      const pageOneHtml = await pageOne.text();
+      expect(pageOneHtml).toContain("Person 01");
+      expect(pageOneHtml).toContain("Person 12");
+      expect(pageOneHtml).not.toContain("Person 13");
+      expect(pageOneHtml).toContain("Page 1 of 3");
+      expect(pageOneHtml).toContain('href="/people?page=2"');
     });
   });
 

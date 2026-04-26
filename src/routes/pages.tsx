@@ -43,6 +43,7 @@ type PostWithSource = Post & { source?: Source | null; author?: Person | null };
 /** Max length for showing full note content inline */
 const NOTE_INLINE_MAX_LENGTH = 280;
 const SOURCES_PER_PAGE = 12;
+const PEOPLE_PER_PAGE = 12;
 const ACTOR_HANDLE = "@erik@erikcraddock.me";
 const ACTOR_URI = new URL("/users/erik", baseUrl).toString();
 const WEBFINGER_SUBSCRIBE_REL = "http://ostatus.org/schema/1.0/subscribe";
@@ -130,6 +131,49 @@ function formatAuthorByline(authors: SourceAuthor[]): string | null {
   }
 
   return `${names.slice(0, -1).join(", ")}, and ${names[names.length - 1]}`;
+}
+
+function PersonCard({ person }: { person: Person }) {
+  const hostname = getLinkPreviewSiteLabel(person.url, null) ?? person.url;
+  const initial = person.name.charAt(0).toUpperCase();
+
+  return (
+    <article class="flex h-full flex-col rounded-2xl border border-gray-200 bg-white p-5 shadow-sm transition-colors hover:border-teal-200 hover:bg-teal-50/40 dark:border-gray-800 dark:bg-gray-900 dark:hover:border-teal-900/60 dark:hover:bg-teal-950/20">
+      <div class="flex items-start gap-4">
+        <div class="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-teal-100 text-lg font-bold text-teal-700 dark:bg-teal-900/40 dark:text-teal-300">
+          {initial}
+        </div>
+        <div class="min-w-0 flex-1">
+          {person.url ? (
+            <a
+              href={person.url}
+              target="_blank"
+              rel="noopener noreferrer"
+              class="line-clamp-2 font-semibold text-gray-950 hover:text-teal-600 dark:text-gray-50 dark:hover:text-teal-400"
+            >
+              {person.name}
+            </a>
+          ) : (
+            <h2 class="line-clamp-2 font-semibold text-gray-950 dark:text-gray-50">
+              {person.name}
+            </h2>
+          )}
+          {person.url ? (
+            <a
+              href={person.url}
+              target="_blank"
+              rel="noopener noreferrer"
+              class="mt-1 block truncate text-sm text-gray-500 hover:text-teal-600 dark:text-gray-400 dark:hover:text-teal-400"
+            >
+              {hostname}
+            </a>
+          ) : (
+            <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">No website listed</p>
+          )}
+        </div>
+      </div>
+    </article>
+  );
 }
 
 function SourceCard({
@@ -611,6 +655,17 @@ function sourceMatchesSearch(source: SourceWithAuthors, query: string): boolean 
 
 function sourcesUrl(page: number, query: string): string {
   return buildPaginationUrl("/sources", page, { q: query || undefined });
+}
+
+function personMatchesSearch(person: Person, query: string): boolean {
+  const normalizedQuery = query.toLowerCase();
+  const searchableText = [person.name, person.url].filter(Boolean).join(" ").toLowerCase();
+
+  return searchableText.includes(normalizedQuery);
+}
+
+function peopleUrl(page: number, query: string): string {
+  return buildPaginationUrl("/people", page, { q: query || undefined });
 }
 
 function FeedActorAvatar({ className = "" }: { className?: string }) {
@@ -1627,9 +1682,11 @@ export function createPagesRoutes(db: Database): Hono {
           <h2>Recommended Sites</h2>
           <p>
             The <a href="/sources">recommended sites</a> page collects websites, publications, and
-            personal blogs that I have found interesting enough to share links from. It is part
-            reading log and part blogroll: a way to browse the sources behind the links I post and
-            discover the people and sites that keep showing up here.
+            personal blogs that I have found interesting enough to share links from. The{" "}
+            <a href="/people">people page</a> collects reusable public attribution identities for
+            authors and creators who show up in those links. Together they form a reading log and
+            blogroll: a way to browse the sources behind the links I post and discover the people
+            and sites that keep showing up here.
           </p>
 
           <h2>Get in Touch</h2>
@@ -1638,6 +1695,150 @@ export function createPagesRoutes(db: Database): Hono {
             <code>@erik@erikcraddock.me</code> in a post. You can also find me on the social
             platforms linked above.
           </p>
+        </div>
+      </Layout>
+    );
+  });
+
+  // People page
+  pages.get("/people", (c) => {
+    const pageParam = c.req.query("page");
+    const page = pageParam ? parseInt(pageParam, 10) : 1;
+    const searchQuery = (c.req.query("q") ?? "").trim();
+
+    if (isNaN(page) || page < 1) {
+      return c.redirect(peopleUrl(1, searchQuery));
+    }
+
+    const allPeople = db.select().from(people).orderBy(asc(people.name)).all();
+    const filteredPeople = searchQuery
+      ? allPeople.filter((person) => personMatchesSearch(person, searchQuery))
+      : allPeople;
+    const totalPages = Math.max(1, Math.ceil(filteredPeople.length / PEOPLE_PER_PAGE));
+
+    if (page > totalPages) {
+      return c.redirect(peopleUrl(totalPages, searchQuery));
+    }
+
+    const offset = (page - 1) * PEOPLE_PER_PAGE;
+    const pagePeople = filteredPeople.slice(offset, offset + PEOPLE_PER_PAGE);
+
+    return c.html(
+      <Layout title="People | erikcraddock.me">
+        <div class="mx-auto max-w-6xl">
+          <div class="mb-8">
+            <h1 class="text-3xl font-bold text-gray-950 dark:text-gray-50">People</h1>
+          </div>
+
+          <form
+            action="/people"
+            method="get"
+            data-autosubmit-people-search="true"
+            class="mb-6 flex flex-col gap-3 sm:flex-row"
+          >
+            <label class="sr-only" for="people-search">
+              Search people
+            </label>
+            <input
+              id="people-search"
+              type="search"
+              name="q"
+              value={searchQuery}
+              placeholder="Search people"
+              autocomplete="off"
+              autofocus
+              class="min-w-0 flex-1 rounded-xl border border-gray-300 bg-white px-4 py-3 text-gray-950 shadow-sm focus:border-teal-500 focus:outline-none focus:ring-2 focus:ring-teal-500/20 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-50"
+            />
+            <button
+              type="submit"
+              class="rounded-xl bg-teal-600 px-5 py-3 font-semibold text-white transition hover:bg-teal-700 sm:sr-only"
+            >
+              Search
+            </button>
+          </form>
+          <script
+            dangerouslySetInnerHTML={{
+              __html: `
+                (() => {
+                  const form = document.querySelector('[data-autosubmit-people-search="true"]');
+                  const input = form?.querySelector('input[name="q"]');
+                  if (!form || !input) return;
+
+                  input.focus();
+                  const valueLength = input.value.length;
+                  input.setSelectionRange(valueLength, valueLength);
+
+                  let timeout;
+                  let controller;
+
+                  const updateResults = async () => {
+                    const query = input.value.trim();
+                    const url = query ? '/people?q=' + encodeURIComponent(query) : '/people';
+                    controller?.abort();
+                    controller = new AbortController();
+
+                    try {
+                      const response = await fetch(url, { signal: controller.signal });
+                      if (!response.ok) return;
+                      const html = await response.text();
+                      const doc = new DOMParser().parseFromString(html, 'text/html');
+                      const results = document.querySelector('[data-people-results="true"]');
+                      const nextResults = doc.querySelector('[data-people-results="true"]');
+                      if (!results || !nextResults) return;
+                      results.innerHTML = nextResults.innerHTML;
+                      history.replaceState(null, '', url);
+                    } catch (error) {
+                      if (error.name !== 'AbortError') console.error(error);
+                    }
+                  };
+
+                  form.addEventListener('submit', (event) => {
+                    event.preventDefault();
+                    clearTimeout(timeout);
+                    updateResults();
+                  });
+
+                  input.addEventListener('input', () => {
+                    clearTimeout(timeout);
+                    timeout = setTimeout(updateResults, 300);
+                  });
+                })();
+              `,
+            }}
+          />
+
+          <div data-people-results="true">
+            {allPeople.length === 0 ? (
+              <div class="rounded-2xl border border-gray-200 bg-white px-4 py-10 text-center text-gray-600 dark:border-gray-800 dark:bg-gray-900 dark:text-gray-400 sm:px-6">
+                No people yet.
+              </div>
+            ) : filteredPeople.length === 0 ? (
+              <div class="rounded-2xl border border-gray-200 bg-white px-4 py-10 text-center text-gray-600 dark:border-gray-800 dark:bg-gray-900 dark:text-gray-400 sm:px-6">
+                No people found for “{searchQuery}”.
+              </div>
+            ) : (
+              <>
+                <div class="mb-4 text-sm text-gray-600 dark:text-gray-400">
+                  Showing {offset + 1}–{Math.min(offset + PEOPLE_PER_PAGE, filteredPeople.length)}{" "}
+                  of {filteredPeople.length} people
+                  {searchQuery ? ` matching “${searchQuery}”` : ""}.
+                </div>
+                <div class="grid gap-5 md:grid-cols-2 lg:grid-cols-3">
+                  {pagePeople.map((person) => (
+                    <PersonCard key={person.id} person={person} />
+                  ))}
+                </div>
+                {totalPages > 1 ? (
+                  <Pagination
+                    currentPage={page}
+                    totalPages={totalPages}
+                    baseUrl="/people"
+                    queryParams={{ q: searchQuery || undefined }}
+                  />
+                ) : null}
+              </>
+            )}
+          </div>
         </div>
       </Layout>
     );
