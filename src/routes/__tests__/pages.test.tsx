@@ -902,7 +902,7 @@ describe("pages routes", () => {
       const res = await app.request("/people/1");
       const html = await res.text();
 
-      expect(html).toContain("Social Media");
+      expect(html).toContain("Follow Test Author");
       expect(html).toContain('href="https://mastodon.social/@testauthor"');
       expect(html).toContain("Mastodon");
       expect(html).toContain("ActivityPub");
