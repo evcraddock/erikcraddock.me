@@ -614,7 +614,7 @@ describe("pages routes", () => {
       expect(html).toContain("Test Author");
       expect(html).toContain("Alice");
       expect(html).toContain("https://alice.example.com");
-      expect(html).toContain("No website listed");
+      expect(html).not.toContain("No website listed");
     });
 
     it("uses the sources page card grid pattern", async () => {
@@ -896,12 +896,12 @@ describe("pages routes", () => {
       expect(html).not.toContain("Followers");
     });
 
-    it("lists sources authored by the selected person", async () => {
+    it("lists websites authored by the selected person", async () => {
       const app = getApp();
       const res = await app.request("/people/1");
       const html = await res.text();
 
-      expect(html).toContain("Sources");
+      expect(html).toContain("Websites");
       expect(html).toContain('href="/sources/1"');
       expect(html).toContain("Test Blog");
     });
