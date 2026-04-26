@@ -42,7 +42,7 @@ type PostWithSource = Post & { source?: Source | null; author?: Person | null };
 
 /** Max length for showing full note content inline */
 const NOTE_INLINE_MAX_LENGTH = 280;
-const SOURCES_PER_PAGE = 24;
+const SOURCES_PER_PAGE = 12;
 const ACTOR_HANDLE = "@erik@erikcraddock.me";
 const ACTOR_URI = new URL("/users/erik", baseUrl).toString();
 const WEBFINGER_SUBSCRIBE_REL = "http://ostatus.org/schema/1.0/subscribe";
@@ -648,6 +648,12 @@ function FeedProfileCard({
               <dd class="font-semibold text-gray-950 dark:text-gray-50">{postCount}</dd>
             </div>
           </dl>
+          <a
+            href="/sources"
+            class="mt-4 inline-flex rounded-full border border-teal-200 px-4 py-2 text-sm font-semibold text-teal-700 transition hover:bg-teal-50 dark:border-teal-900/60 dark:text-teal-300 dark:hover:bg-teal-950/30"
+          >
+            Recommended Sites
+          </a>
         </div>
       </div>
     </section>
@@ -1574,6 +1580,14 @@ export function createPagesRoutes(db: Database): Hono {
             </p>
           </div>
 
+          <h2>Recommended Sites</h2>
+          <p>
+            The <a href="/sources">recommended sites</a> page collects websites, publications, and
+            personal blogs that I have found interesting enough to share links from. It is part
+            reading log and part blogroll: a way to browse the sources behind the links I post and
+            discover the people and sites that keep showing up here.
+          </p>
+
           <h2>Get in Touch</h2>
           <p>
             The best way to reach me is through the Fediverse — just mention{" "}
@@ -1642,10 +1656,6 @@ export function createPagesRoutes(db: Database): Hono {
         <div class="mx-auto max-w-6xl">
           <div class="mb-8">
             <h1 class="text-3xl font-bold text-gray-950 dark:text-gray-50">Recommended Sites</h1>
-            <p class="mt-2 max-w-2xl text-gray-600 dark:text-gray-400">
-              The following are websites which I found interesting enough to share links from at
-              some point in the past.
-            </p>
           </div>
 
           <form
