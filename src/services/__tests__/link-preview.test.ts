@@ -42,6 +42,35 @@ describe("fetchLinkPreview", () => {
     });
   });
 
+  it("decodes named and numeric HTML entities in preview text", async () => {
+    global.fetch = mock(
+      async () =>
+        new Response(
+          `
+          <html>
+            <head>
+              <meta property="og:title" content="Seth&#039;s Blog" />
+              <meta property="og:description" content="Bad money&#8230; Gresham&#x2019;s Law &amp; incentives" />
+              <meta property="og:site_name" content="Seth&apos;s Blog" />
+            </head>
+          </html>
+        `,
+          {
+            status: 200,
+            headers: {
+              "content-type": "text/html; charset=utf-8",
+            },
+          }
+        )
+    ) as unknown as typeof fetch;
+
+    const preview = await fetchLinkPreview("https://seths.blog/2026/04/bad-money/");
+
+    expect(preview?.title).toBe("Seth's Blog");
+    expect(preview?.description).toBe("Bad money… Gresham’s Law & incentives");
+    expect(preview?.siteName).toBe("Seth's Blog");
+  });
+
   it("falls back to title tag and hostname when og tags are missing", async () => {
     global.fetch = mock(
       async () =>
