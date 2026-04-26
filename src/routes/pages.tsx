@@ -1820,13 +1820,13 @@ export function createPagesRoutes(db: Database): Hono {
                 ← Recommended Sites
               </a>
             </header>
-            <div class="px-4 py-5 dark:bg-gray-900 sm:px-6">
-              {sourceLinks.length === 0 ? (
+            {sourceLinks.length === 0 ? (
+              <div class="px-4 py-5 dark:bg-gray-900 sm:px-6">
                 <p class="text-gray-600 dark:text-gray-400">No links from this source yet.</p>
-              ) : (
-                sourceLinks.map((post) => <FeedLinkPreview key={post.id} post={post} />)
-              )}
-            </div>
+              </div>
+            ) : (
+              sourceLinks.map((post) => <FeedPost key={post.id} post={post} />)
+            )}
           </div>
         </div>
       </Layout>
