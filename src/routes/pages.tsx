@@ -290,20 +290,20 @@ function RssIcon() {
   );
 }
 
+const SOCIAL_LINKS = [
+  { name: "GitHub", url: "https://github.com/evcraddock", icon: <GitHubIcon /> },
+  {
+    name: "LinkedIn",
+    url: "https://www.linkedin.com/in/erik-craddock-42aa9815",
+    icon: <LinkedInIcon />,
+  },
+  { name: "Facebook", url: "https://www.facebook.com/evcraddock", icon: <FacebookIcon /> },
+  { name: "YouTube", url: "https://youtube.com/@ErikCraddock", icon: <YouTubeIcon /> },
+  { name: "RSS", url: "/feed.xml", icon: <RssIcon /> },
+];
+
 /** Hero section with bio, social links, and logo */
 function HeroSection() {
-  const socialLinks = [
-    { name: "GitHub", url: "https://github.com/evcraddock", icon: <GitHubIcon /> },
-    {
-      name: "LinkedIn",
-      url: "https://www.linkedin.com/in/erik-craddock-42aa9815",
-      icon: <LinkedInIcon />,
-    },
-    { name: "Facebook", url: "https://www.facebook.com/evcraddock", icon: <FacebookIcon /> },
-    { name: "YouTube", url: "https://youtube.com/@ErikCraddock", icon: <YouTubeIcon /> },
-    { name: "RSS", url: "/feed.xml", icon: <RssIcon /> },
-  ];
-
   return (
     <section class="mb-12 py-8 bg-gray-100 dark:bg-gray-800 -mx-4 px-4 rounded-lg">
       <div class="flex flex-col md:flex-row items-stretch gap-8">
@@ -335,7 +335,7 @@ function HeroSection() {
 
             {/* Social links */}
             <div class="flex justify-start gap-4">
-              {socialLinks.map((link) => (
+              {SOCIAL_LINKS.map((link) => (
                 <a
                   key={link.name}
                   href={link.url}
@@ -649,6 +649,28 @@ function FeedProfileCard({
             </div>
           </dl>
         </div>
+      </div>
+    </section>
+  );
+}
+
+function SocialMediaFeedCard() {
+  return (
+    <section class="border-b border-gray-200 bg-white p-5 dark:border-gray-800 dark:bg-gray-900 lg:mt-4 lg:rounded-2xl lg:border">
+      <h2 class="text-lg font-bold text-gray-950 dark:text-gray-50">Follow me</h2>
+      <div class="mt-4 grid grid-cols-5 gap-2">
+        {SOCIAL_LINKS.map((link) => (
+          <a
+            href={link.url}
+            target={link.url.startsWith("/") ? undefined : "_blank"}
+            rel={link.url.startsWith("/") ? undefined : "noopener noreferrer"}
+            aria-label={link.name}
+            title={link.name}
+            class="flex aspect-square items-center justify-center rounded-xl border border-gray-200 text-gray-600 transition hover:border-teal-200 hover:bg-teal-50 hover:text-teal-700 dark:border-gray-800 dark:text-gray-400 dark:hover:border-teal-900/70 dark:hover:bg-teal-950/20 dark:hover:text-teal-300"
+          >
+            {link.icon}
+          </a>
+        ))}
       </div>
     </section>
   );
@@ -1314,6 +1336,7 @@ export function createPagesRoutes(db: Database): Hono {
                 followingCount={followingCount}
                 postCount={totalPosts}
               />
+              <SocialMediaFeedCard />
               <RecommendedSitesFeedCard />
             </aside>
             <div class="overflow-hidden border-x border-gray-200 bg-white dark:border-gray-800 dark:bg-gray-900 sm:rounded-2xl sm:border">
@@ -1413,6 +1436,7 @@ export function createPagesRoutes(db: Database): Hono {
               followingCount={followingCount}
               postCount={totalPosts}
             />
+            <SocialMediaFeedCard />
             <RecommendedSitesFeedCard />
           </aside>
           <div class="overflow-hidden border-x border-gray-200 bg-white dark:border-gray-800 dark:bg-gray-900 sm:rounded-2xl sm:border">
@@ -1507,18 +1531,6 @@ export function createPagesRoutes(db: Database): Hono {
 
   // About page
   pages.get("/about", (c) => {
-    const socialLinks = [
-      { name: "GitHub", url: "https://github.com/evcraddock", icon: <GitHubIcon /> },
-      {
-        name: "LinkedIn",
-        url: "https://www.linkedin.com/in/erik-craddock-42aa9815",
-        icon: <LinkedInIcon />,
-      },
-      { name: "Facebook", url: "https://www.facebook.com/evcraddock", icon: <FacebookIcon /> },
-      { name: "YouTube", url: "https://youtube.com/@ErikCraddock", icon: <YouTubeIcon /> },
-      { name: "RSS", url: "/feed.xml", icon: <RssIcon /> },
-    ];
-
     return c.html(
       <Layout title="About | Erik Craddock">
         {/* Hero-style header */}
@@ -1549,7 +1561,7 @@ export function createPagesRoutes(db: Database): Hono {
 
               {/* Social links */}
               <div class="flex justify-center md:justify-start gap-4">
-                {socialLinks.map((link) => (
+                {SOCIAL_LINKS.map((link) => (
                   <a
                     href={link.url}
                     target="_blank"
