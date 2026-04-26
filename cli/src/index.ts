@@ -6,6 +6,7 @@ import { postCommand, showPostHelp } from "./commands/post";
 import { linkCommand } from "./commands/link";
 import { noteCommand } from "./commands/note";
 import { sourceCommand, showSourceHelp } from "./commands/source";
+import { personCommand, showPersonHelp } from "./commands/person";
 import { tagCommand, showTagHelp } from "./commands/tag";
 import { imageCommand, showImageHelp } from "./commands/image";
 import { federationCommand, showFederationHelp } from "./commands/federation";
@@ -65,6 +66,7 @@ Commands:
   link            Manage links (list, show, create, edit, delete, publish)
   note            Manage notes (list, show, create, edit, delete, publish)
   source          Manage sources (list, show, create, edit, delete)
+  person          Manage attribution people (list, show, create, edit)
   tag             Manage tags (list)
   image           Manage images (upload, delete)
   federation      Manage ActivityPub federation (delete)
@@ -87,6 +89,7 @@ Examples:
   ec link create --url "https://..." --slug my-link --content "Commentary"
   ec note create --slug quick-thought --content "Just a thought"
   ec source list
+  ec person list
   ec tag list
   ec image upload ./photo.jpg
   ec version
@@ -201,6 +204,14 @@ async function main(): Promise<void> {
         return;
       }
       await sourceCommand(command.slice(1), options);
+      break;
+
+    case "person":
+      if (options.help && !subcmd) {
+        showPersonHelp();
+        return;
+      }
+      await personCommand(command.slice(1), options);
       break;
 
     case "tag":

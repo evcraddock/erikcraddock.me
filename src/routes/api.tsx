@@ -27,6 +27,13 @@ import {
   type SourceAuthorInput,
 } from "@/services/sources";
 import { listTags } from "@/services/tags";
+import {
+  createPerson,
+  findPersonByName,
+  getPerson,
+  listPeople,
+  updatePerson,
+} from "@/services/people";
 import { fetchLinkPreview } from "@/services/link-preview";
 import { logger } from "@/utils/logger";
 import {
@@ -61,7 +68,7 @@ api.doc("/openapi.json", (c: Context) => ({
     title: "erikcraddock.me API",
     version,
     description:
-      "Authenticated content management API for posts, sources, tags, media, and federation actions.",
+      "Authenticated content management API for posts, people, sources, tags, media, and federation actions.",
   },
   servers: [
     {
@@ -292,6 +299,20 @@ const UpdateSourceBodySchema = z
     ...SourceMetadataBodySchema,
   })
   .openapi("UpdateSourceBody");
+
+const CreatePersonBodySchema = z
+  .object({
+    name: z.string().openapi({ example: "Ethan Mollick" }),
+    url: z.string().optional().nullable().openapi({ example: "https://example.com" }),
+  })
+  .openapi("CreatePersonBody");
+
+const UpdatePersonBodySchema = z
+  .object({
+    name: z.string().optional().nullable().openapi({ example: "Ethan Mollick" }),
+    url: z.string().optional().nullable().openapi({ example: "https://example.com" }),
+  })
+  .openapi("UpdatePersonBody");
 
 function parseNullableString(input: unknown): string | null | undefined {
   if (input === undefined) {
@@ -1342,6 +1363,201 @@ registerProtectedRoute(
     }
 
     return c.json({ data: post });
+  }
+);
+
+registerProtectedRoute(
+  protectedRoute({
+    method: "get",
+    path: "/people",
+    tags: ["people"],
+    summary: "List people",
+    responses: {
+      200: {
+        description: "All reusable attribution people.",
+        content: { "application/json": { schema: dataEnvelope(z.array(PersonSchema)) } },
+      },
+      401: {
+        description: "Missing or invalid API key.",
+        content: { "application/json": { schema: ErrorSchema } },
+      },
+    },
+  }),
+  (c: Context) => c.json({ data: listPeople() })
+);
+
+registerProtectedRoute(
+  protectedRoute({
+    method: "get",
+    path: "/people/{id}",
+    tags: ["people"],
+    summary: "Get a person by ID",
+    request: { params: IdParamSchema },
+    responses: {
+      200: {
+        description: "The requested person.",
+        content: { "application/json": { schema: dataEnvelope(PersonSchema) } },
+      },
+      400: {
+        description: "The ID was invalid.",
+        content: { "application/json": { schema: ErrorSchema } },
+      },
+      401: {
+        description: "Missing or invalid API key.",
+        content: { "application/json": { schema: ErrorSchema } },
+      },
+      404: {
+        description: "The person was not found.",
+        content: { "application/json": { schema: ErrorSchema } },
+      },
+    },
+  }),
+  (c: Context) => {
+    const id = parseInt(c.req.param("id") ?? "", 10);
+    if (isNaN(id)) {
+      return c.json({ error: "Invalid person ID" }, 400);
+    }
+
+    const person = getPerson(id);
+    if (!person) {
+      return c.json({ error: "Person not found" }, 404);
+    }
+
+    return c.json({ data: person });
+  }
+);
+
+registerProtectedRoute(
+  protectedRoute({
+    method: "post",
+    path: "/people",
+    tags: ["people"],
+    summary: "Create a person",
+    request: {
+      body: {
+        required: true,
+        content: {
+          "application/json": {
+            schema: CreatePersonBodySchema,
+          },
+        },
+      },
+    },
+    responses: {
+      201: {
+        description: "The person was created.",
+        content: { "application/json": { schema: dataEnvelope(PersonSchema) } },
+      },
+      400: {
+        description: "The request body failed validation.",
+        content: { "application/json": { schema: ErrorSchema } },
+      },
+      401: {
+        description: "Missing or invalid API key.",
+        content: { "application/json": { schema: ErrorSchema } },
+      },
+      409: {
+        description: "A person with the same normalized name already exists.",
+        content: { "application/json": { schema: ErrorSchema } },
+      },
+    },
+  }),
+  async (c: Context) => {
+    const body = await c.req.json();
+    const { name, url } = body;
+
+    if (!name || typeof name !== "string" || name.trim().length === 0) {
+      return c.json({ error: "Name is required" }, 400);
+    }
+
+    if (url !== undefined && url !== null && typeof url !== "string") {
+      return c.json({ error: "URL must be a string" }, 400);
+    }
+
+    const existing = findPersonByName(name);
+    if (existing) {
+      return c.json({ error: `Person already exists: ${existing.id}` }, 409);
+    }
+
+    const person = createPerson({ name: name.trim(), url: parseNullableString(url) ?? null });
+    return c.json({ data: person }, 201);
+  }
+);
+
+registerProtectedRoute(
+  protectedRoute({
+    method: "put",
+    path: "/people/{id}",
+    tags: ["people"],
+    summary: "Update a person",
+    request: {
+      params: IdParamSchema,
+      body: {
+        required: true,
+        content: {
+          "application/json": {
+            schema: UpdatePersonBodySchema,
+          },
+        },
+      },
+    },
+    responses: {
+      200: {
+        description: "The updated person.",
+        content: { "application/json": { schema: dataEnvelope(PersonSchema) } },
+      },
+      400: {
+        description: "The request body or ID was invalid.",
+        content: { "application/json": { schema: ErrorSchema } },
+      },
+      401: {
+        description: "Missing or invalid API key.",
+        content: { "application/json": { schema: ErrorSchema } },
+      },
+      404: {
+        description: "The person was not found.",
+        content: { "application/json": { schema: ErrorSchema } },
+      },
+      409: {
+        description: "A different person with the same normalized name already exists.",
+        content: { "application/json": { schema: ErrorSchema } },
+      },
+    },
+  }),
+  async (c: Context) => {
+    const id = parseInt(c.req.param("id") ?? "", 10);
+    if (isNaN(id)) {
+      return c.json({ error: "Invalid person ID" }, 400);
+    }
+
+    const body = await c.req.json();
+    const { name, url } = body;
+
+    if (name !== undefined && (typeof name !== "string" || name.trim().length === 0)) {
+      return c.json({ error: "Name cannot be empty" }, 400);
+    }
+
+    if (url !== undefined && url !== null && typeof url !== "string") {
+      return c.json({ error: "URL must be a string" }, 400);
+    }
+
+    if (typeof name === "string") {
+      const existing = findPersonByName(name);
+      if (existing && existing.id !== id) {
+        return c.json({ error: `Person already exists: ${existing.id}` }, 409);
+      }
+    }
+
+    const person = updatePerson(id, {
+      name: name !== undefined ? name.trim() : undefined,
+      url: url !== undefined ? (parseNullableString(url) ?? null) : undefined,
+    });
+
+    if (!person) {
+      return c.json({ error: "Person not found" }, 404);
+    }
+
+    return c.json({ data: person });
   }
 );
 

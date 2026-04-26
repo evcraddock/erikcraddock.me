@@ -44,6 +44,8 @@ ec note create --slug thought --content "A quick note"
 
 ec source list                  # List sources (blogroll)
 ec source create --name "HN" --url "https://news.ycombinator.com" --author "Paul Graham" --author "Jessica Livingston"
+ec person list                  # List reusable attribution people
+ec person create --name "Ethan Mollick"
 
 ec tag list                     # List tags with counts
 

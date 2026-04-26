@@ -1263,3 +1263,104 @@ describe("GET /api/tags", () => {
     expect(json.data[0].count).toBe(0);
   });
 });
+
+describe("/api/people", () => {
+  let api: typeof import("../api").api;
+
+  beforeAll(async () => {
+    const module = await import("../api");
+    api = module.api;
+  });
+
+  it("lists people", async () => {
+    testDb.insert(people).values({ name: "Ethan Mollick", url: null }).run();
+    testDb
+      .insert(people)
+      .values({ name: "Simon Willison", url: "https://simonwillison.net/" })
+      .run();
+
+    const res = await api.request("/people", { headers: authHeader });
+
+    expect(res.status).toBe(200);
+    const json = await res.json();
+    expect(json.data).toHaveLength(2);
+    expect(json.data[0]).toMatchObject({ name: "Ethan Mollick", url: null });
+    expect(json.data[1]).toMatchObject({
+      name: "Simon Willison",
+      url: "https://simonwillison.net/",
+    });
+  });
+
+  it("creates and shows a person", async () => {
+    const createRes = await api.request("/people", {
+      method: "POST",
+      headers: { ...authHeader, "Content-Type": "application/json" },
+      body: JSON.stringify({ name: "Ethan Mollick", url: "https://www.oneusefulthing.org/" }),
+    });
+
+    expect(createRes.status).toBe(201);
+    const created = await createRes.json();
+    expect(created.data).toMatchObject({
+      name: "Ethan Mollick",
+      url: "https://www.oneusefulthing.org/",
+    });
+
+    const showRes = await api.request(`/people/${created.data.id}`, { headers: authHeader });
+
+    expect(showRes.status).toBe(200);
+    const shown = await showRes.json();
+    expect(shown.data).toEqual(created.data);
+  });
+
+  it("rejects blank person names", async () => {
+    const res = await api.request("/people", {
+      method: "POST",
+      headers: { ...authHeader, "Content-Type": "application/json" },
+      body: JSON.stringify({ name: "   " }),
+    });
+
+    expect(res.status).toBe(400);
+    const json = await res.json();
+    expect(json.error).toBe("Name is required");
+  });
+
+  it("returns conflict for duplicate normalized names", async () => {
+    testDb.insert(people).values({ name: "Ethan Mollick", url: null }).run();
+
+    const res = await api.request("/people", {
+      method: "POST",
+      headers: { ...authHeader, "Content-Type": "application/json" },
+      body: JSON.stringify({ name: " ethan mollick " }),
+    });
+
+    expect(res.status).toBe(409);
+    const json = await res.json();
+    expect(json.error).toContain("Person already exists:");
+  });
+
+  it("edits a person and clears url", async () => {
+    const person = testDb
+      .insert(people)
+      .values({ name: "Old Name", url: "https://example.com" })
+      .returning()
+      .get();
+
+    const res = await api.request(`/people/${person.id}`, {
+      method: "PUT",
+      headers: { ...authHeader, "Content-Type": "application/json" },
+      body: JSON.stringify({ name: "New Name", url: null }),
+    });
+
+    expect(res.status).toBe(200);
+    const json = await res.json();
+    expect(json.data).toMatchObject({ id: person.id, name: "New Name", url: null });
+  });
+
+  it("returns not found for missing people", async () => {
+    const res = await api.request("/people/999", { headers: authHeader });
+
+    expect(res.status).toBe(404);
+    const json = await res.json();
+    expect(json.error).toBe("Person not found");
+  });
+});

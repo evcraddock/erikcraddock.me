@@ -7,6 +7,7 @@ import type {
   Post,
   Media,
   Source,
+  Person,
   TagWithCount,
 } from "../types";
 
@@ -169,6 +170,27 @@ export class ApiClient {
 
   async deleteMedia(id: number): Promise<ApiResponse<{ success: boolean }>> {
     return this.request<{ success: boolean }>("DELETE", `/media/${id}`);
+  }
+
+  // Person methods
+
+  async listPeople(): Promise<ApiResponse<Person[]>> {
+    return this.request<Person[]>("GET", "/people");
+  }
+
+  async getPerson(id: number): Promise<ApiResponse<Person>> {
+    return this.request<Person>("GET", `/people/${id}`);
+  }
+
+  async createPerson(data: { name: string; url?: string | null }): Promise<ApiResponse<Person>> {
+    return this.request<Person>("POST", "/people", data);
+  }
+
+  async updatePerson(
+    id: number,
+    data: { name?: string; url?: string | null }
+  ): Promise<ApiResponse<Person>> {
+    return this.request<Person>("PUT", `/people/${id}`, data);
   }
 
   // Source methods
