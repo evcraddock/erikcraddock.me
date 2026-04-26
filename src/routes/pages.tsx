@@ -133,9 +133,46 @@ function formatAuthorByline(authors: SourceAuthor[]): string | null {
   return `${names.slice(0, -1).join(", ")}, and ${names[names.length - 1]}`;
 }
 
-function PersonCard({ person }: { person: Person }) {
+function LinkedSourceAuthorByline({ authors }: { authors: SourceAuthor[] }) {
+  return (
+    <>
+      {authors.map((author, index) => {
+        const separator =
+          index === 0
+            ? ""
+            : authors.length === 2
+              ? " and "
+              : index === authors.length - 1
+                ? ", and "
+                : ", ";
+
+        return (
+          <>
+            {separator}
+            <a href={`/people/${author.id}`} class="hover:text-teal-600 dark:hover:text-teal-400">
+              {author.name}
+            </a>
+          </>
+        );
+      })}
+    </>
+  );
+}
+
+function PersonCard({
+  person,
+  titleLink = "detail",
+  authoredSources = [],
+}: {
+  person: Person;
+  titleLink?: "detail" | "website";
+  authoredSources?: Source[];
+}) {
   const hostname = getLinkPreviewSiteLabel(person.url, null) ?? person.url;
   const initial = person.name.charAt(0).toUpperCase();
+  const titleHref = titleLink === "website" && person.url ? person.url : `/people/${person.id}`;
+  const titleExternalAttrs =
+    titleLink === "website" && person.url ? { target: "_blank", rel: "noopener noreferrer" } : {};
 
   return (
     <article class="flex h-full flex-col rounded-2xl border border-gray-200 bg-white p-5 shadow-sm transition-colors hover:border-teal-200 hover:bg-teal-50/40 dark:border-gray-800 dark:bg-gray-900 dark:hover:border-teal-900/60 dark:hover:bg-teal-950/20">
@@ -144,20 +181,13 @@ function PersonCard({ person }: { person: Person }) {
           {initial}
         </div>
         <div class="min-w-0 flex-1">
-          {person.url ? (
-            <a
-              href={person.url}
-              target="_blank"
-              rel="noopener noreferrer"
-              class="line-clamp-2 font-semibold text-gray-950 hover:text-teal-600 dark:text-gray-50 dark:hover:text-teal-400"
-            >
-              {person.name}
-            </a>
-          ) : (
-            <h2 class="line-clamp-2 font-semibold text-gray-950 dark:text-gray-50">
-              {person.name}
-            </h2>
-          )}
+          <a
+            href={titleHref}
+            {...titleExternalAttrs}
+            class="line-clamp-2 font-semibold text-gray-950 hover:text-teal-600 dark:text-gray-50 dark:hover:text-teal-400"
+          >
+            {person.name}
+          </a>
           {person.url ? (
             <a
               href={person.url}
@@ -172,6 +202,24 @@ function PersonCard({ person }: { person: Person }) {
           )}
         </div>
       </div>
+
+      {authoredSources.length > 0 ? (
+        <div class="mt-4 border-t border-gray-200 pt-4 dark:border-gray-800">
+          <h3 class="text-sm font-semibold text-gray-950 dark:text-gray-50">Sources</h3>
+          <ul class="mt-2 space-y-1 text-sm text-gray-600 dark:text-gray-300">
+            {authoredSources.map((source) => (
+              <li key={source.id}>
+                <a
+                  href={`/sources/${source.id}`}
+                  class="hover:text-teal-600 dark:hover:text-teal-400"
+                >
+                  {source.name}
+                </a>
+              </li>
+            ))}
+          </ul>
+        </div>
+      ) : null}
     </article>
   );
 }
@@ -235,8 +283,11 @@ function SourceCard({
       ) : null}
 
       {source.authors.length > 0 ? (
-        <p class="mt-4 text-sm text-gray-600 dark:text-gray-300">
-          by {formatAuthorByline(source.authors)}
+        <p
+          class="mt-4 text-sm text-gray-600 dark:text-gray-300"
+          aria-label={`by ${formatAuthorByline(source.authors)}`}
+        >
+          by <LinkedSourceAuthorByline authors={source.authors} />
         </p>
       ) : null}
 
@@ -864,7 +915,15 @@ function FeedPostMeta({ post, tags: postTags }: { post: PostWithSource; tags: Ta
       {post.author && (
         <>
           <span aria-hidden="true">·</span>
-          <span>by {post.author.name}</span>
+          <span>
+            by{" "}
+            <a
+              href={`/people/${post.author.id}`}
+              class="hover:text-gray-700 dark:hover:text-gray-300"
+            >
+              {post.author.name}
+            </a>
+          </span>
         </>
       )}
       {post.source && (
@@ -1066,7 +1125,18 @@ function PostCard({ post, tags: postTags = [] }: { post: PostWithSource; tags?: 
           </time>
 
           {/* Author attribution for link posts */}
-          {isLink && post.author && <span class="ml-2">• by {post.author.name}</span>}
+          {isLink && post.author && (
+            <span class="ml-2">
+              • by{" "}
+              <a
+                href={`/people/${post.author.id}`}
+                class="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300"
+                onClick={(e) => e.stopPropagation()}
+              >
+                {post.author.name}
+              </a>
+            </span>
+          )}
 
           {/* Source attribution for link posts */}
           {isLink && post.source && (
@@ -1146,6 +1216,21 @@ function getSourceWithAuthors(db: Database, sourceId: number): SourceWithAuthors
     ...source,
     authors: getSourceAuthors(db, source.id),
   };
+}
+
+function getPerson(db: Database, personId: number): Person | null {
+  return db.select().from(people).where(eq(people.id, personId)).get() ?? null;
+}
+
+function getSourcesAuthoredByPerson(db: Database, personId: number): Source[] {
+  return db
+    .select({ source: sources })
+    .from(sourceAuthors)
+    .innerJoin(sources, eq(sourceAuthors.source_id, sources.id))
+    .where(eq(sourceAuthors.person_id, personId))
+    .orderBy(asc(sources.name))
+    .all()
+    .map((row) => row.source);
 }
 
 /**
@@ -2010,6 +2095,75 @@ export function createPagesRoutes(db: Database): Hono {
                   />
                 ) : null}
               </>
+            )}
+          </div>
+        </div>
+      </Layout>
+    );
+  });
+
+  // Person detail page
+  pages.get("/people/:id", (c) => {
+    const id = parseInt(c.req.param("id") ?? "", 10);
+
+    if (isNaN(id)) {
+      return c.html(
+        <NotFound
+          title="Person Not Found"
+          message="The person you're looking for doesn't exist."
+        />,
+        404
+      );
+    }
+
+    const person = getPerson(db, id);
+
+    if (!person) {
+      return c.html(
+        <NotFound
+          title="Person Not Found"
+          message="The person you're looking for doesn't exist."
+        />,
+        404
+      );
+    }
+
+    const authoredSources = getSourcesAuthoredByPerson(db, person.id);
+    const personLinks: PostWithSource[] = db
+      .select({
+        post: posts,
+        source: sources,
+      })
+      .from(posts)
+      .leftJoin(sources, eq(posts.source_id, sources.id))
+      .where(
+        and(eq(posts.author_id, person.id), eq(posts.type, "link"), isNotNull(posts.published_at))
+      )
+      .orderBy(desc(posts.published_at))
+      .all()
+      .map((row) => ({ ...row.post, source: row.source, author: person }));
+
+    return c.html(
+      <Layout title={`${person.name} | erikcraddock.me`} description={person.url ?? undefined}>
+        <div class="mx-auto grid max-w-6xl gap-6 lg:grid-cols-[20rem_minmax(0,42rem)] lg:items-start lg:justify-center">
+          <aside class="lg:sticky lg:top-24">
+            <PersonCard person={person} titleLink="website" authoredSources={authoredSources} />
+          </aside>
+          <div class="overflow-hidden border-x border-gray-200 bg-white dark:border-gray-800 dark:bg-gray-900 sm:rounded-2xl sm:border">
+            <header class="border-b border-gray-200 bg-white/90 px-4 py-4 backdrop-blur dark:border-gray-800 dark:bg-gray-900/90 sm:px-6">
+              <a
+                href="/people"
+                class="text-xl font-bold text-gray-950 hover:text-teal-600 dark:text-gray-50 dark:hover:text-teal-400"
+              >
+                ← People
+              </a>
+            </header>
+            {personLinks.length === 0 ? (
+              <div class="px-4 py-5 dark:bg-gray-900 sm:px-6">
+                <p class="text-gray-600 dark:text-gray-400">No links from this person yet.</p>
+              </div>
+            ) : (
+              personLinks.map((post) => <FeedPost key={post.id} post={post} />)
             )}
           </div>
         </div>

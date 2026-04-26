@@ -537,6 +537,15 @@ describe("pages routes", () => {
       expect(html).toContain("https://example.com/preview.jpg");
     });
 
+    it("links link post authors to person detail pages", async () => {
+      const app = getApp();
+      const res = await app.request("/feed");
+      const html = await res.text();
+
+      expect(html).toContain('href="/people/1"');
+      expect(html).toContain("Test Author");
+    });
+
     it("includes dark mode classes", async () => {
       const app = getApp();
       const res = await app.request("/feed");
@@ -596,6 +605,15 @@ describe("pages routes", () => {
       expect(html).toContain("Alice");
       expect(html).not.toContain("Test Author");
       expect(html).toContain("matching “Alice”");
+    });
+
+    it("links people cards to person detail pages", async () => {
+      const app = getApp();
+      const res = await app.request("/people");
+      const html = await res.text();
+
+      expect(html).toContain('href="/people/1"');
+      expect(html).toContain('href="/people/2"');
     });
 
     it("paginates people", async () => {
@@ -685,6 +703,7 @@ describe("pages routes", () => {
       const html = await res.text();
 
       expect(html).toContain("by Test Author");
+      expect(html).toContain('href="/people/1"');
     });
 
     it("formats two source authors naturally", async () => {
@@ -816,6 +835,65 @@ describe("pages routes", () => {
     });
   });
 
+  describe("GET /people/:id", () => {
+    it("returns 200 and displays the person detail page", async () => {
+      const app = getApp();
+      const res = await app.request("/people/1");
+
+      expect(res.status).toBe(200);
+
+      const html = await res.text();
+      expect(html).toContain("Test Author");
+      expect(html).toContain("← People");
+    });
+
+    it("uses the source detail page layout style", async () => {
+      const app = getApp();
+      const res = await app.request("/people/1");
+      const html = await res.text();
+
+      expect(html).toContain("lg:grid-cols-[20rem_minmax(0,42rem)]");
+      expect(html).toContain("sm:rounded-2xl sm:border");
+      expect(html).not.toContain("Writer, coder, and musician");
+      expect(html).not.toContain("Followers");
+    });
+
+    it("lists sources authored by the selected person", async () => {
+      const app = getApp();
+      const res = await app.request("/people/1");
+      const html = await res.text();
+
+      expect(html).toContain("Sources");
+      expect(html).toContain('href="/sources/1"');
+      expect(html).toContain("Test Blog");
+    });
+
+    it("shows links from the selected person with full shared link content", async () => {
+      const app = getApp();
+      const res = await app.request("/people/1");
+      const html = await res.text();
+
+      expect(html).toContain("This is commentary on an external link.");
+      expect(html).toContain("Quoted shared link text.");
+      expect(html).toContain('href="https://example.com/article"');
+      expect(html).toContain("Example Article");
+      expect(html).toContain("by");
+      expect(html).toContain('href="/people/1"');
+      expect(html).toContain("Test Author");
+      expect(html).toContain("via");
+    });
+
+    it("returns 404 for missing people", async () => {
+      const app = getApp();
+      const res = await app.request("/people/999");
+
+      expect(res.status).toBe(404);
+
+      const html = await res.text();
+      expect(html).toContain("Person Not Found");
+    });
+  });
+
   describe("GET /sources/:id", () => {
     it("returns 200 and displays the source detail page", async () => {
       const app = getApp();
@@ -846,6 +924,7 @@ describe("pages routes", () => {
 
       expect(html).toContain("A test source preview description.");
       expect(html).toContain("by Test Author");
+      expect(html).toContain('href="/people/1"');
       expect(html).toContain('src="https://example.com/favicon.ico"');
     });
 
@@ -872,6 +951,7 @@ describe("pages routes", () => {
       expect(html).toContain("A rich preview description.");
       expect(html).toContain('src="https://example.com/preview.jpg"');
       expect(html).toContain("by Test Author");
+      expect(html).toContain('href="/people/1"');
       expect(html).toContain("via");
     });
 
@@ -1075,7 +1155,9 @@ describe("pages routes", () => {
       expect(html).toContain("via");
       expect(html).toContain('href="/sources/1"');
       expect(html).toContain("Test Blog");
-      expect(html).toContain("by Test Author");
+      expect(html).toContain("by");
+      expect(html).toContain('href="/people/1"');
+      expect(html).toContain("Test Author");
     });
 
     it("backfills OG preview metadata for older link posts during page render", async () => {
