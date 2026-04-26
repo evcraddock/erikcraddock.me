@@ -42,7 +42,7 @@ type PostWithSource = Post & { source?: Source | null; author?: Person | null };
 
 /** Max length for showing full note content inline */
 const NOTE_INLINE_MAX_LENGTH = 280;
-const SOURCES_PER_PAGE = 24;
+const SOURCES_PER_PAGE = 12;
 const ACTOR_HANDLE = "@erik@erikcraddock.me";
 const ACTOR_URI = new URL("/users/erik", baseUrl).toString();
 const WEBFINGER_SUBSCRIBE_REL = "http://ostatus.org/schema/1.0/subscribe";
@@ -651,6 +651,25 @@ function FeedProfileCard({
         </div>
       </div>
     </section>
+  );
+}
+
+function RecommendedSitesFeedCard() {
+  return (
+    <a
+      href="/sources"
+      class="group block border-b border-gray-200 bg-white p-5 transition hover:border-teal-200 hover:bg-teal-50/50 dark:border-gray-800 dark:bg-gray-900 dark:hover:border-teal-900/70 dark:hover:bg-teal-950/20 lg:mt-4 lg:rounded-2xl lg:border"
+    >
+      <h2 class="text-lg font-bold text-gray-950 group-hover:text-teal-700 dark:text-gray-50 dark:group-hover:text-teal-300">
+        Recommended Sites
+      </h2>
+      <p class="mt-2 text-sm leading-6 text-gray-600 dark:text-gray-400">
+        Browse the blogs, publications, and personal sites behind the links I share here.
+      </p>
+      <span class="mt-4 inline-flex text-sm font-semibold text-teal-700 dark:text-teal-300">
+        Explore sources →
+      </span>
+    </a>
   );
 }
 
@@ -1295,6 +1314,7 @@ export function createPagesRoutes(db: Database): Hono {
                 followingCount={followingCount}
                 postCount={totalPosts}
               />
+              <RecommendedSitesFeedCard />
             </aside>
             <div class="overflow-hidden border-x border-gray-200 bg-white dark:border-gray-800 dark:bg-gray-900 sm:rounded-2xl sm:border">
               <header class="border-b border-gray-200 bg-white/90 px-4 py-4 backdrop-blur dark:border-gray-800 dark:bg-gray-900/90 sm:px-6">
@@ -1393,6 +1413,7 @@ export function createPagesRoutes(db: Database): Hono {
               followingCount={followingCount}
               postCount={totalPosts}
             />
+            <RecommendedSitesFeedCard />
           </aside>
           <div class="overflow-hidden border-x border-gray-200 bg-white dark:border-gray-800 dark:bg-gray-900 sm:rounded-2xl sm:border">
             <header class="flex items-center justify-between gap-4 border-b border-gray-200 bg-white/90 px-4 py-4 backdrop-blur dark:border-gray-800 dark:bg-gray-900/90 sm:px-6">
@@ -1574,6 +1595,14 @@ export function createPagesRoutes(db: Database): Hono {
             </p>
           </div>
 
+          <h2>Recommended Sites</h2>
+          <p>
+            The <a href="/sources">recommended sites</a> page collects websites, publications, and
+            personal blogs that I have found interesting enough to share links from. It is part
+            reading log and part blogroll: a way to browse the sources behind the links I post and
+            discover the people and sites that keep showing up here.
+          </p>
+
           <h2>Get in Touch</h2>
           <p>
             The best way to reach me is through the Fediverse — just mention{" "}
@@ -1642,10 +1671,6 @@ export function createPagesRoutes(db: Database): Hono {
         <div class="mx-auto max-w-6xl">
           <div class="mb-8">
             <h1 class="text-3xl font-bold text-gray-950 dark:text-gray-50">Recommended Sites</h1>
-            <p class="mt-2 max-w-2xl text-gray-600 dark:text-gray-400">
-              The following are websites which I found interesting enough to share links from at
-              some point in the past.
-            </p>
           </div>
 
           <form

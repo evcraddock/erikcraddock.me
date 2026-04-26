@@ -4,6 +4,35 @@ This project uses an AI-first development process. Agents do the work, automatio
 
 ## Workflow
 
+### Pipeline Communication
+
+At each handoff or meaningful state change, state where the work is in the task pipeline and what you expect from the human.
+
+Use a short status block like:
+
+```text
+Pipeline: Preflight complete → awaiting plan approval
+Expected from you: approve the plan, request changes, or stop the task.
+```
+
+Include this when:
+
+- preflight finishes
+- a plan is ready for approval
+- implementation starts
+- work is ready for visual review
+- a PR is opened or CI status changes
+- review feedback is ready to address
+- merge/close approval is needed
+- the task is blocked
+
+Be explicit about the next human action. Examples:
+
+- "Approve this plan before I start coding."
+- "Review the screenshot and tell me whether to keep this direction."
+- "CI passed; tell me when to request review or merge."
+- "Human approval is required before merging."
+
 ### 1. Pick Up a Task
 
 Get assigned a task or pick from available tasks. Understand requirements before starting.

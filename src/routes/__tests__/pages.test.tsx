@@ -357,6 +357,17 @@ describe("pages routes", () => {
       expect(html).toContain("Fediverse");
     });
 
+    it("describes recommended sites and links to sources", async () => {
+      const app = getApp();
+      const res = await app.request("/about");
+      const html = await res.text();
+
+      expect(html).toContain("Recommended Sites");
+      expect(html).toContain('href="/sources"');
+      expect(html).toContain("websites, publications, and");
+      expect(html).toContain("reading log and part blogroll");
+    });
+
     it("includes dark mode classes", async () => {
       const app = getApp();
       const res = await app.request("/about");
@@ -489,6 +500,15 @@ describe("pages routes", () => {
 
       expect(html).toContain('href="/follow"');
       expect(html).toContain("Follow");
+    });
+
+    it("links the actor card to recommended sites", async () => {
+      const app = getApp();
+      const res = await app.request("/feed");
+      const html = await res.text();
+
+      expect(html).toContain('href="/sources"');
+      expect(html).toContain("Recommended Sites");
     });
 
     it("shows stored link previews in feed items", async () => {
@@ -662,16 +682,23 @@ describe("pages routes", () => {
       const pageOne = await app.request("/sources");
       const pageOneHtml = await pageOne.text();
       expect(pageOneHtml).toContain("Source 01");
-      expect(pageOneHtml).toContain("Source 24");
-      expect(pageOneHtml).not.toContain("Source 25");
-      expect(pageOneHtml).toContain("Page 1 of 2");
+      expect(pageOneHtml).toContain("Source 12");
+      expect(pageOneHtml).not.toContain("Source 13");
+      expect(pageOneHtml).toContain("Page 1 of 3");
       expect(pageOneHtml).toContain('href="/sources?page=2"');
 
       const pageTwo = await app.request("/sources?page=2");
       const pageTwoHtml = await pageTwo.text();
-      expect(pageTwoHtml).toContain("Source 25");
+      expect(pageTwoHtml).toContain("Source 13");
+      expect(pageTwoHtml).toContain("Source 24");
       expect(pageTwoHtml).not.toContain("Source 01");
-      expect(pageTwoHtml).toContain("Page 2 of 2");
+      expect(pageTwoHtml).not.toContain("Source 25");
+      expect(pageTwoHtml).toContain("Page 2 of 3");
+
+      const pageThree = await app.request("/sources?page=3");
+      const pageThreeHtml = await pageThree.text();
+      expect(pageThreeHtml).toContain("Source 25");
+      expect(pageThreeHtml).toContain("Page 3 of 3");
     });
 
     it("keeps search query in pagination links", async () => {
@@ -694,6 +721,14 @@ describe("pages routes", () => {
       const html = await res.text();
 
       expect(html).toContain('href="/sources?q=Searchable&amp;page=2"');
+    });
+
+    it("does not show the old explanatory text", async () => {
+      const app = getApp();
+      const res = await app.request("/sources");
+      const html = await res.text();
+
+      expect(html).not.toContain("The following are websites which I found interesting enough");
     });
   });
 
