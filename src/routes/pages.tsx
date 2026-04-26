@@ -657,20 +657,18 @@ function FeedProfileCard({
 function SocialMediaFeedCard() {
   return (
     <section class="border-b border-gray-200 bg-white p-5 dark:border-gray-800 dark:bg-gray-900 lg:mt-4 lg:rounded-2xl lg:border">
-      <h2 class="text-lg font-bold text-gray-950 dark:text-gray-50">Find me elsewhere</h2>
-      <p class="mt-2 text-sm leading-6 text-gray-600 dark:text-gray-400">
-        Follow along on the other places I post, share, and occasionally remember to update.
-      </p>
-      <div class="mt-4 grid gap-2">
+      <h2 class="text-lg font-bold text-gray-950 dark:text-gray-50">Follow me</h2>
+      <div class="mt-4 grid grid-cols-5 gap-2">
         {SOCIAL_LINKS.map((link) => (
           <a
             href={link.url}
             target={link.url.startsWith("/") ? undefined : "_blank"}
             rel={link.url.startsWith("/") ? undefined : "noopener noreferrer"}
-            class="flex items-center gap-3 rounded-xl border border-gray-200 px-3 py-2 text-sm font-semibold text-gray-700 transition hover:border-teal-200 hover:bg-teal-50 hover:text-teal-700 dark:border-gray-800 dark:text-gray-300 dark:hover:border-teal-900/70 dark:hover:bg-teal-950/20 dark:hover:text-teal-300"
+            aria-label={link.name}
+            title={link.name}
+            class="flex aspect-square items-center justify-center rounded-xl border border-gray-200 text-gray-600 transition hover:border-teal-200 hover:bg-teal-50 hover:text-teal-700 dark:border-gray-800 dark:text-gray-400 dark:hover:border-teal-900/70 dark:hover:bg-teal-950/20 dark:hover:text-teal-300"
           >
-            <span class="text-gray-500 dark:text-gray-400">{link.icon}</span>
-            <span>{link.name}</span>
+            {link.icon}
           </a>
         ))}
       </div>
