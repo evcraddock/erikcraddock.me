@@ -56,8 +56,24 @@ function extractLinkHref(html: string, rel: string): string | null {
 
 function decodeHtmlEntities(value: string): string {
   return value
+    .replace(/&#(x[0-9a-f]+|\d+);/gi, (_entity, code: string) => {
+      const codePoint = code.toLowerCase().startsWith("x")
+        ? parseInt(code.slice(1), 16)
+        : parseInt(code, 10);
+
+      if (!Number.isFinite(codePoint)) {
+        return _entity;
+      }
+
+      try {
+        return String.fromCodePoint(codePoint);
+      } catch {
+        return _entity;
+      }
+    })
     .replace(/&amp;/g, "&")
     .replace(/&quot;/g, '"')
+    .replace(/&apos;/g, "'")
     .replace(/&#39;/g, "'")
     .replace(/&lt;/g, "<")
     .replace(/&gt;/g, ">")
