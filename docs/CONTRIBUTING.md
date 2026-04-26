@@ -33,6 +33,18 @@ Be explicit about the next human action. Examples:
 - "CI passed; tell me when to request review or merge."
 - "Human approval is required before merging."
 
+When waiting for CI, use code or a tool-driven command to check status on an interval. Do not say you are waiting unless you actually run a wait/check loop. Example:
+
+```bash
+while true; do
+  gh pr view <number> --json statusCheckRollup --jq '.statusCheckRollup[]? | "\(.name): \(.status) \(.conclusion // "")"'
+  if gh pr view <number> --json statusCheckRollup --jq 'all(.statusCheckRollup[]?; .status == "COMPLETED")' | grep -q true; then
+    break
+  fi
+  sleep 30
+done
+```
+
 ### 1. Pick Up a Task
 
 Get assigned a task or pick from available tasks. Understand requirements before starting.
