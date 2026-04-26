@@ -779,6 +779,17 @@ describe("pages routes", () => {
       expect(html).toContain('src="https://example.com/favicon.ico"');
     });
 
+    it("links the selected source card title and URL to the source website", async () => {
+      const app = getApp();
+      const res = await app.request("/sources/1");
+      const html = await res.text();
+
+      expect(html).toContain('href="https://example.com"');
+      expect(html).toContain('aria-label="Test Blog website"');
+      expect(html).toContain('target="_blank"');
+      expect(html).not.toContain('href="/sources/1" class="line-clamp-2 font-semibold');
+    });
+
     it("shows links from the selected source with full shared link content", async () => {
       const app = getApp();
       const res = await app.request("/sources/1");
