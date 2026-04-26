@@ -502,7 +502,21 @@ describe("pages routes", () => {
       expect(html).toContain("Follow");
     });
 
-    it("links the actor card to recommended sites", async () => {
+    it("shows a social media card above recommended sites", async () => {
+      const app = getApp();
+      const res = await app.request("/feed");
+      const html = await res.text();
+
+      expect(html).toContain("Find me elsewhere");
+      expect(html).toContain('href="https://github.com/evcraddock"');
+      expect(html).toContain('href="https://www.linkedin.com/in/erik-craddock-42aa9815"');
+      expect(html).toContain('href="https://www.facebook.com/evcraddock"');
+      expect(html).toContain('href="https://youtube.com/@ErikCraddock"');
+      expect(html).toContain('href="/feed.xml"');
+      expect(html.indexOf("Find me elsewhere")).toBeLessThan(html.indexOf("Recommended Sites"));
+    });
+
+    it("links the feed sidebar to recommended sites", async () => {
       const app = getApp();
       const res = await app.request("/feed");
       const html = await res.text();
