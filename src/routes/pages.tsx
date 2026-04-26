@@ -2084,7 +2084,11 @@ export function createPagesRoutes(db: Database): Hono {
                 </div>
                 <div class="grid gap-5 md:grid-cols-2 lg:grid-cols-3">
                   {pagePeople.map((person) => (
-                    <PersonCard key={person.id} person={person} />
+                    <PersonCard
+                      key={person.id}
+                      person={person}
+                      socialAccounts={getPersonSocialAccounts(db, person.id)}
+                    />
                   ))}
                 </div>
                 {totalPages > 1 ? (

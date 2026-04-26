@@ -646,6 +646,14 @@ describe("pages routes", () => {
       expect(html).toContain('href="/people/2"');
     });
 
+    it("shows avatars from default social accounts on people cards", async () => {
+      const app = getApp();
+      const res = await app.request("/people");
+      const html = await res.text();
+
+      expect(html).toContain('src="https://mastodon.social/avatar.jpg"');
+    });
+
     it("paginates people", async () => {
       const manyPeopleDb = createTestDb();
       for (let i = 1; i <= 25; i++) {
