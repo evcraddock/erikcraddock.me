@@ -341,7 +341,6 @@ const CreatePersonBodySchema = z
     name: z.string().openapi({ example: "Ethan Mollick" }),
     url: z.string().optional().nullable().openapi({ example: "https://example.com" }),
     social_accounts: z.array(PersonSocialAccountInputSchema).optional().nullable(),
-    default_social_account_id: z.number().int().optional().nullable(),
   })
   .openapi("CreatePersonBody");
 
@@ -1563,7 +1562,7 @@ registerProtectedRoute(
   }),
   async (c: Context) => {
     const body = await c.req.json();
-    const { name, url, social_accounts, default_social_account_id } = body;
+    const { name, url, social_accounts } = body;
 
     if (!name || typeof name !== "string" || name.trim().length === 0) {
       return c.json({ error: "Name is required" }, 400);
@@ -1587,7 +1586,6 @@ registerProtectedRoute(
       name: name.trim(),
       url: parseNullableString(url) ?? null,
       social_accounts: parsedSocialAccounts,
-      default_social_account_id: default_social_account_id ?? undefined,
     });
     return c.json({ data: person }, 201);
   }

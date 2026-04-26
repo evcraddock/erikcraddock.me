@@ -192,7 +192,6 @@ export class ApiClient {
       is_activitypub?: boolean;
       is_default?: boolean;
     }>;
-    default_social_account_id?: number | null;
   }): Promise<ApiResponse<Person>> {
     return this.request<Person>("POST", "/people", data);
   }

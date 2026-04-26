@@ -32,7 +32,6 @@ export interface CreatePersonInput {
   name: string;
   url?: string | null;
   social_accounts?: PersonSocialAccountInput[];
-  default_social_account_id?: number | null;
 }
 
 export interface UpdatePersonInput {
@@ -156,10 +155,6 @@ export function createPerson(input: CreatePersonInput): Person {
 
   if (input.social_accounts) {
     replaceSocialAccounts(person.id, input.social_accounts);
-  }
-
-  if (input.default_social_account_id !== undefined) {
-    setDefaultSocialAccount(person.id, input.default_social_account_id);
   }
 
   return getPerson(person.id)!;
