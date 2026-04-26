@@ -9,6 +9,7 @@ import {
   sources,
   sourceAuthors,
   people,
+  personSocialAccounts,
   media,
   followers,
 } from "../db";
@@ -30,6 +31,7 @@ type Database = typeof defaultDb;
 type Post = typeof posts.$inferSelect;
 type Source = typeof sources.$inferSelect;
 type Person = typeof people.$inferSelect;
+type PersonSocialAccount = typeof personSocialAccounts.$inferSelect;
 type SourceAuthor = {
   id: number;
   name: string;
@@ -163,10 +165,12 @@ function PersonCard({
   person,
   titleLink = "detail",
   authoredSources = [],
+  socialAccounts = [],
 }: {
   person: Person;
   titleLink?: "detail" | "website";
   authoredSources?: Source[];
+  socialAccounts?: PersonSocialAccount[];
 }) {
   const hostname = getLinkPreviewSiteLabel(person.url, null) ?? person.url;
   const initial = person.name.charAt(0).toUpperCase();
@@ -202,6 +206,31 @@ function PersonCard({
           )}
         </div>
       </div>
+
+      {socialAccounts.length > 0 ? (
+        <div class="mt-4 border-t border-gray-200 pt-4 dark:border-gray-800">
+          <h3 class="text-sm font-semibold text-gray-950 dark:text-gray-50">Social Media</h3>
+          <ul class="mt-2 space-y-2 text-sm text-gray-600 dark:text-gray-300">
+            {socialAccounts.map((account) => (
+              <li key={account.id} class="flex items-center justify-between gap-3">
+                <a
+                  href={account.url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  class="truncate hover:text-teal-600 dark:hover:text-teal-400"
+                >
+                  {account.label}
+                </a>
+                {account.is_activitypub ? (
+                  <span class="shrink-0 rounded-full bg-teal-100 px-2 py-0.5 text-xs font-medium text-teal-700 dark:bg-teal-900/40 dark:text-teal-300">
+                    ActivityPub
+                  </span>
+                ) : null}
+              </li>
+            ))}
+          </ul>
+        </div>
+      ) : null}
 
       {authoredSources.length > 0 ? (
         <div class="mt-4 border-t border-gray-200 pt-4 dark:border-gray-800">
@@ -1222,6 +1251,15 @@ function getPerson(db: Database, personId: number): Person | null {
   return db.select().from(people).where(eq(people.id, personId)).get() ?? null;
 }
 
+function getPersonSocialAccounts(db: Database, personId: number): PersonSocialAccount[] {
+  return db
+    .select()
+    .from(personSocialAccounts)
+    .where(eq(personSocialAccounts.person_id, personId))
+    .orderBy(asc(personSocialAccounts.sort_order), asc(personSocialAccounts.id))
+    .all();
+}
+
 function getSourcesAuthoredByPerson(db: Database, personId: number): Source[] {
   return db
     .select({ source: sources })
@@ -2129,6 +2167,7 @@ export function createPagesRoutes(db: Database): Hono {
     }
 
     const authoredSources = getSourcesAuthoredByPerson(db, person.id);
+    const socialAccounts = getPersonSocialAccounts(db, person.id);
     const personLinks: PostWithSource[] = db
       .select({
         post: posts,
@@ -2147,7 +2186,12 @@ export function createPagesRoutes(db: Database): Hono {
       <Layout title={`${person.name} | erikcraddock.me`} description={person.url ?? undefined}>
         <div class="mx-auto grid max-w-6xl gap-6 lg:grid-cols-[20rem_minmax(0,42rem)] lg:items-start lg:justify-center">
           <aside class="lg:sticky lg:top-24">
-            <PersonCard person={person} titleLink="website" authoredSources={authoredSources} />
+            <PersonCard
+              person={person}
+              titleLink="website"
+              authoredSources={authoredSources}
+              socialAccounts={socialAccounts}
+            />
           </aside>
           <div class="overflow-hidden border-x border-gray-200 bg-white dark:border-gray-800 dark:bg-gray-900 sm:rounded-2xl sm:border">
             <header class="border-b border-gray-200 bg-white/90 px-4 py-4 backdrop-blur dark:border-gray-800 dark:bg-gray-900/90 sm:px-6">

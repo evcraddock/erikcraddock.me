@@ -33,6 +33,7 @@ import {
   getPerson,
   listPeople,
   updatePerson,
+  type PersonSocialAccountInput,
 } from "@/services/people";
 import { fetchLinkPreview } from "@/services/link-preview";
 import { logger } from "@/utils/logger";
@@ -103,17 +104,37 @@ const ApiPingSchema = z
   })
   .openapi("ApiPing");
 
-const PersonSchema = z
+const PersonSummarySchema = z
   .object({
     id: z.number().int().openapi({ example: 1 }),
     name: z.string().openapi({ example: "Paul Graham" }),
     url: NullableStringSchema.openapi({ example: "https://paulgraham.com" }),
   })
-  .openapi("Person");
+  .openapi("PersonSummary");
 
-const SourceAuthorSchema = PersonSchema.extend({
-  sort_order: z.number().int().openapi({ example: 0 }),
-}).openapi("SourceAuthor");
+const PersonSocialAccountSchema = z
+  .object({
+    id: z.number().int().openapi({ example: 1 }),
+    person_id: z.number().int().openapi({ example: 1 }),
+    label: z.string().openapi({ example: "Mastodon" }),
+    url: z.string().url().openapi({ example: "https://mastodon.social/@example" }),
+    is_activitypub: z.boolean().openapi({ example: true }),
+    sort_order: z.number().int().openapi({ example: 0 }),
+  })
+  .openapi("PersonSocialAccount");
+
+const PersonSchema = PersonSummarySchema.extend({
+  social_accounts: z.array(PersonSocialAccountSchema),
+}).openapi("Person");
+
+const SourceAuthorSchema = z
+  .object({
+    id: z.number().int().openapi({ example: 1 }),
+    name: z.string().openapi({ example: "Paul Graham" }),
+    url: NullableStringSchema.openapi({ example: "https://paulgraham.com" }),
+    sort_order: z.number().int().openapi({ example: 0 }),
+  })
+  .openapi("SourceAuthor");
 
 const SourceSummarySchema = z
   .object({
@@ -165,7 +186,7 @@ const PostListItemSchema = z
     source_id: z.number().int().nullable(),
     author_id: z.number().int().nullable(),
     source: SourceSummarySchema.nullable(),
-    author: PersonSchema.nullable(),
+    author: PersonSummarySchema.nullable(),
     tags: z.array(z.string()).openapi({ example: ["Tech", "Writing"] }),
   })
   .openapi("PostListItem");
@@ -188,7 +209,7 @@ const PostSchema = z
     banner_image_id: z.number().int().nullable(),
     banner_url: NullableStringSchema,
     source: SourceSummarySchema.nullable(),
-    author: PersonSchema.nullable(),
+    author: PersonSummarySchema.nullable(),
     published_at: IsoDateTimeSchema.nullable(),
     created_at: IsoDateTimeSchema,
     updated_at: IsoDateTimeSchema,
@@ -300,10 +321,17 @@ const UpdateSourceBodySchema = z
   })
   .openapi("UpdateSourceBody");
 
+const PersonSocialAccountInputSchema = z.object({
+  label: z.string().openapi({ example: "Mastodon" }),
+  url: z.string().openapi({ example: "https://mastodon.social/@example" }),
+  is_activitypub: z.boolean().optional().openapi({ example: true }),
+});
+
 const CreatePersonBodySchema = z
   .object({
     name: z.string().openapi({ example: "Ethan Mollick" }),
     url: z.string().optional().nullable().openapi({ example: "https://example.com" }),
+    social_accounts: z.array(PersonSocialAccountInputSchema).optional().nullable(),
   })
   .openapi("CreatePersonBody");
 
@@ -311,6 +339,7 @@ const UpdatePersonBodySchema = z
   .object({
     name: z.string().optional().nullable().openapi({ example: "Ethan Mollick" }),
     url: z.string().optional().nullable().openapi({ example: "https://example.com" }),
+    social_accounts: z.array(PersonSocialAccountInputSchema).optional().nullable(),
   })
   .openapi("UpdatePersonBody");
 
@@ -320,6 +349,51 @@ function parseNullableString(input: unknown): string | null | undefined {
   }
 
   return typeof input === "string" ? input.trim() || null : null;
+}
+
+function parsePersonSocialAccounts(
+  input: unknown
+): PersonSocialAccountInput[] | string | undefined {
+  if (input === undefined) {
+    return undefined;
+  }
+
+  if (input === null) {
+    return [];
+  }
+
+  if (!Array.isArray(input)) {
+    return "Social accounts must be an array";
+  }
+
+  const accounts: PersonSocialAccountInput[] = [];
+
+  for (const [index, account] of input.entries()) {
+    if (!account || typeof account !== "object") {
+      return `Social account at index ${index} must be an object`;
+    }
+
+    const candidate = account as Record<string, unknown>;
+    if (typeof candidate.label !== "string" || candidate.label.trim().length === 0) {
+      return `Social account at index ${index} requires a label`;
+    }
+
+    if (typeof candidate.url !== "string" || candidate.url.trim().length === 0) {
+      return `Social account at index ${index} requires a URL`;
+    }
+
+    if (candidate.is_activitypub !== undefined && typeof candidate.is_activitypub !== "boolean") {
+      return `Social account at index ${index} has invalid ActivityPub flag`;
+    }
+
+    accounts.push({
+      label: candidate.label.trim(),
+      url: candidate.url.trim(),
+      is_activitypub: candidate.is_activitypub ?? false,
+    });
+  }
+
+  return accounts;
 }
 
 function parseSourceAuthors(input: unknown): SourceAuthorInput[] | string | undefined {
@@ -1464,7 +1538,7 @@ registerProtectedRoute(
   }),
   async (c: Context) => {
     const body = await c.req.json();
-    const { name, url } = body;
+    const { name, url, social_accounts } = body;
 
     if (!name || typeof name !== "string" || name.trim().length === 0) {
       return c.json({ error: "Name is required" }, 400);
@@ -1474,12 +1548,21 @@ registerProtectedRoute(
       return c.json({ error: "URL must be a string" }, 400);
     }
 
+    const parsedSocialAccounts = parsePersonSocialAccounts(social_accounts);
+    if (typeof parsedSocialAccounts === "string") {
+      return c.json({ error: parsedSocialAccounts }, 400);
+    }
+
     const existing = findPersonByName(name);
     if (existing) {
       return c.json({ error: `Person already exists: ${existing.id}` }, 409);
     }
 
-    const person = createPerson({ name: name.trim(), url: parseNullableString(url) ?? null });
+    const person = createPerson({
+      name: name.trim(),
+      url: parseNullableString(url) ?? null,
+      social_accounts: parsedSocialAccounts,
+    });
     return c.json({ data: person }, 201);
   }
 );
@@ -1531,7 +1614,7 @@ registerProtectedRoute(
     }
 
     const body = await c.req.json();
-    const { name, url } = body;
+    const { name, url, social_accounts } = body;
 
     if (name !== undefined && (typeof name !== "string" || name.trim().length === 0)) {
       return c.json({ error: "Name cannot be empty" }, 400);
@@ -1539,6 +1622,11 @@ registerProtectedRoute(
 
     if (url !== undefined && url !== null && typeof url !== "string") {
       return c.json({ error: "URL must be a string" }, 400);
+    }
+
+    const parsedSocialAccounts = parsePersonSocialAccounts(social_accounts);
+    if (typeof parsedSocialAccounts === "string") {
+      return c.json({ error: parsedSocialAccounts }, 400);
     }
 
     if (typeof name === "string") {
@@ -1551,6 +1639,7 @@ registerProtectedRoute(
     const person = updatePerson(id, {
       name: name !== undefined ? name.trim() : undefined,
       url: url !== undefined ? (parseNullableString(url) ?? null) : undefined,
+      social_accounts: parsedSocialAccounts,
     });
 
     if (!person) {

@@ -10,7 +10,16 @@ afterEach(() => {
   global.fetch = originalFetch;
 });
 import { createTestDb } from "../../db/test-utils";
-import { posts, tags, postTags, sources, sourceAuthors, people, media } from "../../db/schema";
+import {
+  posts,
+  tags,
+  postTags,
+  sources,
+  sourceAuthors,
+  people,
+  personSocialAccounts,
+  media,
+} from "../../db/schema";
 
 // Create test db immediately
 const testDb = createTestDb();
@@ -143,6 +152,26 @@ testDb
   .run();
 
 testDb.update(posts).set({ author_id: 1 }).where(eq(posts.id, 6)).run();
+
+testDb
+  .insert(personSocialAccounts)
+  .values([
+    {
+      person_id: 1,
+      label: "Mastodon",
+      url: "https://mastodon.social/@testauthor",
+      is_activitypub: true,
+      sort_order: 0,
+    },
+    {
+      person_id: 1,
+      label: "GitHub",
+      url: "https://github.com/testauthor",
+      is_activitypub: false,
+      sort_order: 1,
+    },
+  ])
+  .run();
 
 testDb
   .insert(sourceAuthors)
@@ -866,6 +895,19 @@ describe("pages routes", () => {
       expect(html).toContain("Sources");
       expect(html).toContain('href="/sources/1"');
       expect(html).toContain("Test Blog");
+    });
+
+    it("renders the selected person's social media accounts", async () => {
+      const app = getApp();
+      const res = await app.request("/people/1");
+      const html = await res.text();
+
+      expect(html).toContain("Social Media");
+      expect(html).toContain('href="https://mastodon.social/@testauthor"');
+      expect(html).toContain("Mastodon");
+      expect(html).toContain("ActivityPub");
+      expect(html).toContain('href="https://github.com/testauthor"');
+      expect(html).toContain("GitHub");
     });
 
     it("shows links from the selected person with full shared link content", async () => {

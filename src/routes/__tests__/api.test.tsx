@@ -2,7 +2,15 @@
 import { describe, it, expect, beforeAll, beforeEach } from "bun:test";
 import { mock } from "bun:test";
 import { createTestDb } from "../../db/test-utils";
-import { posts, sources, sourceAuthors, people, tags, postTags } from "../../db/schema";
+import {
+  posts,
+  sources,
+  sourceAuthors,
+  people,
+  personSocialAccounts,
+  tags,
+  postTags,
+} from "../../db/schema";
 import { eq } from "drizzle-orm";
 
 // Create test db immediately
@@ -66,6 +74,7 @@ beforeEach(() => {
   testDb.delete(tags).run();
   testDb.delete(posts).run();
   testDb.delete(sourceAuthors).run();
+  testDb.delete(personSocialAccounts).run();
   testDb.delete(people).run();
   testDb.delete(sources).run();
   global.fetch = originalFetch;
@@ -1285,6 +1294,7 @@ describe("/api/people", () => {
     const json = await res.json();
     expect(json.data).toHaveLength(2);
     expect(json.data[0]).toMatchObject({ name: "Ethan Mollick", url: null });
+    expect(json.data[0].social_accounts).toEqual([]);
     expect(json.data[1]).toMatchObject({
       name: "Simon Willison",
       url: "https://simonwillison.net/",
@@ -1303,6 +1313,7 @@ describe("/api/people", () => {
     expect(created.data).toMatchObject({
       name: "Ethan Mollick",
       url: "https://www.oneusefulthing.org/",
+      social_accounts: [],
     });
 
     const showRes = await api.request(`/people/${created.data.id}`, { headers: authHeader });
@@ -1310,6 +1321,77 @@ describe("/api/people", () => {
     expect(showRes.status).toBe(200);
     const shown = await showRes.json();
     expect(shown.data).toEqual(created.data);
+  });
+
+  it("creates a person with multiple social accounts", async () => {
+    const createRes = await api.request("/people", {
+      method: "POST",
+      headers: { ...authHeader, "Content-Type": "application/json" },
+      body: JSON.stringify({
+        name: "Seth Godin",
+        social_accounts: [
+          {
+            label: "Mastodon",
+            url: "https://mastodon.social/@seth",
+            is_activitypub: true,
+          },
+          { label: "Website", url: "https://seths.blog/" },
+        ],
+      }),
+    });
+
+    expect(createRes.status).toBe(201);
+    const created = await createRes.json();
+    expect(created.data.social_accounts).toMatchObject([
+      { label: "Mastodon", url: "https://mastodon.social/@seth", is_activitypub: true },
+      { label: "Website", url: "https://seths.blog/", is_activitypub: false },
+    ]);
+    expect(created.data.social_accounts[0].sort_order).toBe(0);
+    expect(created.data.social_accounts[1].sort_order).toBe(1);
+  });
+
+  it("replaces person social accounts when editing", async () => {
+    const person = testDb.insert(people).values({ name: "Old Name" }).returning().get();
+    testDb
+      .insert(personSocialAccounts)
+      .values({
+        person_id: person.id,
+        label: "Old Account",
+        url: "https://old.example.com",
+        is_activitypub: false,
+        sort_order: 0,
+      })
+      .run();
+
+    const res = await api.request(`/people/${person.id}`, {
+      method: "PUT",
+      headers: { ...authHeader, "Content-Type": "application/json" },
+      body: JSON.stringify({
+        social_accounts: [
+          { label: "Bluesky", url: "https://bsky.app/profile/example.com" },
+          { label: "Mastodon", url: "https://example.social/@person", is_activitypub: true },
+        ],
+      }),
+    });
+
+    expect(res.status).toBe(200);
+    const json = await res.json();
+    expect(json.data.social_accounts).toMatchObject([
+      { label: "Bluesky", is_activitypub: false },
+      { label: "Mastodon", is_activitypub: true },
+    ]);
+  });
+
+  it("rejects malformed social accounts", async () => {
+    const res = await api.request("/people", {
+      method: "POST",
+      headers: { ...authHeader, "Content-Type": "application/json" },
+      body: JSON.stringify({ name: "Bad Social", social_accounts: [{ label: "Mastodon" }] }),
+    });
+
+    expect(res.status).toBe(400);
+    const json = await res.json();
+    expect(JSON.stringify(json.error)).toContain("social_accounts");
   });
 
   it("rejects blank person names", async () => {
