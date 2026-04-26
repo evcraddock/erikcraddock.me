@@ -46,8 +46,15 @@ function formatPerson(person: Person): void {
   if (person.social_accounts.length > 0) {
     console.log("Social accounts:");
     for (const account of person.social_accounts) {
-      const activityPub = account.is_activitypub ? " (ActivityPub)" : "";
-      console.log(`  - ${account.label}: ${account.url}${activityPub}`);
+      const markers = [
+        account.is_activitypub ? "ActivityPub" : null,
+        account.is_default ? "default" : null,
+      ].filter(Boolean);
+      const suffix = markers.length > 0 ? ` (${markers.join(", ")})` : "";
+      console.log(`  - ${account.label}: ${account.url}${suffix}`);
+      if (account.avatar_url) {
+        console.log(`    Avatar: ${account.avatar_url}`);
+      }
     }
   }
 }

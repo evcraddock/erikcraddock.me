@@ -160,6 +160,7 @@ testDb
       person_id: 1,
       label: "Mastodon",
       url: "https://mastodon.social/@testauthor",
+      avatar_url: "https://mastodon.social/avatar.jpg",
       is_activitypub: true,
       sort_order: 0,
     },
@@ -613,7 +614,7 @@ describe("pages routes", () => {
       expect(html).toContain("Test Author");
       expect(html).toContain("Alice");
       expect(html).toContain("https://alice.example.com");
-      expect(html).toContain("No website listed");
+      expect(html).not.toContain("No website listed");
     });
 
     it("uses the sources page card grid pattern", async () => {
@@ -643,6 +644,14 @@ describe("pages routes", () => {
 
       expect(html).toContain('href="/people/1"');
       expect(html).toContain('href="/people/2"');
+    });
+
+    it("shows avatars from default social accounts on people cards", async () => {
+      const app = getApp();
+      const res = await app.request("/people");
+      const html = await res.text();
+
+      expect(html).toContain('src="https://mastodon.social/avatar.jpg"');
     });
 
     it("paginates people", async () => {
@@ -887,12 +896,12 @@ describe("pages routes", () => {
       expect(html).not.toContain("Followers");
     });
 
-    it("lists sources authored by the selected person", async () => {
+    it("lists websites authored by the selected person", async () => {
       const app = getApp();
       const res = await app.request("/people/1");
       const html = await res.text();
 
-      expect(html).toContain("Sources");
+      expect(html).toContain("Websites");
       expect(html).toContain('href="/sources/1"');
       expect(html).toContain("Test Blog");
     });
@@ -908,6 +917,16 @@ describe("pages routes", () => {
       expect(html).toContain("ActivityPub");
       expect(html).toContain('href="https://github.com/testauthor"');
       expect(html).toContain("GitHub");
+    });
+
+    it("uses the effective default social account for avatar and follow button", async () => {
+      const app = getApp();
+      const res = await app.request("/people/1");
+      const html = await res.text();
+
+      expect(html).toContain('src="https://mastodon.social/avatar.jpg"');
+      expect(html).toContain('href="https://mastodon.social/@testauthor"');
+      expect(html).toContain(">Follow</a>");
     });
 
     it("shows links from the selected person with full shared link content", async () => {

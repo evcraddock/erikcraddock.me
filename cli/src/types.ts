@@ -41,7 +41,9 @@ export interface PersonSocialAccount {
   person_id: number;
   label: string;
   url: string;
+  avatar_url: string | null;
   is_activitypub: boolean;
+  is_default: boolean;
   sort_order: number;
 }
 
@@ -50,6 +52,7 @@ export interface Person {
   name: string;
   url: string | null;
   social_accounts: PersonSocialAccount[];
+  default_social_account: PersonSocialAccount | null;
 }
 
 export interface Post {

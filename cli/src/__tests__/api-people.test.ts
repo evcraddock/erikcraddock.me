@@ -53,7 +53,7 @@ describe("ApiClient people methods", () => {
   });
 
   it("calls PUT /people/:id with body", async () => {
-    const updates = { name: "Ethan Mollick", url: null };
+    const updates = { name: "Ethan Mollick", url: null, default_social_account_id: 7 };
 
     await client.updatePerson(3, updates);
 

@@ -1348,6 +1348,73 @@ describe("/api/people", () => {
     ]);
     expect(created.data.social_accounts[0].sort_order).toBe(0);
     expect(created.data.social_accounts[1].sort_order).toBe(1);
+    expect(created.data.default_social_account).toMatchObject({
+      label: "Mastodon",
+      is_activitypub: true,
+      is_default: false,
+    });
+  });
+
+  it("marks an explicit social account as the default", async () => {
+    const createRes = await api.request("/people", {
+      method: "POST",
+      headers: { ...authHeader, "Content-Type": "application/json" },
+      body: JSON.stringify({
+        name: "Default Person",
+        social_accounts: [
+          { label: "Mastodon", url: "https://example.social/@person", is_activitypub: true },
+          {
+            label: "Bluesky",
+            url: "https://bsky.app/profile/example.com",
+            is_default: true,
+            avatar_url: "https://cdn.example.com/avatar.jpg",
+          },
+        ],
+      }),
+    });
+
+    expect(createRes.status).toBe(201);
+    const created = await createRes.json();
+    expect(created.data.default_social_account).toMatchObject({
+      label: "Bluesky",
+      avatar_url: "https://cdn.example.com/avatar.jpg",
+      is_default: true,
+    });
+    expect(created.data.social_accounts[0].is_default).toBe(false);
+    expect(created.data.social_accounts[1].is_default).toBe(true);
+  });
+
+  it("updates a person's default social account by ID", async () => {
+    const person = testDb.insert(people).values({ name: "Default Update" }).returning().get();
+    const accounts = testDb
+      .insert(personSocialAccounts)
+      .values([
+        {
+          person_id: person.id,
+          label: "Mastodon",
+          url: "https://example.social/@person",
+          is_activitypub: true,
+          sort_order: 0,
+        },
+        {
+          person_id: person.id,
+          label: "Bluesky",
+          url: "https://bsky.app/profile/example.com",
+          sort_order: 1,
+        },
+      ])
+      .returning()
+      .all();
+
+    const res = await api.request(`/people/${person.id}`, {
+      method: "PUT",
+      headers: { ...authHeader, "Content-Type": "application/json" },
+      body: JSON.stringify({ default_social_account_id: accounts[1].id }),
+    });
+
+    expect(res.status).toBe(200);
+    const json = await res.json();
+    expect(json.data.default_social_account).toMatchObject({ label: "Bluesky", is_default: true });
   });
 
   it("replaces person social accounts when editing", async () => {
