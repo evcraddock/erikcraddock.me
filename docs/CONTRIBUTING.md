@@ -38,7 +38,7 @@ When waiting for CI, use code or a tool-driven command to check status on an int
 ```bash
 while true; do
   gh pr view <number> --json statusCheckRollup --jq '.statusCheckRollup[]? | "\(.name): \(.status) \(.conclusion // "")"'
-  if gh pr view <number> --json statusCheckRollup --jq 'all(.statusCheckRollup[]?; .status == "COMPLETED")' | grep -q true; then
+  if gh pr view <number> --json statusCheckRollup --jq '(.statusCheckRollup | length) > 0 and all(.statusCheckRollup[]; .status == "COMPLETED")' | grep -q true; then
     break
   fi
   sleep 30
