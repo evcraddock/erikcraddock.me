@@ -14,6 +14,7 @@ interface EditOptions {
   excerpt?: string;
   tags?: string[];
   source?: string;
+  author?: string | null;
 }
 
 function parseEditArgs(args: string[]): { slug?: string; options: EditOptions; help: boolean } {
@@ -60,6 +61,12 @@ function parseEditArgs(args: string[]): { slug?: string; options: EditOptions; h
       options.source = args[++i];
     } else if (arg.startsWith("--source=")) {
       options.source = arg.split("=").slice(1).join("=");
+    } else if (arg === "--author" && args[i + 1]) {
+      options.author = args[++i];
+    } else if (arg.startsWith("--author=")) {
+      options.author = arg.split("=").slice(1).join("=");
+    } else if (arg === "--no-author") {
+      options.author = null;
     } else if (!arg.startsWith("-") && !slug) {
       slug = arg;
     }
@@ -87,6 +94,8 @@ Options:
   --excerpt <text>    Update excerpt
   --tags <tags>       Replace tags (comma-separated)
   --source <id>       Update source ID
+  --author <id>       Update author person ID
+  --no-author         Clear author
   --json              Output as JSON
   --help, -h          Show this help message
 
@@ -134,6 +143,7 @@ export async function edit(args: string[], globalOptions: GlobalOptions): Promis
   let excerpt = options.excerpt;
   let tags = options.tags;
   let source = options.source;
+  let author = options.author;
 
   if (options.file) {
     // File-based editing
@@ -154,6 +164,7 @@ export async function edit(args: string[], globalOptions: GlobalOptions): Promis
     excerpt = options.excerpt ?? frontmatter.excerpt;
     tags = options.tags ?? frontmatter.tags;
     source = options.source ?? frontmatter.source;
+    author = options.author ?? frontmatter.author;
 
     // Process images
     const banner = frontmatter.banner;
@@ -176,9 +187,11 @@ export async function edit(args: string[], globalOptions: GlobalOptions): Promis
   }
 
   // Check if any update options provided
-  if (!url && !title && !content && !excerpt && !tags && !source) {
+  if (!url && !title && !content && !excerpt && !tags && !source && author === undefined) {
     console.error("❌ No update options provided.");
-    console.error("Use --file, --url, --title, --content, --excerpt, --tags, or --source.");
+    console.error(
+      "Use --file, --url, --title, --content, --excerpt, --tags, --source, --author, or --no-author."
+    );
     process.exit(1);
   }
 
@@ -192,6 +205,17 @@ export async function edit(args: string[], globalOptions: GlobalOptions): Promis
     }
   }
 
+  let authorId: number | null | undefined;
+  if (author !== undefined && author !== null) {
+    authorId = parseInt(author, 10);
+    if (isNaN(authorId) || authorId <= 0) {
+      console.error("❌ Invalid author ID. Must be a positive integer.");
+      process.exit(1);
+    }
+  } else if (author === null) {
+    authorId = null;
+  }
+
   const updateData: {
     url?: string;
     title?: string;
@@ -199,6 +223,7 @@ export async function edit(args: string[], globalOptions: GlobalOptions): Promis
     excerpt?: string;
     tags?: string[];
     source_id?: number;
+    author_id?: number | null;
   } = {};
 
   if (url !== undefined) updateData.url = url;
@@ -207,6 +232,7 @@ export async function edit(args: string[], globalOptions: GlobalOptions): Promis
   if (excerpt !== undefined) updateData.excerpt = excerpt;
   if (tags !== undefined) updateData.tags = tags;
   if (sourceId !== undefined) updateData.source_id = sourceId;
+  if (authorId !== undefined) updateData.author_id = authorId;
 
   const result = await client.updatePost(slug, updateData);
 

@@ -308,6 +308,36 @@ describe("POST /api/posts - slug validation", () => {
     expect(json.data.published_at).toBeNull();
   });
 
+  it("stores link author independently from source", async () => {
+    const source = testDb
+      .insert(sources)
+      .values({ name: "Example Source", url: "https://example.com" })
+      .returning()
+      .get();
+    const person = testDb.insert(people).values({ name: "Example Author" }).returning().get();
+
+    const res = await api.request("/posts", {
+      method: "POST",
+      headers: { ...authHeader, "Content-Type": "application/json" },
+      body: JSON.stringify({
+        type: "link",
+        slug: "authored-link",
+        title: "Authored Link",
+        url: "https://example.com/article",
+        content: "Commentary",
+        source_id: source.id,
+        author_id: person.id,
+      }),
+    });
+
+    expect(res.status).toBe(201);
+    const json = await res.json();
+    expect(json.data.source_id).toBe(source.id);
+    expect(json.data.source.name).toBe("Example Source");
+    expect(json.data.author_id).toBe(person.id);
+    expect(json.data.author.name).toBe("Example Author");
+  });
+
   it("stores link preview metadata for link posts", async () => {
     global.fetch = mock(
       async () =>
@@ -533,6 +563,50 @@ describe("PUT /api/posts/by-slug/:slug", () => {
 
     expect(res.status).toBe(200);
     expect(mockSendUpdateActivity).toHaveBeenCalledWith(post.id);
+  });
+
+  it("updates and clears link author by slug", async () => {
+    const originalPerson = testDb
+      .insert(people)
+      .values({ name: "Original Author" })
+      .returning()
+      .get();
+    const nextPerson = testDb.insert(people).values({ name: "Next Author" }).returning().get();
+    testDb
+      .insert(posts)
+      .values({
+        slug: "author-update-link",
+        type: "link",
+        title: "Author Update Link",
+        content: "Content",
+        url: "https://example.com/author-update",
+        author_id: originalPerson.id,
+        created_at: new Date(),
+        updated_at: new Date(),
+      })
+      .run();
+
+    const updateRes = await api.request("/posts/by-slug/author-update-link", {
+      method: "PUT",
+      headers: { ...authHeader, "Content-Type": "application/json" },
+      body: JSON.stringify({ author_id: nextPerson.id }),
+    });
+
+    expect(updateRes.status).toBe(200);
+    const updated = await updateRes.json();
+    expect(updated.data.author_id).toBe(nextPerson.id);
+    expect(updated.data.author.name).toBe("Next Author");
+
+    const clearRes = await api.request("/posts/by-slug/author-update-link", {
+      method: "PUT",
+      headers: { ...authHeader, "Content-Type": "application/json" },
+      body: JSON.stringify({ author_id: null }),
+    });
+
+    expect(clearRes.status).toBe(200);
+    const cleared = await clearRes.json();
+    expect(cleared.data.author_id).toBeNull();
+    expect(cleared.data.author).toBeNull();
   });
 
   it("returns 404 for non-existent slug", async () => {

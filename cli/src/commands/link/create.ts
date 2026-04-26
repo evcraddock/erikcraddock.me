@@ -15,6 +15,7 @@ interface CreateOptions {
   excerpt?: string;
   tags?: string[];
   source?: string;
+  author?: string;
 }
 
 function parseCreateArgs(args: string[]): { options: CreateOptions; help: boolean } {
@@ -64,6 +65,10 @@ function parseCreateArgs(args: string[]): { options: CreateOptions; help: boolea
       options.source = args[++i];
     } else if (arg.startsWith("--source=")) {
       options.source = arg.split("=").slice(1).join("=");
+    } else if (arg === "--author" && args[i + 1]) {
+      options.author = args[++i];
+    } else if (arg.startsWith("--author=")) {
+      options.author = arg.split("=").slice(1).join("=");
     }
 
     i++;
@@ -87,6 +92,7 @@ Options:
   --excerpt <text>    Short excerpt/summary
   --tags <tags>       Comma-separated list of tags
   --source <id>       Source ID (e.g., Hacker News, Reddit)
+  --author <id>       Author person ID
   --json              Output as JSON
   --help, -h          Show this help message
 
@@ -128,6 +134,7 @@ export async function create(args: string[], globalOptions: GlobalOptions): Prom
   let excerpt = options.excerpt;
   let tags = options.tags;
   let source = options.source;
+  let author = options.author;
   let banner: string | undefined;
   let bannerImageId: number | undefined;
   let publishedAt: string | undefined; // For imports - original publish date from frontmatter
@@ -151,6 +158,7 @@ export async function create(args: string[], globalOptions: GlobalOptions): Prom
     slug = options.slug ?? frontmatter.slug;
     excerpt = options.excerpt ?? frontmatter.excerpt;
     source = options.source ?? frontmatter.source;
+    author = options.author ?? frontmatter.author;
     banner = frontmatter.banner;
     publishedAt = frontmatter.date; // For imports - set original publish date
 
@@ -215,6 +223,13 @@ export async function create(args: string[], globalOptions: GlobalOptions): Prom
     process.exit(1);
   }
 
+  // Parse author ID if provided
+  const authorId = author ? parseInt(author, 10) : undefined;
+  if (author && (isNaN(authorId!) || authorId! <= 0)) {
+    console.error("❌ Invalid author ID. Must be a positive integer.");
+    process.exit(1);
+  }
+
   const result = await client.createPost({
     type: "link",
     slug,
@@ -224,6 +239,7 @@ export async function create(args: string[], globalOptions: GlobalOptions): Prom
     excerpt,
     tags,
     source_id: sourceId,
+    author_id: authorId,
     banner_image_id: bannerImageId,
     published_at: publishedAt,
   });

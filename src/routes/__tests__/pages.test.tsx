@@ -142,6 +142,8 @@ testDb
   ])
   .run();
 
+testDb.update(posts).set({ author_id: 1 }).where(eq(posts.id, 6)).run();
+
 testDb
   .insert(sourceAuthors)
   .values([
@@ -852,6 +854,7 @@ describe("pages routes", () => {
       expect(html).toContain("via");
       expect(html).toContain('href="/sources/1"');
       expect(html).toContain("Test Blog");
+      expect(html).toContain("by Test Author");
     });
 
     it("backfills OG preview metadata for older link posts during page render", async () => {

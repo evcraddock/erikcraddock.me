@@ -82,6 +82,14 @@ function formatTable(posts: PostListItem[]): void {
   const slugWidth = Math.max(4, ...posts.map((p) => p.slug.length));
   const titleWidth = Math.min(40, Math.max(5, ...posts.map((p) => (p.title || "-").length)));
   const statusWidth = 9; // "published" is 9 chars
+  const authorWidth = Math.min(
+    24,
+    Math.max(6, ...posts.map((p) => (p.author?.name || "-").length))
+  );
+  const sourceWidth = Math.min(
+    24,
+    Math.max(6, ...posts.map((p) => (p.source?.name || "-").length))
+  );
   const dateWidth = 10; // YYYY-MM-DD
 
   // Header
@@ -89,6 +97,8 @@ function formatTable(posts: PostListItem[]): void {
     "SLUG".padEnd(Math.min(slugWidth, 30)),
     "TITLE".padEnd(titleWidth),
     "STATUS".padEnd(statusWidth),
+    "AUTHOR".padEnd(authorWidth),
+    "SOURCE".padEnd(sourceWidth),
     "DATE".padEnd(dateWidth),
   ].join("  ");
 
@@ -103,6 +113,8 @@ function formatTable(posts: PostListItem[]): void {
       truncate(post.slug, 30).padEnd(Math.min(slugWidth, 30)),
       truncate(post.title, titleWidth).padEnd(titleWidth),
       status.padEnd(statusWidth),
+      truncate(post.author?.name ?? null, authorWidth).padEnd(authorWidth),
+      truncate(post.source?.name ?? null, sourceWidth).padEnd(sourceWidth),
       date.padEnd(dateWidth),
     ].join("  ");
 

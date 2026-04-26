@@ -11,10 +11,20 @@ export interface PostListItem {
   title: string | null;
   excerpt: string | null;
   published_at: string | null;
+  source_id: number | null;
+  author_id: number | null;
+  source: SourceSummary | null;
+  author: PersonSummary | null;
   tags: string[];
 }
 
 export type PostStatus = "draft" | "published" | "all";
+
+type PersonSummary = {
+  id: number;
+  name: string;
+  url: string | null;
+};
 
 type SourceSummary = {
   id: number;
@@ -32,6 +42,17 @@ type SourceSummary = {
     sort_order: number;
   }>;
 };
+
+function getPersonSummary(personId: number): PersonSummary | null {
+  const person = db.select().from(people).where(eq(people.id, personId)).get();
+  return person ? { id: person.id, name: person.name, url: person.url } : null;
+}
+
+function validatePersonId(personId: number): void {
+  if (!getPersonSummary(personId)) {
+    throw new Error(`Person not found: ${personId}`);
+  }
+}
 
 function getSourceSummary(sourceId: number): SourceSummary | null {
   const sourceRecord = db.select().from(sources).where(eq(sources.id, sourceId)).get();
@@ -131,6 +152,8 @@ export function listPosts(options: ListPostsOptions = {}): PostListItem[] {
       title: posts.title,
       excerpt: posts.excerpt,
       published_at: posts.published_at,
+      source_id: posts.source_id,
+      author_id: posts.author_id,
     })
     .from(posts);
 
@@ -167,6 +190,10 @@ export function listPosts(options: ListPostsOptions = {}): PostListItem[] {
       title: post.title,
       excerpt: post.excerpt,
       published_at: post.published_at?.toISOString() ?? null,
+      source_id: post.source_id,
+      author_id: post.author_id,
+      source: post.source_id ? getSourceSummary(post.source_id) : null,
+      author: post.author_id ? getPersonSummary(post.author_id) : null,
       tags: postTagRecords.map((t) => t.name),
     };
   });
@@ -186,6 +213,7 @@ export interface CreatePostInput {
   og_image_url?: string | null;
   og_site_name?: string | null;
   source_id?: number | null;
+  author_id?: number | null;
   tags?: string[]; // Tag slugs
   banner_image_id?: number | null;
   published_at?: Date | null; // For imports - set to create as already published
@@ -240,6 +268,7 @@ export function createPost(input: CreatePostInput) {
     og_image_url,
     og_site_name,
     source_id,
+    author_id,
     tags: tagSlugs,
     banner_image_id,
     published_at,
@@ -259,6 +288,11 @@ export function createPost(input: CreatePostInput) {
     if (!sourceRecord) {
       throw new Error(`Source not found: ${source_id}`);
     }
+  }
+
+  // Validate author_id if provided
+  if (author_id !== undefined && author_id !== null) {
+    validatePersonId(author_id);
   }
 
   // Auto-generate excerpt if not provided
@@ -282,6 +316,7 @@ export function createPost(input: CreatePostInput) {
       og_image_url: og_image_url ?? null,
       og_site_name: og_site_name ?? null,
       source_id: source_id ?? null,
+      author_id: author_id ?? null,
       banner_image_id: banner_image_id ?? null,
       created_at: published_at ?? now,
       updated_at: published_at ?? now,
@@ -317,13 +352,15 @@ export function createPost(input: CreatePostInput) {
     }
   }
 
-  // Get source info if source_id is set
+  // Get source and author info if set
   const source = post.source_id ? getSourceSummary(post.source_id) : null;
+  const author = post.author_id ? getPersonSummary(post.author_id) : null;
 
   return {
     ...post,
     banner_url,
     source,
+    author,
     published_at: post.published_at?.toISOString() ?? null,
     created_at: post.created_at.toISOString(),
     updated_at: post.updated_at.toISOString(),
@@ -341,6 +378,7 @@ export interface UpdatePostInput {
   og_image_url?: string | null;
   og_site_name?: string | null;
   source_id?: number | null;
+  author_id?: number | null;
   tags?: string[]; // Tag slugs
   banner_image_id?: number | null;
 }
@@ -365,6 +403,7 @@ export function updatePost(id: number, input: UpdatePostInput) {
     og_image_url,
     og_site_name,
     source_id,
+    author_id,
     tags: tagSlugs,
     banner_image_id,
   } = input;
@@ -385,6 +424,11 @@ export function updatePost(id: number, input: UpdatePostInput) {
     }
   }
 
+  // Validate author_id if provided
+  if (author_id !== undefined && author_id !== null) {
+    validatePersonId(author_id);
+  }
+
   // Build update object with only provided fields
   const updates: Record<string, unknown> = {
     updated_at: new Date(),
@@ -399,6 +443,7 @@ export function updatePost(id: number, input: UpdatePostInput) {
   if (og_image_url !== undefined) updates.og_image_url = og_image_url;
   if (og_site_name !== undefined) updates.og_site_name = og_site_name;
   if (source_id !== undefined) updates.source_id = source_id;
+  if (author_id !== undefined) updates.author_id = author_id;
   if (banner_image_id !== undefined) updates.banner_image_id = banner_image_id;
 
   // Update post
@@ -513,13 +558,15 @@ export function getPost(id: number) {
     }
   }
 
-  // Get source info if source_id is set
+  // Get source and author info if set
   const source = post.source_id ? getSourceSummary(post.source_id) : null;
+  const author = post.author_id ? getPersonSummary(post.author_id) : null;
 
   return {
     ...post,
     banner_url,
     source,
+    author,
     published_at: post.published_at?.toISOString() ?? null,
     created_at: post.created_at.toISOString(),
     updated_at: post.updated_at.toISOString(),
@@ -553,13 +600,15 @@ export function getPostBySlug(slug: string) {
     }
   }
 
-  // Get source info if source_id is set
+  // Get source and author info if set
   const source = post.source_id ? getSourceSummary(post.source_id) : null;
+  const author = post.author_id ? getPersonSummary(post.author_id) : null;
 
   return {
     ...post,
     banner_url,
     source,
+    author,
     published_at: post.published_at?.toISOString() ?? null,
     created_at: post.created_at.toISOString(),
     updated_at: post.updated_at.toISOString(),
