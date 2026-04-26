@@ -160,6 +160,7 @@ testDb
       person_id: 1,
       label: "Mastodon",
       url: "https://mastodon.social/@testauthor",
+      avatar_url: "https://mastodon.social/avatar.jpg",
       is_activitypub: true,
       sort_order: 0,
     },
@@ -908,6 +909,16 @@ describe("pages routes", () => {
       expect(html).toContain("ActivityPub");
       expect(html).toContain('href="https://github.com/testauthor"');
       expect(html).toContain("GitHub");
+    });
+
+    it("uses the effective default social account for avatar and follow button", async () => {
+      const app = getApp();
+      const res = await app.request("/people/1");
+      const html = await res.text();
+
+      expect(html).toContain('src="https://mastodon.social/avatar.jpg"');
+      expect(html).toContain('href="https://mastodon.social/@testauthor"');
+      expect(html).toContain(">Follow</a>");
     });
 
     it("shows links from the selected person with full shared link content", async () => {

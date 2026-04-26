@@ -5,7 +5,9 @@ import { loadConfig } from "../../lib/config";
 interface SocialAccountOption {
   label: string;
   url: string;
+  avatar_url?: string | null;
   is_activitypub?: boolean;
+  is_default?: boolean;
 }
 
 interface CreateOptions {
@@ -47,7 +49,7 @@ function parseCreateArgs(args: string[]): { options: CreateOptions; help: boolea
 }
 
 function parseSocialAccount(input: string): SocialAccountOption | null {
-  const [label, url, flag] = input.split("|").map((part) => part.trim());
+  const [label, url, ...flags] = input.split("|").map((part) => part.trim());
   if (!label || !url) {
     return null;
   }
@@ -55,7 +57,9 @@ function parseSocialAccount(input: string): SocialAccountOption | null {
   return {
     label,
     url,
-    is_activitypub: flag === "activitypub" || flag === "ap" || flag === "true",
+    avatar_url: flags.find((flag) => flag.startsWith("avatar="))?.slice("avatar=".length),
+    is_activitypub: flags.some((flag) => ["activitypub", "ap", "true"].includes(flag)),
+    is_default: flags.includes("default"),
   };
 }
 
@@ -69,14 +73,14 @@ Required:
 
 Options:
   --url <url>         Person URL (optional)
-  --social <account>  Social account as "label|url|activitypub" (can be repeated)
+  --social <account>  Social account as "label|url|activitypub|default|avatar=URL" (can be repeated)
   --json              Output as JSON
   --help, -h          Show this help message
 
 Examples:
   ec person create --name "Ethan Mollick"
   ec person create --name "Simon Willison" --url "https://simonwillison.net/"
-  ec person create --name "Example" --social "Mastodon|https://example.social/@person|activitypub"
+  ec person create --name "Example" --social "Mastodon|https://example.social/@person|activitypub|default|avatar=https://example.social/avatar.jpg"
 `);
 }
 

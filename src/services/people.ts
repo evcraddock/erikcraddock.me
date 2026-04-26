@@ -6,7 +6,9 @@ export interface PersonSocialAccount {
   person_id: number;
   label: string;
   url: string;
+  avatar_url: string | null;
   is_activitypub: boolean;
+  is_default: boolean;
   sort_order: number;
 }
 
@@ -15,24 +17,29 @@ export interface Person {
   name: string;
   url: string | null;
   social_accounts: PersonSocialAccount[];
+  default_social_account: PersonSocialAccount | null;
 }
 
 export interface PersonSocialAccountInput {
   label: string;
   url: string;
+  avatar_url?: string | null;
   is_activitypub?: boolean;
+  is_default?: boolean;
 }
 
 export interface CreatePersonInput {
   name: string;
   url?: string | null;
   social_accounts?: PersonSocialAccountInput[];
+  default_social_account_id?: number | null;
 }
 
 export interface UpdatePersonInput {
   name?: string;
   url?: string | null;
   social_accounts?: PersonSocialAccountInput[];
+  default_social_account_id?: number | null;
 }
 
 type PersonRecord = typeof people.$inferSelect;
@@ -50,8 +57,23 @@ function listSocialAccountsForPerson(personId: number): PersonSocialAccount[] {
     .all();
 }
 
+export function getDefaultSocialAccount(
+  accounts: PersonSocialAccount[]
+): PersonSocialAccount | null {
+  return (
+    accounts.find((account) => account.is_default) ??
+    accounts.find((account) => account.is_activitypub) ??
+    null
+  );
+}
+
 function attachSocialAccounts(person: PersonRecord): Person {
-  return { ...person, social_accounts: listSocialAccountsForPerson(person.id) };
+  const socialAccounts = listSocialAccountsForPerson(person.id);
+  return {
+    ...person,
+    social_accounts: socialAccounts,
+    default_social_account: getDefaultSocialAccount(socialAccounts),
+  };
 }
 
 function replaceSocialAccounts(personId: number, accounts: PersonSocialAccountInput[]): void {
@@ -61,17 +83,49 @@ function replaceSocialAccounts(personId: number, accounts: PersonSocialAccountIn
     return;
   }
 
+  const defaultIndex = accounts.findIndex((account) => account.is_default);
+
   db.insert(personSocialAccounts)
     .values(
       accounts.map((account, index) => ({
         person_id: personId,
         label: account.label,
         url: account.url,
+        avatar_url: account.avatar_url ?? null,
         is_activitypub: account.is_activitypub ?? false,
+        is_default: defaultIndex === index,
         sort_order: index,
       }))
     )
     .run();
+}
+
+export function setDefaultSocialAccount(personId: number, socialAccountId: number | null): boolean {
+  const existing = getPerson(personId);
+  if (!existing) {
+    return false;
+  }
+
+  if (socialAccountId !== null) {
+    const account = existing.social_accounts.find((candidate) => candidate.id === socialAccountId);
+    if (!account) {
+      return false;
+    }
+  }
+
+  db.update(personSocialAccounts)
+    .set({ is_default: false })
+    .where(eq(personSocialAccounts.person_id, personId))
+    .run();
+
+  if (socialAccountId !== null) {
+    db.update(personSocialAccounts)
+      .set({ is_default: true })
+      .where(eq(personSocialAccounts.id, socialAccountId))
+      .run();
+  }
+
+  return true;
 }
 
 export function listPeople(): Person[] {
@@ -104,6 +158,10 @@ export function createPerson(input: CreatePersonInput): Person {
     replaceSocialAccounts(person.id, input.social_accounts);
   }
 
+  if (input.default_social_account_id !== undefined) {
+    setDefaultSocialAccount(person.id, input.default_social_account_id);
+  }
+
   return getPerson(person.id)!;
 }
 
@@ -127,6 +185,13 @@ export function updatePerson(id: number, input: UpdatePersonInput): Person | nul
 
   if (input.social_accounts !== undefined) {
     replaceSocialAccounts(id, input.social_accounts);
+  }
+
+  if (input.default_social_account_id !== undefined) {
+    const updated = setDefaultSocialAccount(id, input.default_social_account_id);
+    if (!updated) {
+      throw new Error(`Default social account not found: ${input.default_social_account_id}`);
+    }
   }
 
   return getPerson(id);

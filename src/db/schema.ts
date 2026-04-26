@@ -68,7 +68,9 @@ export const personSocialAccounts = sqliteTable("person_social_accounts", {
     .references(() => people.id, { onDelete: "cascade" }),
   label: text("label").notNull(),
   url: text("url").notNull(),
+  avatar_url: text("avatar_url"),
   is_activitypub: integer("is_activitypub", { mode: "boolean" }).notNull().default(false),
+  is_default: integer("is_default", { mode: "boolean" }).notNull().default(false),
   sort_order: integer("sort_order").notNull().default(0),
 });
 

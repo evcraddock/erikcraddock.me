@@ -185,7 +185,14 @@ export class ApiClient {
   async createPerson(data: {
     name: string;
     url?: string | null;
-    social_accounts?: Array<{ label: string; url: string; is_activitypub?: boolean }>;
+    social_accounts?: Array<{
+      label: string;
+      url: string;
+      avatar_url?: string | null;
+      is_activitypub?: boolean;
+      is_default?: boolean;
+    }>;
+    default_social_account_id?: number | null;
   }): Promise<ApiResponse<Person>> {
     return this.request<Person>("POST", "/people", data);
   }
@@ -195,7 +202,14 @@ export class ApiClient {
     data: {
       name?: string;
       url?: string | null;
-      social_accounts?: Array<{ label: string; url: string; is_activitypub?: boolean }>;
+      social_accounts?: Array<{
+        label: string;
+        url: string;
+        avatar_url?: string | null;
+        is_activitypub?: boolean;
+        is_default?: boolean;
+      }>;
+      default_social_account_id?: number | null;
     }
   ): Promise<ApiResponse<Person>> {
     return this.request<Person>("PUT", `/people/${id}`, data);

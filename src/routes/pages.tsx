@@ -174,6 +174,15 @@ function PersonCard({
 }) {
   const hostname = getLinkPreviewSiteLabel(person.url, null) ?? person.url;
   const initial = person.name.charAt(0).toUpperCase();
+  const defaultSocialAccount =
+    socialAccounts.find((account) => account.is_default) ??
+    socialAccounts.find((account) => account.is_activitypub) ??
+    null;
+  const activityPubAccount =
+    (defaultSocialAccount?.is_activitypub ? defaultSocialAccount : null) ??
+    socialAccounts.find((account) => account.is_activitypub) ??
+    null;
+  const avatarUrl = defaultSocialAccount?.avatar_url ?? null;
   const titleHref = titleLink === "website" && person.url ? person.url : `/people/${person.id}`;
   const titleExternalAttrs =
     titleLink === "website" && person.url ? { target: "_blank", rel: "noopener noreferrer" } : {};
@@ -181,8 +190,12 @@ function PersonCard({
   return (
     <article class="flex h-full flex-col rounded-2xl border border-gray-200 bg-white p-5 shadow-sm transition-colors hover:border-teal-200 hover:bg-teal-50/40 dark:border-gray-800 dark:bg-gray-900 dark:hover:border-teal-900/60 dark:hover:bg-teal-950/20">
       <div class="flex items-start gap-4">
-        <div class="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-teal-100 text-lg font-bold text-teal-700 dark:bg-teal-900/40 dark:text-teal-300">
-          {initial}
+        <div class="flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-2xl bg-teal-100 text-lg font-bold text-teal-700 dark:bg-teal-900/40 dark:text-teal-300">
+          {avatarUrl ? (
+            <img src={avatarUrl} alt="" class="h-full w-full object-cover" loading="lazy" />
+          ) : (
+            initial
+          )}
         </div>
         <div class="min-w-0 flex-1">
           <a
@@ -204,6 +217,16 @@ function PersonCard({
           ) : (
             <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">No website listed</p>
           )}
+          {activityPubAccount ? (
+            <a
+              href={activityPubAccount.url}
+              target="_blank"
+              rel="noopener noreferrer"
+              class="mt-3 inline-flex rounded-full bg-teal-600 px-3 py-1 text-sm font-semibold text-white transition hover:bg-teal-700 dark:bg-teal-500 dark:text-gray-950 dark:hover:bg-teal-400"
+            >
+              Follow
+            </a>
+          ) : null}
         </div>
       </div>
 
