@@ -9,6 +9,7 @@ import {
   sources,
   sourceAuthors,
   people,
+  personSocialAccounts,
   media,
   followers,
 } from "../db";
@@ -30,6 +31,7 @@ type Database = typeof defaultDb;
 type Post = typeof posts.$inferSelect;
 type Source = typeof sources.$inferSelect;
 type Person = typeof people.$inferSelect;
+type PersonSocialAccount = typeof personSocialAccounts.$inferSelect;
 type SourceAuthor = {
   id: number;
   name: string;
@@ -163,10 +165,12 @@ function PersonCard({
   person,
   titleLink = "detail",
   authoredSources = [],
+  socialAccounts = [],
 }: {
   person: Person;
   titleLink?: "detail" | "website";
   authoredSources?: Source[];
+  socialAccounts?: PersonSocialAccount[];
 }) {
   const hostname = getLinkPreviewSiteLabel(person.url, null) ?? person.url;
   const initial = person.name.charAt(0).toUpperCase();
@@ -202,6 +206,34 @@ function PersonCard({
           )}
         </div>
       </div>
+
+      {socialAccounts.length > 0 ? (
+        <div class="mt-4 border-t border-gray-200 pt-4 dark:border-gray-800">
+          <h3 class="text-sm font-semibold text-gray-950 dark:text-gray-50">
+            Follow {person.name}
+          </h3>
+          <div class="mt-3 grid grid-cols-4 gap-2">
+            {socialAccounts.map((account) => (
+              <a
+                key={account.id}
+                href={account.url}
+                target="_blank"
+                rel="noopener noreferrer"
+                aria-label={`${account.label}${account.is_activitypub ? " (ActivityPub)" : ""}`}
+                title={`${account.label}${account.is_activitypub ? " (ActivityPub)" : ""}`}
+                class="relative flex aspect-square items-center justify-center rounded-xl border border-gray-200 text-sm font-semibold text-gray-600 transition hover:border-teal-200 hover:bg-teal-50 hover:text-teal-700 dark:border-gray-800 dark:text-gray-400 dark:hover:border-teal-900/70 dark:hover:bg-teal-950/20 dark:hover:text-teal-300"
+              >
+                {getSocialAccountIcon(account)}
+                {account.is_activitypub ? (
+                  <span class="absolute right-1 top-1 rounded-full bg-teal-100 px-1 text-[0.55rem] font-bold leading-3 text-teal-700 dark:bg-teal-900/60 dark:text-teal-200">
+                    AP
+                  </span>
+                ) : null}
+              </a>
+            ))}
+          </div>
+        </div>
+      ) : null}
 
       {authoredSources.length > 0 ? (
         <div class="mt-4 border-t border-gray-200 pt-4 dark:border-gray-800">
@@ -402,6 +434,78 @@ function RssIcon() {
   );
 }
 
+function MastodonIcon() {
+  return (
+    <svg class="w-6 h-6" fill="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+      <path d="M20.94 14.28c-.3 1.53-2.68 3.2-5.42 3.52-1.43.17-2.84.33-4.34.26-2.45-.11-4.38-.58-4.38-.58 0 .24.02.47.05.68.33 2.5 2.39 2.65 4.36 2.72 1.99.06 3.76-.49 3.76-.49l.08 1.8s-1.39.74-3.88.88c-1.37.08-3.07-.03-5.05-.56-4.29-1.15-5.03-5.78-5.14-10.48-.03-1.4-.01-2.72-.01-3.83 0-4.86 3.18-6.28 3.18-6.28C5.76 1.18 8.45.88 11.96.86h.08c3.51.02 6.2.32 7.8 1.06 0 0 3.18 1.42 3.18 6.28 0 0 .04 3.59-.08 6.08ZM18.8 8.57c0-1.2-.31-2.16-.93-2.86-.64-.71-1.47-1.08-2.5-1.08-1.19 0-2.09.46-2.68 1.39l-.58.98-.58-.98c-.59-.93-1.49-1.39-2.68-1.39-1.03 0-1.86.37-2.5 1.08-.62.7-.93 1.66-.93 2.86v5.87h2.33V8.73c0-1.2.5-1.81 1.49-1.81 1.1 0 1.65.71 1.65 2.11v3.13h2.31V9.03c0-1.4.55-2.11 1.65-2.11.99 0 1.49.61 1.49 1.81v5.71h2.34V8.57Z" />
+    </svg>
+  );
+}
+
+function BlueskyIcon() {
+  return (
+    <svg class="w-6 h-6" fill="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+      <path d="M5.52 3.2C8.14 5.18 10.96 9.2 12 11.35c1.04-2.15 3.86-6.17 6.48-8.15 1.9-1.43 4.98-2.53 4.98.98 0 .7-.4 5.88-.64 6.72-.82 2.94-3.82 3.69-6.49 3.24 4.66.79 5.85 3.42 3.29 6.04-4.86 4.97-6.99-1.25-7.54-2.85-.1-.29-.15-.43-.08-.43s-.02.14-.12.43c-.55 1.6-2.68 7.82-7.54 2.85-2.56-2.62-1.37-5.25 3.29-6.04-2.67.45-5.67-.3-6.49-3.24C.9 10.06.5 4.88.5 4.18c0-3.51 3.08-2.41 5.02-.98Z" />
+    </svg>
+  );
+}
+
+function TwitterIcon() {
+  return (
+    <svg class="w-6 h-6" fill="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+      <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817-5.966 6.817H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231 5.45-6.231Zm-1.16 17.52h1.833L7.084 4.126H5.117L17.083 19.77Z" />
+    </svg>
+  );
+}
+
+function SubstackIcon() {
+  return (
+    <svg class="w-6 h-6" fill="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+      <path d="M4 3h16v3H4V3Zm0 5h16v3H4V8Zm0 5h16v8l-8-4-8 4v-8Z" />
+    </svg>
+  );
+}
+
+function InstagramIcon() {
+  return (
+    <svg class="w-6 h-6" fill="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+      <path d="M7.8 2h8.4A5.8 5.8 0 0 1 22 7.8v8.4a5.8 5.8 0 0 1-5.8 5.8H7.8A5.8 5.8 0 0 1 2 16.2V7.8A5.8 5.8 0 0 1 7.8 2Zm-.2 2A3.6 3.6 0 0 0 4 7.6v8.8A3.6 3.6 0 0 0 7.6 20h8.8a3.6 3.6 0 0 0 3.6-3.6V7.6A3.6 3.6 0 0 0 16.4 4H7.6Zm9.65 1.75a1.25 1.25 0 1 1 0 2.5 1.25 1.25 0 0 1 0-2.5ZM12 7a5 5 0 1 1 0 10 5 5 0 0 1 0-10Zm0 2a3 3 0 1 0 0 6 3 3 0 0 0 0-6Z" />
+    </svg>
+  );
+}
+
+function TikTokIcon() {
+  return (
+    <svg class="w-6 h-6" fill="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+      <path d="M16.6 2c.36 3.03 2.05 4.84 5.02 5.03v3.41a8.68 8.68 0 0 1-5.02-1.54v6.48c0 8.23-8.97 10.8-12.58 4.9-2.32-3.8-.9-10.47 6.55-10.74v3.6c-.58.09-1.2.24-1.76.52-1.68.85-2.63 2.44-2.37 4.25.5 3.46 6.84 4.48 6.31-2.28V2h3.85Z" />
+    </svg>
+  );
+}
+
+function RedditIcon() {
+  return (
+    <svg class="w-6 h-6" fill="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+      <path d="M21.5 12.1c0-1.25-1.02-2.27-2.27-2.27-.61 0-1.16.24-1.57.63-1.4-.9-3.28-1.48-5.35-1.56l.9-4.23 2.94.62a1.6 1.6 0 1 0 .25-1.18l-3.53-.75a.6.6 0 0 0-.71.46l-1.08 5.08c-2.14.06-4.08.64-5.52 1.56a2.26 2.26 0 0 0-1.57-.63 2.27 2.27 0 0 0-.99 4.31c-.03.2-.05.41-.05.62 0 3.24 4.03 5.87 9 5.87s9-2.63 9-5.87c0-.21-.02-.42-.05-.62a2.27 2.27 0 0 0 .6-2.04ZM7.88 13.64a1.35 1.35 0 1 1 2.7 0 1.35 1.35 0 0 1-2.7 0Zm7.35 3.69c-.94.94-2.74 1.01-3.28 1.01s-2.34-.07-3.28-1.01a.5.5 0 0 1 .71-.71c.59.59 1.85.72 2.57.72s1.98-.13 2.57-.72a.5.5 0 0 1 .71.71Zm-.06-2.34a1.35 1.35 0 1 1 0-2.7 1.35 1.35 0 0 1 0 2.7Z" />
+    </svg>
+  );
+}
+
+function PeerTubeIcon() {
+  return (
+    <svg class="w-6 h-6" fill="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+      <path d="M5 3v18l7-4.5V21l7-4.5L12 12l7-4.5L12 3v4.5L5 3Zm7 4.5L15.5 10 12 12V7.5ZM8 8.5 11.5 11 8 13.5v-5Zm4 4.5 3.5 2.5L12 18v-5Z" />
+    </svg>
+  );
+}
+
+function LemmyIcon() {
+  return (
+    <svg class="w-6 h-6" fill="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+      <path d="M12 2a7 7 0 0 1 7 7v2.1A5.5 5.5 0 0 1 16.5 22h-9A5.5 5.5 0 0 1 5 11.1V9a7 7 0 0 1 7-7Zm-3.5 9.5a1.5 1.5 0 1 0 0-3 1.5 1.5 0 0 0 0 3Zm7 0a1.5 1.5 0 1 0 0-3 1.5 1.5 0 0 0 0 3Zm-7.2 4.2a.75.75 0 0 0-.6 1.37A9.7 9.7 0 0 0 12 18a9.7 9.7 0 0 0 4.3-.93.75.75 0 1 0-.6-1.37c-.86.38-2.1.8-3.7.8s-2.84-.42-3.7-.8ZM6.9 4.2 4.7 2a1 1 0 0 0-1.4 1.4l2.2 2.2a7.02 7.02 0 0 1 1.4-1.4Zm10.2 0 2.2-2.2a1 1 0 1 1 1.4 1.4l-2.2 2.2a7.02 7.02 0 0 0-1.4-1.4Z" />
+    </svg>
+  );
+}
+
 const SOCIAL_LINKS = [
   { name: "GitHub", url: "https://github.com/evcraddock", icon: <GitHubIcon /> },
   {
@@ -413,6 +517,44 @@ const SOCIAL_LINKS = [
   { name: "YouTube", url: "https://youtube.com/@ErikCraddock", icon: <YouTubeIcon /> },
   { name: "RSS", url: "/feed.xml", icon: <RssIcon /> },
 ];
+
+function getSocialAccountIcon(account: PersonSocialAccount) {
+  switch (account.label.trim().toLowerCase()) {
+    case "github":
+      return <GitHubIcon />;
+    case "linkedin":
+      return <LinkedInIcon />;
+    case "facebook":
+      return <FacebookIcon />;
+    case "youtube":
+      return <YouTubeIcon />;
+    case "rss":
+      return <RssIcon />;
+    case "mastodon":
+      return <MastodonIcon />;
+    case "bluesky":
+      return <BlueskyIcon />;
+    case "twitter":
+    case "x":
+      return <TwitterIcon />;
+    case "substack":
+      return <SubstackIcon />;
+    case "instagram":
+      return <InstagramIcon />;
+    case "tiktok":
+    case "tik tok":
+      return <TikTokIcon />;
+    case "reddit":
+      return <RedditIcon />;
+    case "peertube":
+    case "peer tube":
+      return <PeerTubeIcon />;
+    case "lemmy":
+      return <LemmyIcon />;
+    default:
+      return <span class="text-sm font-semibold">{account.label.slice(0, 2).toUpperCase()}</span>;
+  }
+}
 
 /** Hero section with bio, social links, and logo */
 function HeroSection() {
@@ -1220,6 +1362,15 @@ function getSourceWithAuthors(db: Database, sourceId: number): SourceWithAuthors
 
 function getPerson(db: Database, personId: number): Person | null {
   return db.select().from(people).where(eq(people.id, personId)).get() ?? null;
+}
+
+function getPersonSocialAccounts(db: Database, personId: number): PersonSocialAccount[] {
+  return db
+    .select()
+    .from(personSocialAccounts)
+    .where(eq(personSocialAccounts.person_id, personId))
+    .orderBy(asc(personSocialAccounts.sort_order), asc(personSocialAccounts.id))
+    .all();
 }
 
 function getSourcesAuthoredByPerson(db: Database, personId: number): Source[] {
@@ -2129,6 +2280,7 @@ export function createPagesRoutes(db: Database): Hono {
     }
 
     const authoredSources = getSourcesAuthoredByPerson(db, person.id);
+    const socialAccounts = getPersonSocialAccounts(db, person.id);
     const personLinks: PostWithSource[] = db
       .select({
         post: posts,
@@ -2147,7 +2299,12 @@ export function createPagesRoutes(db: Database): Hono {
       <Layout title={`${person.name} | erikcraddock.me`} description={person.url ?? undefined}>
         <div class="mx-auto grid max-w-6xl gap-6 lg:grid-cols-[20rem_minmax(0,42rem)] lg:items-start lg:justify-center">
           <aside class="lg:sticky lg:top-24">
-            <PersonCard person={person} titleLink="website" authoredSources={authoredSources} />
+            <PersonCard
+              person={person}
+              titleLink="website"
+              authoredSources={authoredSources}
+              socialAccounts={socialAccounts}
+            />
           </aside>
           <div class="overflow-hidden border-x border-gray-200 bg-white dark:border-gray-800 dark:bg-gray-900 sm:rounded-2xl sm:border">
             <header class="border-b border-gray-200 bg-white/90 px-4 py-4 backdrop-blur dark:border-gray-800 dark:bg-gray-900/90 sm:px-6">

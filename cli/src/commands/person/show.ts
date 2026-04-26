@@ -42,6 +42,14 @@ function formatPerson(person: Person): void {
   console.log(`ID:   ${person.id}`);
   console.log(`Name: ${person.name}`);
   console.log(`URL:  ${person.url || "-"}`);
+
+  if (person.social_accounts.length > 0) {
+    console.log("Social accounts:");
+    for (const account of person.social_accounts) {
+      const activityPub = account.is_activitypub ? " (ActivityPub)" : "";
+      console.log(`  - ${account.label}: ${account.url}${activityPub}`);
+    }
+  }
 }
 
 export async function show(args: string[], globalOptions: GlobalOptions): Promise<void> {

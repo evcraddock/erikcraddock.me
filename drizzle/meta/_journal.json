@@ -71,6 +71,13 @@
       "when": 1777163674440,
       "tag": "0009_known_absorbing_man",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "6",
+      "when": 1777225658548,
+      "tag": "0010_narrow_mephistopheles",
+      "breakpoints": true
     }
   ]
 }

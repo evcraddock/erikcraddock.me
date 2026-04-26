@@ -2,13 +2,20 @@ import type { GlobalOptions } from "../../types";
 import { ApiClient } from "../../lib/api";
 import { loadConfig } from "../../lib/config";
 
+interface SocialAccountOption {
+  label: string;
+  url: string;
+  is_activitypub?: boolean;
+}
+
 interface CreateOptions {
   name?: string;
   url?: string | null;
+  socialAccounts: SocialAccountOption[];
 }
 
 function parseCreateArgs(args: string[]): { options: CreateOptions; help: boolean } {
-  const options: CreateOptions = {};
+  const options: CreateOptions = { socialAccounts: [] };
   let help = false;
 
   let i = 0;
@@ -25,12 +32,31 @@ function parseCreateArgs(args: string[]): { options: CreateOptions; help: boolea
       options.url = args[++i];
     } else if (arg.startsWith("--url=")) {
       options.url = arg.split("=").slice(1).join("=");
+    } else if (arg === "--social" && args[i + 1]) {
+      const parsed = parseSocialAccount(args[++i]);
+      if (parsed) options.socialAccounts.push(parsed);
+    } else if (arg.startsWith("--social=")) {
+      const parsed = parseSocialAccount(arg.split("=").slice(1).join("="));
+      if (parsed) options.socialAccounts.push(parsed);
     }
 
     i++;
   }
 
   return { options, help };
+}
+
+function parseSocialAccount(input: string): SocialAccountOption | null {
+  const [label, url, flag] = input.split("|").map((part) => part.trim());
+  if (!label || !url) {
+    return null;
+  }
+
+  return {
+    label,
+    url,
+    is_activitypub: flag === "activitypub" || flag === "ap" || flag === "true",
+  };
 }
 
 function showCreateHelp(): void {
@@ -43,12 +69,14 @@ Required:
 
 Options:
   --url <url>         Person URL (optional)
+  --social <account>  Social account as "label|url|activitypub" (can be repeated)
   --json              Output as JSON
   --help, -h          Show this help message
 
 Examples:
   ec person create --name "Ethan Mollick"
   ec person create --name "Simon Willison" --url "https://simonwillison.net/"
+  ec person create --name "Example" --social "Mastodon|https://example.social/@person|activitypub"
 `);
 }
 
@@ -79,6 +107,7 @@ export async function create(args: string[], globalOptions: GlobalOptions): Prom
   const result = await client.createPerson({
     name: options.name.trim(),
     url: options.url?.trim() || null,
+    social_accounts: options.socialAccounts,
   });
 
   if (result.error) {

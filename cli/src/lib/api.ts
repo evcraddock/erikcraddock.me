@@ -182,13 +182,21 @@ export class ApiClient {
     return this.request<Person>("GET", `/people/${id}`);
   }
 
-  async createPerson(data: { name: string; url?: string | null }): Promise<ApiResponse<Person>> {
+  async createPerson(data: {
+    name: string;
+    url?: string | null;
+    social_accounts?: Array<{ label: string; url: string; is_activitypub?: boolean }>;
+  }): Promise<ApiResponse<Person>> {
     return this.request<Person>("POST", "/people", data);
   }
 
   async updatePerson(
     id: number,
-    data: { name?: string; url?: string | null }
+    data: {
+      name?: string;
+      url?: string | null;
+      social_accounts?: Array<{ label: string; url: string; is_activitypub?: boolean }>;
+    }
   ): Promise<ApiResponse<Person>> {
     return this.request<Person>("PUT", `/people/${id}`, data);
   }

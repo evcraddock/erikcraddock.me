@@ -36,10 +36,20 @@ export interface PostListItem {
   tags: string[];
 }
 
+export interface PersonSocialAccount {
+  id: number;
+  person_id: number;
+  label: string;
+  url: string;
+  is_activitypub: boolean;
+  sort_order: number;
+}
+
 export interface Person {
   id: number;
   name: string;
   url: string | null;
+  social_accounts: PersonSocialAccount[];
 }
 
 export interface Post {
