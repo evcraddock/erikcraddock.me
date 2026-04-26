@@ -13,6 +13,7 @@ export interface PostFrontmatter {
   type?: string;
   url?: string;
   source?: string;
+  author?: string;
   date?: string; // For imports - original publish date
 }
 
@@ -163,6 +164,9 @@ export function generateMarkdown(frontmatter: PostFrontmatter, content: string):
   }
   if (frontmatter.source) {
     lines.push(`source: ${frontmatter.source}`);
+  }
+  if (frontmatter.author) {
+    lines.push(`author: ${frontmatter.author}`);
   }
   if (frontmatter.status) {
     lines.push(`status: ${frontmatter.status}`);

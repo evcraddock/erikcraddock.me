@@ -29,7 +29,17 @@ export interface PostListItem {
   title: string | null;
   excerpt: string | null;
   published_at: string | null;
+  source_id: number | null;
+  author_id: number | null;
+  source: Source | null;
+  author: Person | null;
   tags: string[];
+}
+
+export interface Person {
+  id: number;
+  name: string;
+  url: string | null;
 }
 
 export interface Post {
@@ -41,6 +51,9 @@ export interface Post {
   excerpt: string | null;
   url: string | null;
   source_id: number | null;
+  source: Source | null;
+  author_id: number | null;
+  author: Person | null;
   published_at: string | null;
   created_at: string;
   updated_at: string;

@@ -1,0 +1,1 @@
+ALTER TABLE `posts` ADD `author_id` integer REFERENCES people(id);

@@ -84,6 +84,7 @@ export class ApiClient {
     excerpt?: string;
     url?: string;
     source_id?: number;
+    author_id?: number;
     tags?: string[];
     banner_image_id?: number;
     published_at?: string; // ISO date string for imports
@@ -99,6 +100,7 @@ export class ApiClient {
       excerpt?: string;
       url?: string;
       source_id?: number;
+      author_id?: number | null;
       tags?: string[];
       banner_image_id?: number;
     }

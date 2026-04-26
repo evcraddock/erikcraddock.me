@@ -14,6 +14,7 @@ export const posts = sqliteTable("posts", {
   og_image_url: text("og_image_url"),
   og_site_name: text("og_site_name"),
   source_id: integer("source_id").references(() => sources.id),
+  author_id: integer("author_id").references(() => people.id, { onDelete: "set null" }),
   banner_image_id: integer("banner_image_id").references(() => media.id, { onDelete: "set null" }),
   published_at: integer("published_at", { mode: "timestamp" }),
   created_at: integer("created_at", { mode: "timestamp" }).notNull(),

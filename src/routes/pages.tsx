@@ -29,6 +29,7 @@ type Database = typeof defaultDb;
 // Post type for the card component (with optional source)
 type Post = typeof posts.$inferSelect;
 type Source = typeof sources.$inferSelect;
+type Person = typeof people.$inferSelect;
 type SourceAuthor = {
   id: number;
   name: string;
@@ -37,7 +38,7 @@ type SourceAuthor = {
 };
 type SourceWithAuthors = Source & { authors: SourceAuthor[] };
 type Tag = { id: number; name: string; slug: string };
-type PostWithSource = Post & { source?: Source | null };
+type PostWithSource = Post & { source?: Source | null; author?: Person | null };
 
 /** Max length for showing full note content inline */
 const NOTE_INLINE_MAX_LENGTH = 280;
@@ -707,6 +708,12 @@ function FeedPostMeta({ post, tags: postTags }: { post: PostWithSource; tags: Ta
       <time>{formattedDate}</time>
       <span aria-hidden="true">·</span>
       <span class="capitalize">{post.type}</span>
+      {post.author && (
+        <>
+          <span aria-hidden="true">·</span>
+          <span>by {post.author.name}</span>
+        </>
+      )}
       {post.source && (
         <>
           <span aria-hidden="true">·</span>
@@ -904,6 +911,9 @@ function PostCard({ post, tags: postTags = [] }: { post: PostWithSource; tags?: 
                 })
               : "Draft"}
           </time>
+
+          {/* Author attribution for link posts */}
+          {isLink && post.author && <span class="ml-2">• by {post.author.name}</span>}
 
           {/* Source attribution for link posts */}
           {isLink && post.source && (
@@ -1270,9 +1280,11 @@ export function createPagesRoutes(db: Database): Hono {
       .select({
         post: posts,
         source: sources,
+        author: people,
       })
       .from(posts)
       .leftJoin(sources, eq(posts.source_id, sources.id))
+      .leftJoin(people, eq(posts.author_id, people.id))
       .where(isNotNull(posts.published_at))
       .orderBy(desc(posts.published_at))
       .limit(FEED_POSTS_PER_PAGE)
@@ -1282,6 +1294,7 @@ export function createPagesRoutes(db: Database): Hono {
     const pagePosts: PostWithSource[] = results.map((row) => ({
       ...row.post,
       source: row.source,
+      author: row.author,
     }));
 
     // Fetch tags for all displayed posts
@@ -1619,14 +1632,18 @@ export function createPagesRoutes(db: Database): Hono {
     }
 
     const sourceLinks: PostWithSource[] = db
-      .select()
+      .select({
+        post: posts,
+        author: people,
+      })
       .from(posts)
+      .leftJoin(people, eq(posts.author_id, people.id))
       .where(
         and(eq(posts.source_id, source.id), eq(posts.type, "link"), isNotNull(posts.published_at))
       )
       .orderBy(desc(posts.published_at))
       .all()
-      .map((post) => ({ ...post, source }));
+      .map((row) => ({ ...row.post, source, author: row.author }));
 
     return c.html(
       <Layout
@@ -1731,9 +1748,11 @@ export function createPagesRoutes(db: Database): Hono {
       .select({
         post: posts,
         source: sources,
+        author: people,
       })
       .from(posts)
       .leftJoin(sources, eq(posts.source_id, sources.id))
+      .leftJoin(people, eq(posts.author_id, people.id))
       .where(eq(posts.slug, slug))
       .get();
 
@@ -1746,6 +1765,7 @@ export function createPagesRoutes(db: Database): Hono {
 
     let post = result.post;
     const source = result.source;
+    const author = result.author;
     const isLink = post.type === "link";
     const isNote = post.type === "note";
 
@@ -1811,7 +1831,7 @@ export function createPagesRoutes(db: Database): Hono {
       .all().length;
     const followerCount = db.select().from(followers).all().length;
     const followingCount = 0;
-    const feedPost: PostWithSource = { ...post, source };
+    const feedPost: PostWithSource = { ...post, source, author };
 
     return c.html(
       <Layout
@@ -1899,10 +1919,12 @@ export function createPagesRoutes(db: Database): Hono {
       .select({
         post: posts,
         source: sources,
+        author: people,
       })
       .from(posts)
       .innerJoin(postTags, eq(posts.id, postTags.post_id))
       .leftJoin(sources, eq(posts.source_id, sources.id))
+      .leftJoin(people, eq(posts.author_id, people.id))
       .where(and(eq(postTags.tag_id, tag.id), isNotNull(posts.published_at)))
       .orderBy(desc(posts.published_at))
       .all();
@@ -1911,6 +1933,7 @@ export function createPagesRoutes(db: Database): Hono {
     const taggedPosts: PostWithSource[] = results.map((row) => ({
       ...row.post,
       source: row.source,
+      author: row.author,
     }));
 
     // Fetch all tags for the displayed posts

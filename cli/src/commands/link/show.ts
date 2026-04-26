@@ -35,6 +35,12 @@ function formatLink(post: Post): void {
   }
   console.log(`Slug:      ${post.slug}`);
   console.log(`Status:    ${status}`);
+  if (post.author) {
+    console.log(`Author:    ${post.author.name}`);
+  }
+  if (post.source) {
+    console.log(`Source:    ${post.source.name}`);
+  }
   console.log(`Created:   ${formatDate(post.created_at)}`);
   console.log(`Updated:   ${formatDate(post.updated_at)}`);
   if (post.published_at) {

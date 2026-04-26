@@ -96,14 +96,17 @@ const ApiPingSchema = z
   })
   .openapi("ApiPing");
 
-const SourceAuthorSchema = z
+const PersonSchema = z
   .object({
     id: z.number().int().openapi({ example: 1 }),
     name: z.string().openapi({ example: "Paul Graham" }),
     url: NullableStringSchema.openapi({ example: "https://paulgraham.com" }),
-    sort_order: z.number().int().openapi({ example: 0 }),
   })
-  .openapi("SourceAuthor");
+  .openapi("Person");
+
+const SourceAuthorSchema = PersonSchema.extend({
+  sort_order: z.number().int().openapi({ example: 0 }),
+}).openapi("SourceAuthor");
 
 const SourceSummarySchema = z
   .object({
@@ -152,6 +155,10 @@ const PostListItemSchema = z
     title: NullableStringSchema,
     excerpt: NullableStringSchema,
     published_at: IsoDateTimeSchema.nullable(),
+    source_id: z.number().int().nullable(),
+    author_id: z.number().int().nullable(),
+    source: SourceSummarySchema.nullable(),
+    author: PersonSchema.nullable(),
     tags: z.array(z.string()).openapi({ example: ["Tech", "Writing"] }),
   })
   .openapi("PostListItem");
@@ -170,9 +177,11 @@ const PostSchema = z
     og_image_url: NullableStringSchema,
     og_site_name: NullableStringSchema,
     source_id: z.number().int().nullable(),
+    author_id: z.number().int().nullable(),
     banner_image_id: z.number().int().nullable(),
     banner_url: NullableStringSchema,
     source: SourceSummarySchema.nullable(),
+    author: PersonSchema.nullable(),
     published_at: IsoDateTimeSchema.nullable(),
     created_at: IsoDateTimeSchema,
     updated_at: IsoDateTimeSchema,
@@ -228,6 +237,7 @@ const CreatePostBodySchema = z
     excerpt: z.string().optional().nullable(),
     url: z.string().optional().nullable(),
     source_id: z.number().int().optional().nullable(),
+    author_id: z.number().int().optional().nullable(),
     tags: z.array(z.string()).optional(),
     banner_image_id: z.number().int().optional().nullable(),
     published_at: z.string().optional().nullable().openapi({ example: "2024-03-15T10:30:00Z" }),
@@ -241,6 +251,7 @@ const UpdatePostBodySchema = z
     excerpt: z.string().optional().nullable(),
     url: z.string().optional().nullable(),
     source_id: z.number().int().optional().nullable(),
+    author_id: z.number().int().optional().nullable(),
     tags: z.array(z.string()).optional(),
     banner_image_id: z.number().int().optional().nullable(),
   })
@@ -427,6 +438,7 @@ function hasFederatedPostChanges(
     excerpt: string | null;
     url: string | null;
     source_id: number | null;
+    author_id: number | null;
     banner_image_id: number | null;
   },
   input: {
@@ -435,6 +447,7 @@ function hasFederatedPostChanges(
     excerpt?: string | null;
     url?: string | null;
     source_id?: number | null;
+    author_id?: number | null;
     tags?: string[];
     banner_image_id?: number | null;
   }
@@ -456,6 +469,10 @@ function hasFederatedPostChanges(
   }
 
   if (input.source_id !== undefined && input.source_id !== existingPost.source_id) {
+    return true;
+  }
+
+  if (input.author_id !== undefined && input.author_id !== existingPost.author_id) {
     return true;
   }
 
@@ -601,6 +618,7 @@ registerProtectedRoute(
       excerpt,
       url,
       source_id,
+      author_id,
       tags,
       banner_image_id,
       published_at,
@@ -658,6 +676,10 @@ registerProtectedRoute(
       return c.json({ error: "source_id must be a number" }, 400);
     }
 
+    if (author_id !== undefined && author_id !== null && typeof author_id !== "number") {
+      return c.json({ error: "author_id must be a number" }, 400);
+    }
+
     let publishedAtDate: Date | null = null;
     if (published_at !== undefined && published_at !== null) {
       if (typeof published_at !== "string") {
@@ -684,6 +706,7 @@ registerProtectedRoute(
         og_image_url: linkPreview?.og_image_url,
         og_site_name: linkPreview?.og_site_name,
         source_id: source_id ?? null,
+        author_id: author_id ?? null,
         tags: tags || [],
         banner_image_id: banner_image_id ?? null,
         published_at: publishedAtDate,
@@ -780,7 +803,7 @@ registerProtectedRoute(
     }
 
     const body = await c.req.json();
-    const { title, content, excerpt, url, source_id, tags, banner_image_id } = body;
+    const { title, content, excerpt, url, source_id, author_id, tags, banner_image_id } = body;
 
     if (tags !== undefined && !Array.isArray(tags)) {
       return c.json({ error: "Tags must be an array" }, 400);
@@ -798,6 +821,10 @@ registerProtectedRoute(
       return c.json({ error: "source_id must be a number" }, 400);
     }
 
+    if (author_id !== undefined && author_id !== null && typeof author_id !== "number") {
+      return c.json({ error: "author_id must be a number" }, 400);
+    }
+
     try {
       const existingPost = getPost(id);
       if (!existingPost) {
@@ -810,6 +837,7 @@ registerProtectedRoute(
         excerpt,
         url,
         source_id,
+        author_id,
         tags,
         banner_image_id,
       });
@@ -844,6 +872,7 @@ registerProtectedRoute(
             ? (linkPreview?.og_site_name ?? null)
             : undefined,
         source_id,
+        author_id,
         tags,
         banner_image_id,
       });
@@ -1095,7 +1124,7 @@ registerProtectedRoute(
     }
 
     const body = await c.req.json();
-    const { title, content, excerpt, url, source_id, tags, banner_image_id } = body;
+    const { title, content, excerpt, url, source_id, author_id, tags, banner_image_id } = body;
 
     if (tags !== undefined && !Array.isArray(tags)) {
       return c.json({ error: "Tags must be an array" }, 400);
@@ -1113,6 +1142,10 @@ registerProtectedRoute(
       return c.json({ error: "source_id must be a number" }, 400);
     }
 
+    if (author_id !== undefined && author_id !== null && typeof author_id !== "number") {
+      return c.json({ error: "author_id must be a number" }, 400);
+    }
+
     try {
       const shouldFederateUpdate = hasFederatedPostChanges(existingPost, {
         title,
@@ -1120,6 +1153,7 @@ registerProtectedRoute(
         excerpt,
         url,
         source_id,
+        author_id,
         tags,
         banner_image_id,
       });
@@ -1150,6 +1184,7 @@ registerProtectedRoute(
             ? (linkPreview?.og_site_name ?? null)
             : undefined,
         source_id,
+        author_id,
         tags,
         banner_image_id,
       });
