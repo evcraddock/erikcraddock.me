@@ -608,6 +608,93 @@ describe("pages routes", () => {
       expect(html).toContain("dark:text-gray-100");
       expect(html).toContain("dark:text-teal-400");
     });
+
+    it("shows an auto-submitting search form for recommended sites", async () => {
+      const app = getApp();
+      const res = await app.request("/sources");
+      const html = await res.text();
+
+      expect(html).toContain('action="/sources"');
+      expect(html).toContain('name="q"');
+      expect(html).toContain('data-autosubmit-search="true"');
+      expect(html).toContain("autofocus");
+      expect(html).toContain('data-sources-results="true"');
+      expect(html).toContain("input.focus()");
+      expect(html).toContain("fetch(url");
+      expect(html).toContain("Search recommended sites");
+    });
+
+    it("filters recommended sites by search query", async () => {
+      const app = getApp();
+      const res = await app.request("/sources?q=Another");
+      const html = await res.text();
+
+      expect(html).toContain("Another Site");
+      expect(html).not.toContain("Test Blog");
+      expect(html).toContain("matching “Another”");
+    });
+
+    it("searches source authors", async () => {
+      const app = getApp();
+      const res = await app.request("/sources?q=Carol");
+      const html = await res.text();
+
+      expect(html).toContain("Group Blog");
+      expect(html).not.toContain("Test Blog");
+    });
+
+    it("paginates recommended sites", async () => {
+      const manySourcesDb = createTestDb();
+      for (let i = 1; i <= 25; i++) {
+        manySourcesDb
+          .insert(sources)
+          .values({
+            id: i,
+            name: `Source ${String(i).padStart(2, "0")}`,
+            url: `https://source-${i}.example.com`,
+          })
+          .run();
+      }
+      const app = createPagesRoutes(
+        manySourcesDb as unknown as Parameters<typeof createPagesRoutes>[0]
+      );
+
+      const pageOne = await app.request("/sources");
+      const pageOneHtml = await pageOne.text();
+      expect(pageOneHtml).toContain("Source 01");
+      expect(pageOneHtml).toContain("Source 24");
+      expect(pageOneHtml).not.toContain("Source 25");
+      expect(pageOneHtml).toContain("Page 1 of 2");
+      expect(pageOneHtml).toContain('href="/sources?page=2"');
+
+      const pageTwo = await app.request("/sources?page=2");
+      const pageTwoHtml = await pageTwo.text();
+      expect(pageTwoHtml).toContain("Source 25");
+      expect(pageTwoHtml).not.toContain("Source 01");
+      expect(pageTwoHtml).toContain("Page 2 of 2");
+    });
+
+    it("keeps search query in pagination links", async () => {
+      const manySourcesDb = createTestDb();
+      for (let i = 1; i <= 25; i++) {
+        manySourcesDb
+          .insert(sources)
+          .values({
+            id: i,
+            name: `Searchable Source ${String(i).padStart(2, "0")}`,
+            url: `https://searchable-${i}.example.com`,
+          })
+          .run();
+      }
+      const app = createPagesRoutes(
+        manySourcesDb as unknown as Parameters<typeof createPagesRoutes>[0]
+      );
+
+      const res = await app.request("/sources?q=Searchable");
+      const html = await res.text();
+
+      expect(html).toContain('href="/sources?q=Searchable&amp;page=2"');
+    });
   });
 
   describe("GET /sources/:id", () => {
