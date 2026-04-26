@@ -42,6 +42,7 @@ type PostWithSource = Post & { source?: Source | null; author?: Person | null };
 
 /** Max length for showing full note content inline */
 const NOTE_INLINE_MAX_LENGTH = 280;
+const SOURCES_PER_PAGE = 24;
 const ACTOR_HANDLE = "@erik@erikcraddock.me";
 const ACTOR_URI = new URL("/users/erik", baseUrl).toString();
 const WEBFINGER_SUBSCRIBE_REL = "http://ostatus.org/schema/1.0/subscribe";
@@ -495,20 +496,37 @@ function ArticleCardsSection({
 }
 
 /** Pagination component */
+function buildPaginationUrl(
+  baseUrl: string,
+  page: number,
+  queryParams: Record<string, string | undefined> = {}
+): string {
+  const params = new URLSearchParams();
+  for (const [key, value] of Object.entries(queryParams)) {
+    if (value) params.set(key, value);
+  }
+  if (page > 1) params.set("page", String(page));
+  const query = params.toString();
+  return query ? `${baseUrl}?${query}` : baseUrl;
+}
+
 function Pagination({
   currentPage,
   totalPages,
   baseUrl,
+  queryParams = {},
 }: {
   currentPage: number;
   totalPages: number;
   baseUrl: string;
+  queryParams?: Record<string, string | undefined>;
 }) {
-  const prevUrl = currentPage > 1 ? `${baseUrl}?page=${currentPage - 1}` : null;
-  const nextUrl = currentPage < totalPages ? `${baseUrl}?page=${currentPage + 1}` : null;
+  const prevUrl =
+    currentPage > 1 ? buildPaginationUrl(baseUrl, currentPage - 1, queryParams) : null;
+  const nextUrl =
+    currentPage < totalPages ? buildPaginationUrl(baseUrl, currentPage + 1, queryParams) : null;
 
-  // Clean up URL for page 1 (no query param needed)
-  const cleanPrevUrl = currentPage === 2 ? baseUrl : prevUrl;
+  const cleanPrevUrl = prevUrl;
 
   return (
     <div class="flex flex-col items-center gap-4 mt-8">
@@ -554,6 +572,28 @@ function Pagination({
       </div>
     </div>
   );
+}
+
+function sourceMatchesSearch(source: SourceWithAuthors, query: string): boolean {
+  const normalizedQuery = query.toLowerCase();
+  const searchableText = [
+    source.name,
+    source.url,
+    source.feed_url,
+    source.preview_title,
+    source.preview_description,
+    source.preview_site_name,
+    ...source.authors.map((author) => author.name),
+  ]
+    .filter(Boolean)
+    .join(" ")
+    .toLowerCase();
+
+  return searchableText.includes(normalizedQuery);
+}
+
+function sourcesUrl(page: number, query: string): string {
+  return buildPaginationUrl("/sources", page, { q: query || undefined });
 }
 
 function FeedActorAvatar({ className = "" }: { className?: string }) {
@@ -1547,6 +1587,14 @@ export function createPagesRoutes(db: Database): Hono {
 
   // Sources / Blogroll page
   pages.get("/sources", (c) => {
+    const pageParam = c.req.query("page");
+    const page = pageParam ? parseInt(pageParam, 10) : 1;
+    const searchQuery = (c.req.query("q") ?? "").trim();
+
+    if (isNaN(page) || page < 1) {
+      return c.redirect(sourcesUrl(1, searchQuery));
+    }
+
     const allSourceRows = db.select().from(sources).orderBy(sources.name).all();
     const allSourceAuthors = db
       .select({
@@ -1577,6 +1625,17 @@ export function createPagesRoutes(db: Database): Hono {
       ...source,
       authors: authorsBySourceId.get(source.id) ?? [],
     }));
+    const filteredSources = searchQuery
+      ? allSources.filter((source) => sourceMatchesSearch(source, searchQuery))
+      : allSources;
+    const totalPages = Math.max(1, Math.ceil(filteredSources.length / SOURCES_PER_PAGE));
+
+    if (page > totalPages) {
+      return c.redirect(sourcesUrl(totalPages, searchQuery));
+    }
+
+    const offset = (page - 1) * SOURCES_PER_PAGE;
+    const pageSources = filteredSources.slice(offset, offset + SOURCES_PER_PAGE);
 
     return c.html(
       <Layout title="Recommended Sites | erikcraddock.me">
@@ -1589,17 +1648,115 @@ export function createPagesRoutes(db: Database): Hono {
             </p>
           </div>
 
-          {allSources.length === 0 ? (
-            <div class="rounded-2xl border border-gray-200 bg-white px-4 py-10 text-center text-gray-600 dark:border-gray-800 dark:bg-gray-900 dark:text-gray-400 sm:px-6">
-              No sources yet.
-            </div>
-          ) : (
-            <div class="grid gap-5 md:grid-cols-2 lg:grid-cols-3">
-              {allSources.map((source) => (
-                <SourceCard key={source.id} source={source} />
-              ))}
-            </div>
-          )}
+          <form
+            action="/sources"
+            method="get"
+            data-autosubmit-search="true"
+            class="mb-6 flex flex-col gap-3 sm:flex-row"
+          >
+            <label class="sr-only" for="source-search">
+              Search recommended sites
+            </label>
+            <input
+              id="source-search"
+              type="search"
+              name="q"
+              value={searchQuery}
+              placeholder="Search recommended sites"
+              autocomplete="off"
+              autofocus
+              class="min-w-0 flex-1 rounded-xl border border-gray-300 bg-white px-4 py-3 text-gray-950 shadow-sm focus:border-teal-500 focus:outline-none focus:ring-2 focus:ring-teal-500/20 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-50"
+            />
+            <button
+              type="submit"
+              class="rounded-xl bg-teal-600 px-5 py-3 font-semibold text-white transition hover:bg-teal-700 sm:sr-only"
+            >
+              Search
+            </button>
+          </form>
+          <script
+            dangerouslySetInnerHTML={{
+              __html: `
+                (() => {
+                  const form = document.querySelector('[data-autosubmit-search="true"]');
+                  const input = form?.querySelector('input[name="q"]');
+                  if (!form || !input) return;
+
+                  input.focus();
+                  const valueLength = input.value.length;
+                  input.setSelectionRange(valueLength, valueLength);
+
+                  let timeout;
+                  let controller;
+
+                  const updateResults = async () => {
+                    const query = input.value.trim();
+                    const url = query ? '/sources?q=' + encodeURIComponent(query) : '/sources';
+                    controller?.abort();
+                    controller = new AbortController();
+
+                    try {
+                      const response = await fetch(url, { signal: controller.signal });
+                      if (!response.ok) return;
+                      const html = await response.text();
+                      const doc = new DOMParser().parseFromString(html, 'text/html');
+                      const results = document.querySelector('[data-sources-results="true"]');
+                      const nextResults = doc.querySelector('[data-sources-results="true"]');
+                      if (!results || !nextResults) return;
+                      results.innerHTML = nextResults.innerHTML;
+                      history.replaceState(null, '', url);
+                    } catch (error) {
+                      if (error.name !== 'AbortError') console.error(error);
+                    }
+                  };
+
+                  form.addEventListener('submit', (event) => {
+                    event.preventDefault();
+                    clearTimeout(timeout);
+                    updateResults();
+                  });
+
+                  input.addEventListener('input', () => {
+                    clearTimeout(timeout);
+                    timeout = setTimeout(updateResults, 300);
+                  });
+                })();
+              `,
+            }}
+          />
+
+          <div data-sources-results="true">
+            {allSources.length === 0 ? (
+              <div class="rounded-2xl border border-gray-200 bg-white px-4 py-10 text-center text-gray-600 dark:border-gray-800 dark:bg-gray-900 dark:text-gray-400 sm:px-6">
+                No sources yet.
+              </div>
+            ) : filteredSources.length === 0 ? (
+              <div class="rounded-2xl border border-gray-200 bg-white px-4 py-10 text-center text-gray-600 dark:border-gray-800 dark:bg-gray-900 dark:text-gray-400 sm:px-6">
+                No recommended sites found for “{searchQuery}”.
+              </div>
+            ) : (
+              <>
+                <div class="mb-4 text-sm text-gray-600 dark:text-gray-400">
+                  Showing {offset + 1}–{Math.min(offset + SOURCES_PER_PAGE, filteredSources.length)}{" "}
+                  of {filteredSources.length} recommended sites
+                  {searchQuery ? ` matching “${searchQuery}”` : ""}.
+                </div>
+                <div class="grid gap-5 md:grid-cols-2 lg:grid-cols-3">
+                  {pageSources.map((source) => (
+                    <SourceCard key={source.id} source={source} />
+                  ))}
+                </div>
+                {totalPages > 1 ? (
+                  <Pagination
+                    currentPage={page}
+                    totalPages={totalPages}
+                    baseUrl="/sources"
+                    queryParams={{ q: searchQuery || undefined }}
+                  />
+                ) : null}
+              </>
+            )}
+          </div>
         </div>
       </Layout>
     );
