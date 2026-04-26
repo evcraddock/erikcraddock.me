@@ -81,7 +81,7 @@ testDb
       slug: "test-link",
       type: "link",
       title: "Test Link Post",
-      content: "This is commentary on an external link.",
+      content: "This is commentary on an external link.\n\n> Quoted shared link text.",
       url: "https://example.com/article",
       og_title: "Example Article",
       og_description: "A rich preview description.",
@@ -730,15 +730,19 @@ describe("pages routes", () => {
       expect(html).toContain('src="https://example.com/favicon.ico"');
     });
 
-    it("shows links from the selected source as preview links", async () => {
+    it("shows links from the selected source with full shared link content", async () => {
       const app = getApp();
       const res = await app.request("/sources/1");
       const html = await res.text();
 
+      expect(html).toContain("This is commentary on an external link.");
+      expect(html).toContain("Quoted shared link text.");
       expect(html).toContain('href="https://example.com/article"');
       expect(html).toContain("Example Article");
       expect(html).toContain("A rich preview description.");
       expect(html).toContain('src="https://example.com/preview.jpg"');
+      expect(html).toContain("by Test Author");
+      expect(html).toContain("via");
     });
 
     it("returns 404 for missing sources", async () => {
