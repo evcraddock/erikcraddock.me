@@ -648,15 +648,28 @@ function FeedProfileCard({
               <dd class="font-semibold text-gray-950 dark:text-gray-50">{postCount}</dd>
             </div>
           </dl>
-          <a
-            href="/sources"
-            class="mt-4 inline-flex rounded-full border border-teal-200 px-4 py-2 text-sm font-semibold text-teal-700 transition hover:bg-teal-50 dark:border-teal-900/60 dark:text-teal-300 dark:hover:bg-teal-950/30"
-          >
-            Recommended Sites
-          </a>
         </div>
       </div>
     </section>
+  );
+}
+
+function RecommendedSitesFeedCard() {
+  return (
+    <a
+      href="/sources"
+      class="group block border-b border-gray-200 bg-white p-5 transition hover:border-teal-200 hover:bg-teal-50/50 dark:border-gray-800 dark:bg-gray-900 dark:hover:border-teal-900/70 dark:hover:bg-teal-950/20 lg:mt-4 lg:rounded-2xl lg:border"
+    >
+      <h2 class="text-lg font-bold text-gray-950 group-hover:text-teal-700 dark:text-gray-50 dark:group-hover:text-teal-300">
+        Recommended Sites
+      </h2>
+      <p class="mt-2 text-sm leading-6 text-gray-600 dark:text-gray-400">
+        Browse the blogs, publications, and personal sites behind the links I share here.
+      </p>
+      <span class="mt-4 inline-flex text-sm font-semibold text-teal-700 dark:text-teal-300">
+        Explore sources →
+      </span>
+    </a>
   );
 }
 
@@ -1301,6 +1314,7 @@ export function createPagesRoutes(db: Database): Hono {
                 followingCount={followingCount}
                 postCount={totalPosts}
               />
+              <RecommendedSitesFeedCard />
             </aside>
             <div class="overflow-hidden border-x border-gray-200 bg-white dark:border-gray-800 dark:bg-gray-900 sm:rounded-2xl sm:border">
               <header class="border-b border-gray-200 bg-white/90 px-4 py-4 backdrop-blur dark:border-gray-800 dark:bg-gray-900/90 sm:px-6">
@@ -1399,6 +1413,7 @@ export function createPagesRoutes(db: Database): Hono {
               followingCount={followingCount}
               postCount={totalPosts}
             />
+            <RecommendedSitesFeedCard />
           </aside>
           <div class="overflow-hidden border-x border-gray-200 bg-white dark:border-gray-800 dark:bg-gray-900 sm:rounded-2xl sm:border">
             <header class="flex items-center justify-between gap-4 border-b border-gray-200 bg-white/90 px-4 py-4 backdrop-blur dark:border-gray-800 dark:bg-gray-900/90 sm:px-6">
