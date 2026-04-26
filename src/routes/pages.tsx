@@ -132,8 +132,17 @@ function formatAuthorByline(authors: SourceAuthor[]): string | null {
   return `${names.slice(0, -1).join(", ")}, and ${names[names.length - 1]}`;
 }
 
-function SourceCard({ source }: { source: SourceWithAuthors }) {
+function SourceCard({
+  source,
+  titleLink = "detail",
+}: {
+  source: SourceWithAuthors;
+  titleLink?: "detail" | "website";
+}) {
   const hostname = getLinkPreviewSiteLabel(source.url, null) ?? source.url;
+  const titleHref = titleLink === "website" ? source.url : `/sources/${source.id}`;
+  const titleExternalAttrs =
+    titleLink === "website" ? { target: "_blank", rel: "noopener noreferrer" } : {};
 
   return (
     <article class="flex h-full flex-col rounded-2xl border border-gray-200 bg-white p-5 shadow-sm transition-colors hover:border-teal-200 hover:bg-teal-50/40 dark:border-gray-800 dark:bg-gray-900 dark:hover:border-teal-900/60 dark:hover:bg-teal-950/20">
@@ -158,12 +167,20 @@ function SourceCard({ source }: { source: SourceWithAuthors }) {
         </a>
         <div class="min-w-0 flex-1">
           <a
-            href={`/sources/${source.id}`}
+            href={titleHref}
+            {...titleExternalAttrs}
             class="line-clamp-2 font-semibold text-gray-950 hover:text-teal-600 dark:text-gray-50 dark:hover:text-teal-400"
           >
             {source.name}
           </a>
-          <p class="mt-1 truncate text-sm text-gray-500 dark:text-gray-400">{hostname}</p>
+          <a
+            href={source.url}
+            target="_blank"
+            rel="noopener noreferrer"
+            class="mt-1 block truncate text-sm text-gray-500 hover:text-teal-600 dark:text-gray-400 dark:hover:text-teal-400"
+          >
+            {hostname}
+          </a>
         </div>
       </div>
 
@@ -1846,7 +1863,7 @@ export function createPagesRoutes(db: Database): Hono {
       >
         <div class="mx-auto grid max-w-6xl gap-6 lg:grid-cols-[20rem_minmax(0,42rem)] lg:items-start lg:justify-center">
           <aside class="lg:sticky lg:top-24">
-            <SourceCard source={source} />
+            <SourceCard source={source} titleLink="website" />
           </aside>
           <div class="overflow-hidden border-x border-gray-200 bg-white dark:border-gray-800 dark:bg-gray-900 sm:rounded-2xl sm:border">
             <header class="border-b border-gray-200 bg-white/90 px-4 py-4 backdrop-blur dark:border-gray-800 dark:bg-gray-900/90 sm:px-6">
