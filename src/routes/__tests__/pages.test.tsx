@@ -243,6 +243,28 @@ describe("pages routes", () => {
       expect(footer).not.toContain("Follow on the Fediverse");
     });
 
+    it("links the hero avatar to the about page", async () => {
+      const app = getApp();
+      const res = await app.request("/");
+      const html = await res.text();
+
+      expect(html).toContain('href="/about"');
+      expect(html).toContain('aria-label="About Erik Craddock"');
+      expect(html).toContain('alt="Erik Craddock"');
+    });
+
+    it("displays a latest updates feed teaser", async () => {
+      const app = getApp();
+      const res = await app.request("/");
+      const html = await res.text();
+
+      expect(html).toContain("Latest updates");
+      expect(html).toContain("Notes, Links &amp; Updates");
+      expect(html).toContain("Browse the full feed for shorter notes");
+      expect(html).toContain('href="/feed"');
+      expect(html).toContain("Open Feed");
+    });
+
     it("displays Recent Articles section", async () => {
       const app = getApp();
       const res = await app.request("/");
@@ -550,7 +572,7 @@ describe("pages routes", () => {
       expect(html.indexOf("Follow me")).toBeLessThan(html.indexOf("Recommended Sites"));
     });
 
-    it("shows articles and recommended sites in the feed sidebar", async () => {
+    it("shows articles below social media and above recommended sites in the feed sidebar", async () => {
       const app = getApp();
       const res = await app.request("/feed");
       const html = await res.text();
@@ -561,6 +583,8 @@ describe("pages routes", () => {
       expect(html).toContain("Explore Articles");
       expect(html).toContain('href="/sources"');
       expect(html).toContain("Recommended Sites");
+      expect(html.indexOf("Follow me")).toBeLessThan(html.indexOf("Articles"));
+      expect(html.indexOf("Articles")).toBeLessThan(html.indexOf("Recommended Sites"));
     });
 
     it("shows stored link previews in feed items", async () => {
@@ -1332,6 +1356,8 @@ describe("pages routes", () => {
       expect(html).toContain("Follow me");
       expect(html).toContain("Recommended Sites");
       expect(html).toContain("Explore sources");
+      expect(html.indexOf("Follow me")).toBeLessThan(html.indexOf("Articles"));
+      expect(html.indexOf("Articles")).toBeLessThan(html.indexOf("Recommended Sites"));
     });
   });
 

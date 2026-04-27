@@ -585,13 +585,17 @@ function HeroSection() {
       <div class="flex flex-col md:flex-row items-stretch gap-8">
         {/* Logo - shown first on mobile, second on desktop */}
         <div class="order-first md:order-last flex-shrink-0">
-          <div class="w-64 h-64 md:w-80 md:h-80 rounded-full overflow-hidden bg-gray-200 dark:bg-gray-700 border-4 border-gray-300 dark:border-gray-600 shadow-lg">
+          <a
+            href="/about"
+            class="block w-64 h-64 md:w-80 md:h-80 rounded-full overflow-hidden bg-gray-200 dark:bg-gray-700 border-4 border-gray-300 dark:border-gray-600 shadow-lg transition-transform hover:scale-[1.02] focus:outline-none focus:ring-2 focus:ring-teal-500 focus:ring-offset-4 dark:focus:ring-offset-gray-800"
+            aria-label="About Erik Craddock"
+          >
             <img
               src="/images/erik-logo.png"
               alt="Erik Craddock"
               class="w-full h-full object-cover"
             />
-          </div>
+          </a>
         </div>
 
         {/* Bio and social links */}
@@ -627,6 +631,40 @@ function HeroSection() {
             </div>
           </div>
         </div>
+      </div>
+    </section>
+  );
+}
+
+function HomeFeedTeaser() {
+  return (
+    <section class="mb-12 rounded-lg bg-white p-6 shadow-md dark:bg-gray-800 sm:p-8">
+      <div class="flex flex-col gap-5 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <p class="text-sm font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">
+            Latest updates
+          </p>
+          <h2 class="mt-2 text-2xl font-bold text-gray-900 dark:text-gray-100">
+            Notes, Links & Updates
+          </h2>
+          <p class="mt-2 max-w-2xl text-gray-600 dark:text-gray-400">
+            Browse the full feed for shorter notes, links worth sharing, and new articles.
+          </p>
+        </div>
+        <a
+          href="/feed"
+          class="inline-flex shrink-0 items-center justify-center gap-2 rounded-lg bg-teal-600 px-5 py-3 text-sm font-semibold text-white transition-colors hover:bg-teal-700 dark:bg-teal-500 dark:text-gray-950 dark:hover:bg-teal-400"
+        >
+          Open Feed
+          <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              stroke-width="2"
+              d="M9 5l7 7-7 7"
+            />
+          </svg>
+        </a>
       </div>
     </section>
   );
@@ -734,7 +772,7 @@ function ArticleCardsSection({
 
   return (
     <section class="mb-12">
-      <h2 class="text-2xl font-bold text-gray-900 dark:text-gray-100 mb-6">Recent Articles</h2>
+      <h2 class="mb-6 text-2xl font-bold text-gray-900 dark:text-gray-100">Recent Articles</h2>
 
       {/* Responsive grid: 1 col mobile, 2 tablet, 3 desktop */}
       <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -753,10 +791,10 @@ function ArticleCardsSection({
         <div class="mt-8 text-center">
           <a
             href="/articles"
-            class="inline-flex items-center gap-2 px-6 py-3 bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-lg transition-colors"
+            class="inline-flex items-center gap-2 rounded-lg bg-teal-600 px-5 py-3 text-sm font-semibold text-white transition-colors hover:bg-teal-700 dark:bg-teal-500 dark:text-gray-950 dark:hover:bg-teal-400"
           >
             More Articles
-            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path
                 stroke-linecap="round"
                 stroke-linejoin="round"
@@ -1511,6 +1549,7 @@ export function createPagesRoutes(db: Database): Hono {
     return c.html(
       <Layout title="Home | erikcraddock.me">
         <HeroSection />
+        <HomeFeedTeaser />
         <ArticleCardsSection
           articles={recentArticles}
           getBannerUrl={getBannerUrl}
@@ -1685,8 +1724,8 @@ export function createPagesRoutes(db: Database): Hono {
                 followingCount={followingCount}
                 postCount={totalPosts}
               />
-              <ArticlesFeedCard />
               <SocialMediaFeedCard />
+              <ArticlesFeedCard />
               <RecommendedSitesFeedCard />
             </aside>
             <div class="overflow-hidden border-x border-gray-200 bg-white dark:border-gray-800 dark:bg-gray-900 sm:rounded-2xl sm:border">
@@ -1786,8 +1825,8 @@ export function createPagesRoutes(db: Database): Hono {
               followingCount={followingCount}
               postCount={totalPosts}
             />
-            <ArticlesFeedCard />
             <SocialMediaFeedCard />
+            <ArticlesFeedCard />
             <RecommendedSitesFeedCard />
           </aside>
           <div class="overflow-hidden border-x border-gray-200 bg-white dark:border-gray-800 dark:bg-gray-900 sm:rounded-2xl sm:border">
@@ -2619,8 +2658,8 @@ export function createPagesRoutes(db: Database): Hono {
               followingCount={followingCount}
               postCount={totalPosts}
             />
-            <ArticlesFeedCard />
             <SocialMediaFeedCard />
+            <ArticlesFeedCard />
             <RecommendedSitesFeedCard />
           </aside>
           <div class="overflow-hidden border-x border-gray-200 bg-white dark:border-gray-800 dark:bg-gray-900 sm:rounded-2xl sm:border">
