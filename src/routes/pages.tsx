@@ -2517,6 +2517,7 @@ export function createPagesRoutes(db: Database): Hono {
     let post = result.post;
     const source = result.source;
     const author = result.author;
+    const isArticle = post.type === "article";
     const isLink = post.type === "link";
     const isNote = post.type === "note";
 
@@ -2591,14 +2592,22 @@ export function createPagesRoutes(db: Database): Hono {
         description={description}
         canonicalUrl={canonicalUrl}
       >
-        <div class="mx-auto grid max-w-6xl gap-6 lg:grid-cols-[20rem_minmax(0,42rem)] lg:items-start lg:justify-center">
-          <aside class="lg:sticky lg:top-24">
-            <FeedProfileCard
-              followerCount={followerCount}
-              followingCount={followingCount}
-              postCount={totalPosts}
-            />
-          </aside>
+        <div
+          class={
+            isArticle
+              ? "mx-auto max-w-3xl"
+              : "mx-auto grid max-w-6xl gap-6 lg:grid-cols-[20rem_minmax(0,42rem)] lg:items-start lg:justify-center"
+          }
+        >
+          {!isArticle && (
+            <aside class="lg:sticky lg:top-24">
+              <FeedProfileCard
+                followerCount={followerCount}
+                followingCount={followingCount}
+                postCount={totalPosts}
+              />
+            </aside>
+          )}
           <div class="overflow-hidden border-x border-gray-200 bg-white dark:border-gray-800 dark:bg-gray-900 sm:rounded-2xl sm:border">
             <header class="border-b border-gray-200 bg-white/90 px-4 py-4 backdrop-blur dark:border-gray-800 dark:bg-gray-900/90 sm:px-6">
               <a
