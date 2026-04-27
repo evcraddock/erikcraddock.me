@@ -8,6 +8,7 @@ import {
   postTags,
   sources,
   sourceAuthors,
+  sourceSocialAccounts,
   people,
   personSocialAccounts,
   media,
@@ -32,13 +33,21 @@ type Post = typeof posts.$inferSelect;
 type Source = typeof sources.$inferSelect;
 type Person = typeof people.$inferSelect;
 type PersonSocialAccount = typeof personSocialAccounts.$inferSelect;
+type SourceSocialAccount = typeof sourceSocialAccounts.$inferSelect;
+type SocialAccount = Pick<
+  PersonSocialAccount | SourceSocialAccount,
+  "id" | "label" | "url" | "avatar_url" | "is_activitypub" | "is_default"
+>;
 type SourceAuthor = {
   id: number;
   name: string;
   url: string | null;
   sort_order: number;
 };
-type SourceWithAuthors = Source & { authors: SourceAuthor[] };
+type SourceWithAuthors = Source & {
+  authors: SourceAuthor[];
+  social_accounts: SourceSocialAccount[];
+};
 type Tag = { id: number; name: string; slug: string };
 type PostWithSource = Post & { source?: Source | null; author?: Person | null };
 
@@ -172,7 +181,7 @@ function PersonCard({
   person: Person;
   titleLink?: "detail" | "website";
   authoredSources?: Source[];
-  socialAccounts?: PersonSocialAccount[];
+  socialAccounts?: SocialAccount[];
   showSocialAccounts?: boolean;
   showFollowButton?: boolean;
 }) {
@@ -345,6 +354,29 @@ function SourceCard({
         </p>
       ) : null}
 
+      {source.social_accounts.length > 0 ? (
+        <div class="mt-4 border-t border-gray-200 pt-4 dark:border-gray-800">
+          <h3 class="text-sm font-semibold text-gray-950 dark:text-gray-50">
+            Follow {source.name}
+          </h3>
+          <div class="mt-3 grid grid-cols-4 gap-2">
+            {source.social_accounts.map((account) => (
+              <a
+                key={account.id}
+                href={account.url}
+                target="_blank"
+                rel="noopener noreferrer"
+                aria-label={`${account.label}${account.is_activitypub ? " (ActivityPub)" : ""}`}
+                title={`${account.label}${account.is_activitypub ? " (ActivityPub)" : ""}`}
+                class="relative flex aspect-square items-center justify-center rounded-xl border border-gray-200 text-sm font-semibold text-gray-600 transition hover:border-teal-200 hover:bg-teal-50 hover:text-teal-700 dark:border-gray-800 dark:text-gray-400 dark:hover:border-teal-900/70 dark:hover:bg-teal-950/20 dark:hover:text-teal-300"
+              >
+                {getSocialAccountIcon(account)}
+              </a>
+            ))}
+          </div>
+        </div>
+      ) : null}
+
       {source.feed_url ? (
         <div class="mt-auto pt-5 text-sm font-medium">
           <a
@@ -480,6 +512,30 @@ function TwitterIcon() {
   );
 }
 
+function EmailIcon() {
+  return (
+    <svg
+      class="w-6 h-6"
+      fill="none"
+      stroke="currentColor"
+      stroke-width="2"
+      viewBox="0 0 24 24"
+      aria-hidden="true"
+    >
+      <path
+        stroke-linecap="round"
+        stroke-linejoin="round"
+        d="M3 8l7.89 5.26a2 2 0 0 0 2.22 0L21 8"
+      />
+      <path
+        stroke-linecap="round"
+        stroke-linejoin="round"
+        d="M5 19h14a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2Z"
+      />
+    </svg>
+  );
+}
+
 function SubstackIcon() {
   return (
     <svg class="w-6 h-6" fill="currentColor" viewBox="0 0 24 24" aria-hidden="true">
@@ -540,7 +596,7 @@ const SOCIAL_LINKS = [
   { name: "RSS", url: "/feed.xml", icon: <RssIcon /> },
 ];
 
-function getSocialAccountIcon(account: PersonSocialAccount) {
+function getSocialAccountIcon(account: SocialAccount) {
   switch (account.label.trim().toLowerCase()) {
     case "github":
       return <GitHubIcon />;
@@ -552,6 +608,8 @@ function getSocialAccountIcon(account: PersonSocialAccount) {
       return <YouTubeIcon />;
     case "rss":
       return <RssIcon />;
+    case "email":
+      return <EmailIcon />;
     case "mastodon":
       return <MastodonIcon />;
     case "bluesky":
@@ -1426,6 +1484,15 @@ function getSourceAuthors(db: Database, sourceId: number): SourceAuthor[] {
     .all();
 }
 
+function getSourceSocialAccounts(db: Database, sourceId: number): SourceSocialAccount[] {
+  return db
+    .select()
+    .from(sourceSocialAccounts)
+    .where(eq(sourceSocialAccounts.source_id, sourceId))
+    .orderBy(asc(sourceSocialAccounts.sort_order), asc(sourceSocialAccounts.id))
+    .all();
+}
+
 function getSourceWithAuthors(db: Database, sourceId: number): SourceWithAuthors | null {
   const source = db.select().from(sources).where(eq(sources.id, sourceId)).get();
 
@@ -1436,6 +1503,7 @@ function getSourceWithAuthors(db: Database, sourceId: number): SourceWithAuthors
   return {
     ...source,
     authors: getSourceAuthors(db, source.id),
+    social_accounts: getSourceSocialAccounts(db, source.id),
   };
 }
 
@@ -2204,9 +2272,22 @@ export function createPagesRoutes(db: Database): Hono {
       authorsBySourceId.set(author.sourceId, existing);
     }
 
+    const sourceSocialAccountRows = db
+      .select()
+      .from(sourceSocialAccounts)
+      .orderBy(asc(sourceSocialAccounts.sort_order), asc(sourceSocialAccounts.id))
+      .all();
+    const socialAccountsBySourceId = new Map<number, SourceSocialAccount[]>();
+    for (const account of sourceSocialAccountRows) {
+      const existing = socialAccountsBySourceId.get(account.source_id) ?? [];
+      existing.push(account);
+      socialAccountsBySourceId.set(account.source_id, existing);
+    }
+
     const allSources: SourceWithAuthors[] = allSourceRows.map((source) => ({
       ...source,
       authors: authorsBySourceId.get(source.id) ?? [],
+      social_accounts: socialAccountsBySourceId.get(source.id) ?? [],
     }));
     const filteredSources = searchQuery
       ? allSources.filter((source) => sourceMatchesSearch(source, searchQuery))

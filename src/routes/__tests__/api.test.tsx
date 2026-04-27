@@ -6,6 +6,7 @@ import {
   posts,
   sources,
   sourceAuthors,
+  sourceSocialAccounts,
   people,
   personSocialAccounts,
   tags,
@@ -74,6 +75,7 @@ beforeEach(() => {
   testDb.delete(tags).run();
   testDb.delete(posts).run();
   testDb.delete(sourceAuthors).run();
+  testDb.delete(sourceSocialAccounts).run();
   testDb.delete(personSocialAccounts).run();
   testDb.delete(people).run();
   testDb.delete(sources).run();
@@ -930,6 +932,32 @@ describe("POST /api/sources", () => {
     expect(persistedPeople.map((person) => person.name)).toEqual(["Alice", "Bob"]);
   });
 
+  it("creates source with email social account", async () => {
+    const res = await api.request("/sources", {
+      method: "POST",
+      headers: { ...authHeader, "Content-Type": "application/json" },
+      body: JSON.stringify({
+        name: "Email Source",
+        url: "https://email.example.com",
+        social_accounts: [{ label: "Email", url: "hello@example.com" }],
+      }),
+    });
+
+    expect(res.status).toBe(201);
+    const json = await res.json();
+    expect(json.data.social_accounts).toMatchObject([
+      { label: "Email", url: "mailto:hello@example.com", is_activitypub: false },
+    ]);
+    expect(json.data.social_accounts[0].source_id).toBe(json.data.id);
+
+    const persistedAccounts = testDb
+      .select()
+      .from(sourceSocialAccounts)
+      .where(eq(sourceSocialAccounts.source_id, json.data.id))
+      .all();
+    expect(persistedAccounts).toHaveLength(1);
+  });
+
   it("creates source without authors", async () => {
     const res = await api.request("/sources", {
       method: "POST",
@@ -1079,6 +1107,38 @@ describe("PUT /api/sources/:id", () => {
     expect(json.data.authors.map((author: { name: string }) => author.name)).toEqual([
       "Alice",
       "Bob",
+    ]);
+  });
+
+  it("replaces source social accounts when editing", async () => {
+    const source = testDb
+      .insert(sources)
+      .values({ name: "Test", url: "https://example.com" })
+      .returning()
+      .get();
+    testDb
+      .insert(sourceSocialAccounts)
+      .values({
+        source_id: source.id,
+        label: "Old Account",
+        url: "https://old.example.com",
+        is_activitypub: false,
+        sort_order: 0,
+      })
+      .run();
+
+    const res = await api.request(`/sources/${source.id}`, {
+      method: "PUT",
+      headers: { ...authHeader, "Content-Type": "application/json" },
+      body: JSON.stringify({
+        social_accounts: [{ label: "Email", url: "mailto:new@example.com" }],
+      }),
+    });
+
+    expect(res.status).toBe(200);
+    const json = await res.json();
+    expect(json.data.social_accounts).toMatchObject([
+      { label: "Email", url: "mailto:new@example.com", is_activitypub: false },
     ]);
   });
 
@@ -1415,6 +1475,23 @@ describe("/api/people", () => {
     expect(res.status).toBe(200);
     const json = await res.json();
     expect(json.data.default_social_account).toMatchObject({ label: "Bluesky", is_default: true });
+  });
+
+  it("creates a person with an email social account as mailto link", async () => {
+    const createRes = await api.request("/people", {
+      method: "POST",
+      headers: { ...authHeader, "Content-Type": "application/json" },
+      body: JSON.stringify({
+        name: "Email Person",
+        social_accounts: [{ label: "Email", url: "person@example.com" }],
+      }),
+    });
+
+    expect(createRes.status).toBe(201);
+    const created = await createRes.json();
+    expect(created.data.social_accounts).toMatchObject([
+      { label: "Email", url: "mailto:person@example.com", is_activitypub: false },
+    ]);
   });
 
   it("replaces person social accounts when editing", async () => {

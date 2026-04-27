@@ -90,6 +90,17 @@ export interface SourceAuthor {
   sort_order: number;
 }
 
+export interface SourceSocialAccount {
+  id: number;
+  source_id: number;
+  label: string;
+  url: string;
+  avatar_url: string | null;
+  is_activitypub: boolean;
+  is_default: boolean;
+  sort_order: number;
+}
+
 export interface Source {
   id: number;
   name: string;
@@ -101,6 +112,7 @@ export interface Source {
   preview_site_name: string | null;
   favicon_url: string | null;
   authors: SourceAuthor[];
+  social_accounts: SourceSocialAccount[];
 }
 
 export interface TagWithCount {

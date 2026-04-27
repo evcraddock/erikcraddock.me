@@ -2,11 +2,20 @@ import type { GlobalOptions } from "../../types";
 import { ApiClient } from "../../lib/api";
 import { loadConfig } from "../../lib/config";
 
+interface SocialAccountOption {
+  label: string;
+  url: string;
+  avatar_url?: string | null;
+  is_activitypub?: boolean;
+  is_default?: boolean;
+}
+
 interface EditOptions {
   name?: string;
   url?: string;
   feedUrl?: string | null;
   authors?: string[];
+  socialAccounts?: SocialAccountOption[];
 }
 
 function parseEditArgs(args: string[]): { id: number | null; options: EditOptions; help: boolean } {
@@ -40,6 +49,14 @@ function parseEditArgs(args: string[]): { id: number | null; options: EditOption
       options.authors = [...(options.authors ?? []), arg.split("=").slice(1).join("=")];
     } else if (arg === "--no-authors") {
       options.authors = [];
+    } else if (arg === "--social" && args[i + 1]) {
+      const parsed = parseSocialAccount(args[++i]);
+      if (parsed) options.socialAccounts = [...(options.socialAccounts ?? []), parsed];
+    } else if (arg.startsWith("--social=")) {
+      const parsed = parseSocialAccount(arg.split("=").slice(1).join("="));
+      if (parsed) options.socialAccounts = [...(options.socialAccounts ?? []), parsed];
+    } else if (arg === "--no-socials") {
+      options.socialAccounts = [];
     } else if (!arg.startsWith("-") && id === null) {
       const parsed = parseInt(arg, 10);
       if (!isNaN(parsed)) {
@@ -51,6 +68,21 @@ function parseEditArgs(args: string[]): { id: number | null; options: EditOption
   }
 
   return { id, options, help };
+}
+
+function parseSocialAccount(input: string): SocialAccountOption | null {
+  const [label, url, ...flags] = input.split("|").map((part) => part.trim());
+  if (!label || !url) {
+    return null;
+  }
+
+  return {
+    label,
+    url,
+    avatar_url: flags.find((flag) => flag.startsWith("avatar="))?.slice("avatar=".length),
+    is_activitypub: flags.some((flag) => ["activitypub", "ap", "true"].includes(flag)),
+    is_default: flags.includes("default"),
+  };
 }
 
 function showEditHelp(): void {
@@ -68,6 +100,8 @@ Options:
   --no-feed-url       Remove feed URL
   --author <name>     Replace source authors (can be repeated)
   --no-authors        Remove all source authors
+  --social <account>  Replace social accounts with "label|url|activitypub|default|avatar=URL" entries
+  --no-socials        Remove all social accounts
   --json              Output as JSON
   --help, -h          Show this help message
 
@@ -77,8 +111,10 @@ Examples:
   ec source edit 1 --feed-url "https://hnrss.org/frontpage"
   ec source edit 1 --author "Paul Graham"
   ec source edit 1 --author "Alice" --author "Bob"
+  ec source edit 1 --social "Email|hello@example.com"
   ec source edit 1 --no-feed-url
   ec source edit 1 --no-authors
+  ec source edit 1 --no-socials
 `);
 }
 
@@ -101,12 +137,13 @@ export async function edit(args: string[], globalOptions: GlobalOptions): Promis
     options.name !== undefined ||
     options.url !== undefined ||
     options.feedUrl !== undefined ||
-    options.authors !== undefined;
+    options.authors !== undefined ||
+    options.socialAccounts !== undefined;
 
   if (!hasUpdates) {
     console.error("❌ No update options provided.");
     console.error(
-      "Specify at least one of: --name, --url, --feed-url, --no-feed-url, --author, --no-authors"
+      "Specify at least one of: --name, --url, --feed-url, --no-feed-url, --author, --no-authors, --social, --no-socials"
     );
     process.exit(1);
   }
@@ -126,6 +163,7 @@ export async function edit(args: string[], globalOptions: GlobalOptions): Promis
     url: options.url,
     feed_url: options.feedUrl,
     authors: options.authors?.map((name) => ({ name })),
+    social_accounts: options.socialAccounts,
   });
 
   if (result.error) {

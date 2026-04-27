@@ -16,6 +16,7 @@ import {
   postTags,
   sources,
   sourceAuthors,
+  sourceSocialAccounts,
   people,
   personSocialAccounts,
   media,
@@ -170,6 +171,26 @@ testDb
       url: "https://github.com/testauthor",
       is_activitypub: false,
       sort_order: 1,
+    },
+    {
+      person_id: 1,
+      label: "Email",
+      url: "mailto:testauthor@example.com",
+      is_activitypub: false,
+      sort_order: 2,
+    },
+  ])
+  .run();
+
+testDb
+  .insert(sourceSocialAccounts)
+  .values([
+    {
+      source_id: 1,
+      label: "Email",
+      url: "mailto:hello@example.com",
+      is_activitypub: false,
+      sort_order: 0,
     },
   ])
   .run();
@@ -948,6 +969,8 @@ describe("pages routes", () => {
       expect(html).toContain("ActivityPub");
       expect(html).toContain('href="https://github.com/testauthor"');
       expect(html).toContain("GitHub");
+      expect(html).toContain('href="mailto:testauthor@example.com"');
+      expect(html).toContain("Email");
     });
 
     it("uses the effective default social account for avatar and follow button", async () => {
@@ -1018,6 +1041,9 @@ describe("pages routes", () => {
       expect(html).toContain("by Test Author");
       expect(html).toContain('href="/people/1"');
       expect(html).toContain('src="https://example.com/favicon.ico"');
+      expect(html).toContain("Follow Test Blog");
+      expect(html).toContain('href="mailto:hello@example.com"');
+      expect(html).toContain('aria-label="Email"');
     });
 
     it("links the selected source card title and URL to the source website", async () => {

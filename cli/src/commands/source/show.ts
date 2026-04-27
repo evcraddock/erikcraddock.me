@@ -49,6 +49,19 @@ function formatSource(source: Source): void {
   console.log(`URL:       ${source.url}`);
   console.log(`Authors:   ${formatAuthors(source)}`);
   console.log(`Feed URL:  ${source.feed_url || "-"}`);
+
+  if (source.social_accounts.length > 0) {
+    console.log("Socials:");
+    for (const account of source.social_accounts) {
+      const flags = [
+        account.is_activitypub ? "ActivityPub" : null,
+        account.is_default ? "default" : null,
+      ].filter(Boolean);
+      console.log(
+        `  - ${account.id}: ${account.label} ${account.url}${flags.length ? ` (${flags.join(", ")})` : ""}`
+      );
+    }
+  }
 }
 
 export async function show(args: string[], globalOptions: GlobalOptions): Promise<void> {
