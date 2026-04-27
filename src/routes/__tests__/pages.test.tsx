@@ -1283,16 +1283,18 @@ describe("pages routes", () => {
       expect(html).toContain("/posts/test-post");
     });
 
-    it("uses a single-pane layout for article posts", async () => {
+    it("uses the wider two-pane layout for article posts", async () => {
       const app = getApp();
       const res = await app.request("/posts/test-post");
 
       expect(res.status).toBe(200);
 
       const html = await res.text();
-      expect(html).toContain('class="mx-auto max-w-3xl"');
-      expect(html).not.toContain("Followers");
-      expect(html).not.toContain("Following");
+      expect(html).toContain(
+        'class="mx-auto grid max-w-6xl gap-6 lg:grid-cols-[20rem_minmax(0,1fr)] lg:items-start"'
+      );
+      expect(html).toContain("Followers");
+      expect(html).toContain("Following");
     });
 
     it("keeps the actor card for link posts", async () => {
@@ -1303,6 +1305,9 @@ describe("pages routes", () => {
 
       const html = await res.text();
       expect(html).toContain("@erik@erikcraddock.me");
+      expect(html).toContain(
+        'class="mx-auto grid max-w-6xl gap-6 lg:grid-cols-[20rem_minmax(0,1fr)] lg:items-start"'
+      );
       expect(html).toContain("Followers");
       expect(html).toContain("Following");
     });
