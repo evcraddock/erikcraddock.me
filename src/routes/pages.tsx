@@ -982,6 +982,25 @@ function RecommendedSitesFeedCard() {
   );
 }
 
+function ArticlesFeedCard() {
+  return (
+    <a
+      href="/articles"
+      class="group block border-b border-gray-200 bg-white p-5 transition hover:border-teal-200 hover:bg-teal-50/50 dark:border-gray-800 dark:bg-gray-900 dark:hover:border-teal-900/70 dark:hover:bg-teal-950/20 lg:mt-4 lg:rounded-2xl lg:border"
+    >
+      <h2 class="text-lg font-bold text-gray-950 group-hover:text-teal-700 dark:text-gray-50 dark:group-hover:text-teal-300">
+        Articles
+      </h2>
+      <p class="mt-2 text-sm leading-6 text-gray-600 dark:text-gray-400">
+        Read longer essays, project notes, and polished writing from the site archive.
+      </p>
+      <span class="mt-4 inline-flex text-sm font-semibold text-teal-700 dark:text-teal-300">
+        Explore Articles →
+      </span>
+    </a>
+  );
+}
+
 function FeedArticlePreview({
   post,
   bannerUrl,
@@ -1666,6 +1685,7 @@ export function createPagesRoutes(db: Database): Hono {
                 followingCount={followingCount}
                 postCount={totalPosts}
               />
+              <ArticlesFeedCard />
               <SocialMediaFeedCard />
               <RecommendedSitesFeedCard />
             </aside>
@@ -1766,6 +1786,7 @@ export function createPagesRoutes(db: Database): Hono {
               followingCount={followingCount}
               postCount={totalPosts}
             />
+            <ArticlesFeedCard />
             <SocialMediaFeedCard />
             <RecommendedSitesFeedCard />
           </aside>
@@ -2598,6 +2619,9 @@ export function createPagesRoutes(db: Database): Hono {
               followingCount={followingCount}
               postCount={totalPosts}
             />
+            <ArticlesFeedCard />
+            <SocialMediaFeedCard />
+            <RecommendedSitesFeedCard />
           </aside>
           <div class="overflow-hidden border-x border-gray-200 bg-white dark:border-gray-800 dark:bg-gray-900 sm:rounded-2xl sm:border">
             <header class="border-b border-gray-200 bg-white/90 px-4 py-4 backdrop-blur dark:border-gray-800 dark:bg-gray-900/90 sm:px-6">
