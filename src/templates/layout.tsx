@@ -76,6 +76,14 @@ export function Layout({ title, children, ogImage, description, canonicalUrl }: 
               Erik Craddock
             </a>
             <div class="flex items-center gap-6">
+              <ThemeToggle />
+            </div>
+          </nav>
+        </header>
+        <main class="flex-1 max-w-6xl mx-auto px-4 py-8 w-full">{children}</main>
+        <footer class="bg-white border-t dark:bg-gray-800 dark:border-gray-700">
+          <div class="max-w-6xl mx-auto px-4 py-6 text-center text-gray-500 dark:text-gray-400 text-sm">
+            <nav aria-label="Footer navigation" class="mb-3 flex justify-center gap-6">
               <a
                 href="/articles"
                 class="text-gray-600 hover:text-gray-900 dark:text-gray-400 dark:hover:text-gray-100"
@@ -94,22 +102,7 @@ export function Layout({ title, children, ogImage, description, canonicalUrl }: 
               >
                 About
               </a>
-              <ThemeToggle />
-            </div>
-          </nav>
-        </header>
-        <main class="flex-1 max-w-6xl mx-auto px-4 py-8 w-full">{children}</main>
-        <footer class="bg-white border-t dark:bg-gray-800 dark:border-gray-700">
-          <div class="max-w-6xl mx-auto px-4 py-6 text-center text-gray-500 dark:text-gray-400 text-sm">
-            <p class="mb-2">
-              Follow on the Fediverse:{" "}
-              <a
-                href="/about"
-                class="text-teal-600 hover:text-teal-700 dark:text-teal-400 dark:hover:text-teal-300"
-              >
-                @erik@erikcraddock.me
-              </a>
-            </p>
+            </nav>
             <p>&copy; {new Date().getFullYear()} Erik Craddock</p>
           </div>
         </footer>

@@ -227,17 +227,42 @@ describe("pages routes", () => {
       expect(html).toContain("dark:border-gray-700");
     });
 
-    it("includes navigation links to Articles and Feed", async () => {
+    it("moves navigation links from header to footer", async () => {
+      const app = getApp();
+      const res = await app.request("/");
+      const html = await res.text();
+      const header = html.match(/<header[\s\S]*?<\/header>/)?.[0] ?? "";
+      const footer = html.match(/<footer[\s\S]*?<\/footer>/)?.[0] ?? "";
+
+      expect(header).not.toContain('href="/articles"');
+      expect(header).not.toContain('href="/feed"');
+      expect(header).not.toContain('href="/about"');
+      expect(footer).toContain('href="/articles"');
+      expect(footer).toContain('href="/feed"');
+      expect(footer).toContain('href="/about"');
+      expect(footer).not.toContain("Follow on the Fediverse");
+    });
+
+    it("links the hero avatar to the about page", async () => {
       const app = getApp();
       const res = await app.request("/");
       const html = await res.text();
 
-      expect(html).toContain('href="/articles"');
-      expect(html).toContain('href="/feed"');
-      // Sources removed from nav
-      expect(html).not.toContain('href="/sources"');
-      // About is linked from footer and Fediverse icon, but not in main nav
       expect(html).toContain('href="/about"');
+      expect(html).toContain('aria-label="About Erik Craddock"');
+      expect(html).toContain('alt="Erik Craddock"');
+    });
+
+    it("displays a latest updates feed teaser", async () => {
+      const app = getApp();
+      const res = await app.request("/");
+      const html = await res.text();
+
+      expect(html).toContain("Latest updates");
+      expect(html).toContain("Notes, Links &amp; Updates");
+      expect(html).toContain("Browse the full feed for shorter notes");
+      expect(html).toContain('href="/feed"');
+      expect(html).toContain("Open Feed");
     });
 
     it("displays Recent Articles section", async () => {
@@ -547,13 +572,19 @@ describe("pages routes", () => {
       expect(html.indexOf("Follow me")).toBeLessThan(html.indexOf("Recommended Sites"));
     });
 
-    it("links the feed sidebar to recommended sites", async () => {
+    it("shows articles below social media and above recommended sites in the feed sidebar", async () => {
       const app = getApp();
       const res = await app.request("/feed");
       const html = await res.text();
 
+      expect(html).toContain('href="/articles"');
+      expect(html).toContain("Articles");
+      expect(html).toContain("Read longer essays, project notes, and polished writing");
+      expect(html).toContain("Explore Articles");
       expect(html).toContain('href="/sources"');
       expect(html).toContain("Recommended Sites");
+      expect(html.indexOf("Follow me")).toBeLessThan(html.indexOf("Articles"));
+      expect(html.indexOf("Articles")).toBeLessThan(html.indexOf("Recommended Sites"));
     });
 
     it("shows stored link previews in feed items", async () => {
@@ -767,7 +798,7 @@ describe("pages routes", () => {
 
       expect(html).toContain("dark:bg-gray-900");
       expect(html).toContain("dark:text-gray-100");
-      expect(html).toContain("dark:text-teal-400");
+      expect(html).toContain("dark:hover:text-teal-400");
     });
 
     it("shows an auto-submitting search form for recommended sites", async () => {
@@ -1072,7 +1103,7 @@ describe("pages routes", () => {
       const res = await app.request("/posts/test-post");
       const html = await res.text();
 
-      expect(html).toContain("dark:text-teal-400");
+      expect(html).toContain("dark:hover:text-teal-400");
       expect(html).toContain("dark:bg-gray-900");
       expect(html).toContain("dark:text-gray-300");
     });
@@ -1310,6 +1341,23 @@ describe("pages routes", () => {
       );
       expect(html).toContain("Followers");
       expect(html).toContain("Following");
+    });
+
+    it("shows feed sidebar sections on post pages", async () => {
+      const app = getApp();
+      const res = await app.request("/posts/test-post");
+
+      expect(res.status).toBe(200);
+
+      const html = await res.text();
+      expect(html).toContain("Articles");
+      expect(html).toContain("Read longer essays, project notes, and polished writing");
+      expect(html).toContain("Explore Articles");
+      expect(html).toContain("Follow me");
+      expect(html).toContain("Recommended Sites");
+      expect(html).toContain("Explore sources");
+      expect(html.indexOf("Follow me")).toBeLessThan(html.indexOf("Articles"));
+      expect(html.indexOf("Articles")).toBeLessThan(html.indexOf("Recommended Sites"));
     });
   });
 
