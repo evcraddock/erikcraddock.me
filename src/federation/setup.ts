@@ -1,8 +1,5 @@
 import {
   createFederation,
-  Person,
-  Image,
-  Endpoints,
   Follow,
   Undo,
   Accept,
@@ -15,6 +12,7 @@ import { addFollower, removeFollower, getAllFollowers, getFollowerCount } from "
 import { getOutboxActivities, getPublishedPostCount } from "./outbox";
 import { getOrigin } from "./utils";
 import { logger } from "@/utils/logger";
+import { buildActorProfile } from "./actor-profile";
 
 // Context type for federation - we use void since we don't need request-specific data
 export type FederationContext = void;
@@ -89,28 +87,17 @@ export function createFedifyFederation() {
       // for both HTTP Signatures (publicKey) and Object Integrity Proofs (assertionMethods)
       const keys = await ctx.getActorKeyPairs(identifier);
 
-      // Build image URLs using canonical origin for correct protocol behind reverse proxy
-      const iconUrl = new URL("/images/erik-logo.png", ctx.canonicalOrigin);
-      const bannerUrl = new URL("/images/banner.png", ctx.canonicalOrigin);
-
-      return new Person({
-        id: ctx.getActorUri(identifier),
-        preferredUsername: identifier,
-        name: "Erik Craddock",
-        summary: "Writer, coder, and musician — not always in that order.",
-        icon: new Image({ url: iconUrl, mediaType: "image/png" }),
-        image: new Image({ url: bannerUrl, mediaType: "image/png" }),
-        // Use canonicalOrigin to ensure correct protocol behind reverse proxy
-        url: new URL("/", ctx.canonicalOrigin),
-        inbox: ctx.getInboxUri(identifier),
-        outbox: ctx.getOutboxUri(identifier),
-        followers: ctx.getFollowersUri(identifier),
-        // Shared inbox for efficient batch delivery to multiple followers on same instance
-        endpoints: new Endpoints({ sharedInbox: ctx.getInboxUri() }),
-        // First key's CryptographicKey for HTTP Signatures (legacy, widely supported)
-        publicKey: keys[0].cryptographicKey,
-        // All keys as Multikey for Object Integrity Proofs (modern standard)
-        assertionMethods: keys.map((key) => key.multikey),
+      return buildActorProfile({
+        identifier,
+        canonicalOrigin: ctx.canonicalOrigin,
+        uris: {
+          actor: ctx.getActorUri(identifier),
+          inbox: ctx.getInboxUri(identifier),
+          outbox: ctx.getOutboxUri(identifier),
+          followers: ctx.getFollowersUri(identifier),
+          sharedInbox: ctx.getInboxUri(),
+        },
+        keys,
       });
     })
     // Set up key pairs dispatcher - provides keys for HTTP signatures and proofs
