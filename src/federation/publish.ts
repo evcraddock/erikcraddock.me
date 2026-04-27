@@ -1,4 +1,4 @@
-import { Create, Delete, Update, Image, Person, Endpoints } from "@fedify/fedify";
+import { Create, Delete, Update } from "@fedify/fedify";
 import { eq } from "drizzle-orm";
 import { db, posts, media, postTags, tags } from "@/db";
 import { federation } from "./setup";
@@ -7,6 +7,7 @@ import { logger } from "@/utils/logger";
 import { dateToInstant, baseUrl } from "./utils";
 import { postToObject, PublishedPost, PostTag } from "./post-object";
 import { mediaUrl } from "@/services/media";
+import { buildActorUpdateActivity } from "./actor-profile";
 
 // ActivityPub Public address
 const PUBLIC = new URL("https://www.w3.org/ns/activitystreams#Public");
@@ -315,31 +316,18 @@ export async function sendActorUpdateActivity(): Promise<boolean> {
   // Get key pairs for the actor
   const keys = await ctx.getActorKeyPairs("erik");
 
-  // Build the Person object (same as actor dispatcher)
-  const iconUrl = new URL("/images/erik-logo.png", baseUrl);
-  const bannerUrl = new URL("/images/banner.png", baseUrl);
-
-  const person = new Person({
-    id: actorUri,
-    preferredUsername: "erik",
-    name: "Erik Craddock",
-    summary: "Writer, coder, and musician — not always in that order.",
-    icon: new Image({ url: iconUrl, mediaType: "image/png" }),
-    image: new Image({ url: bannerUrl, mediaType: "image/png" }),
-    url: new URL("/", baseUrl),
-    inbox: ctx.getInboxUri("erik"),
-    outbox: ctx.getOutboxUri("erik"),
-    followers: ctx.getFollowersUri("erik"),
-    endpoints: new Endpoints({ sharedInbox: ctx.getInboxUri() }),
-    publicKey: keys[0].cryptographicKey,
-    assertionMethods: keys.map((key) => key.multikey),
-  });
-
-  const activityUri = new URL(`/users/erik#update-${Date.now()}`, baseUrl);
-  const activity = new Update({
-    id: activityUri,
-    actor: actorUri,
-    object: person,
+  const activity = buildActorUpdateActivity({
+    identifier: "erik",
+    canonicalOrigin: baseUrl,
+    activityId: new URL(`/users/erik#update-${Date.now()}`, baseUrl),
+    uris: {
+      actor: actorUri,
+      inbox: ctx.getInboxUri("erik"),
+      outbox: ctx.getOutboxUri("erik"),
+      followers: ctx.getFollowersUri("erik"),
+      sharedInbox: ctx.getInboxUri(),
+    },
+    keys,
   });
 
   logger.info("federation", `Sending actor Update activity to ${followers.length} followers`);
