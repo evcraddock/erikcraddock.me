@@ -1659,7 +1659,7 @@ export function createPagesRoutes(db: Database): Hono {
     if (totalPosts === 0) {
       return c.html(
         <Layout title="Feed | erikcraddock.me">
-          <div class="mx-auto grid max-w-6xl gap-6 lg:grid-cols-[20rem_minmax(0,42rem)] lg:items-start lg:justify-center">
+          <div class="mx-auto grid max-w-6xl gap-6 lg:grid-cols-[20rem_minmax(0,1fr)] lg:items-start">
             <aside class="lg:sticky lg:top-24">
               <FeedProfileCard
                 followerCount={followerCount}
@@ -1759,7 +1759,7 @@ export function createPagesRoutes(db: Database): Hono {
 
     return c.html(
       <Layout title={`Feed${page > 1 ? ` - Page ${page}` : ""} | erikcraddock.me`}>
-        <div class="mx-auto grid max-w-6xl gap-6 lg:grid-cols-[20rem_minmax(0,42rem)] lg:items-start lg:justify-center">
+        <div class="mx-auto grid max-w-6xl gap-6 lg:grid-cols-[20rem_minmax(0,1fr)] lg:items-start">
           <aside class="lg:sticky lg:top-24">
             <FeedProfileCard
               followerCount={followerCount}
@@ -2591,7 +2591,7 @@ export function createPagesRoutes(db: Database): Hono {
         description={description}
         canonicalUrl={canonicalUrl}
       >
-        <div class="mx-auto grid max-w-6xl gap-6 lg:grid-cols-[20rem_minmax(0,42rem)] lg:items-start lg:justify-center">
+        <div class="mx-auto grid max-w-6xl gap-6 lg:grid-cols-[20rem_minmax(0,1fr)] lg:items-start">
           <aside class="lg:sticky lg:top-24">
             <FeedProfileCard
               followerCount={followerCount}
