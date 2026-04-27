@@ -74,6 +74,19 @@ export const personSocialAccounts = sqliteTable("person_social_accounts", {
   sort_order: integer("sort_order").notNull().default(0),
 });
 
+export const sourceSocialAccounts = sqliteTable("source_social_accounts", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  source_id: integer("source_id")
+    .notNull()
+    .references(() => sources.id, { onDelete: "cascade" }),
+  label: text("label").notNull(),
+  url: text("url").notNull(),
+  avatar_url: text("avatar_url"),
+  is_activitypub: integer("is_activitypub", { mode: "boolean" }).notNull().default(false),
+  is_default: integer("is_default", { mode: "boolean" }).notNull().default(false),
+  sort_order: integer("sort_order").notNull().default(0),
+});
+
 export const sourceAuthors = sqliteTable("source_authors", {
   id: integer("id").primaryKey({ autoIncrement: true }),
   source_id: integer("source_id")

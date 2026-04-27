@@ -25,6 +25,7 @@ import {
   updateSource,
   deleteSource,
   type SourceAuthorInput,
+  type SourceSocialAccountInput,
 } from "@/services/sources";
 import { listTags } from "@/services/tags";
 import {
@@ -112,18 +113,23 @@ const PersonSummarySchema = z
   })
   .openapi("PersonSummary");
 
-const PersonSocialAccountSchema = z
-  .object({
-    id: z.number().int().openapi({ example: 1 }),
-    person_id: z.number().int().openapi({ example: 1 }),
-    label: z.string().openapi({ example: "Mastodon" }),
-    url: z.string().url().openapi({ example: "https://mastodon.social/@example" }),
-    avatar_url: NullableStringSchema.openapi({ example: "https://example.social/avatar.jpg" }),
-    is_activitypub: z.boolean().openapi({ example: true }),
-    is_default: z.boolean().openapi({ example: true }),
-    sort_order: z.number().int().openapi({ example: 0 }),
-  })
-  .openapi("PersonSocialAccount");
+const SocialAccountFieldsSchema = z.object({
+  id: z.number().int().openapi({ example: 1 }),
+  label: z.string().openapi({ example: "Mastodon" }),
+  url: z.string().openapi({ example: "https://mastodon.social/@example" }),
+  avatar_url: NullableStringSchema.openapi({ example: "https://example.social/avatar.jpg" }),
+  is_activitypub: z.boolean().openapi({ example: true }),
+  is_default: z.boolean().openapi({ example: true }),
+  sort_order: z.number().int().openapi({ example: 0 }),
+});
+
+const PersonSocialAccountSchema = SocialAccountFieldsSchema.extend({
+  person_id: z.number().int().openapi({ example: 1 }),
+}).openapi("PersonSocialAccount");
+
+const SourceSocialAccountSchema = SocialAccountFieldsSchema.extend({
+  source_id: z.number().int().openapi({ example: 1 }),
+}).openapi("SourceSocialAccount");
 
 const PersonSchema = PersonSummarySchema.extend({
   social_accounts: z.array(PersonSocialAccountSchema),
@@ -155,6 +161,7 @@ const SourceSummarySchema = z
 
 const SourceSchema = SourceSummarySchema.extend({
   feed_url: NullableStringSchema,
+  social_accounts: z.array(SourceSocialAccountSchema),
 }).openapi("Source");
 
 const TagSchema = z
@@ -304,27 +311,7 @@ const SourceMetadataBodySchema = {
   favicon_url: z.string().optional().nullable(),
 };
 
-const CreateSourceBodySchema = z
-  .object({
-    name: z.string().openapi({ example: "Hacker News" }),
-    url: z.string().openapi({ example: "https://news.ycombinator.com" }),
-    feed_url: z.string().optional().nullable().openapi({ example: "https://hnrss.org/frontpage" }),
-    authors: z.array(SourceAuthorInputSchema).optional().nullable(),
-    ...SourceMetadataBodySchema,
-  })
-  .openapi("CreateSourceBody");
-
-const UpdateSourceBodySchema = z
-  .object({
-    name: z.string().optional().nullable(),
-    url: z.string().optional().nullable(),
-    feed_url: z.string().optional().nullable(),
-    authors: z.array(SourceAuthorInputSchema).optional().nullable(),
-    ...SourceMetadataBodySchema,
-  })
-  .openapi("UpdateSourceBody");
-
-const PersonSocialAccountInputSchema = z.object({
+const SocialAccountInputSchema = z.object({
   label: z.string().openapi({ example: "Mastodon" }),
   url: z.string().openapi({ example: "https://mastodon.social/@example" }),
   avatar_url: z
@@ -336,11 +323,33 @@ const PersonSocialAccountInputSchema = z.object({
   is_default: z.boolean().optional().openapi({ example: true }),
 });
 
+const CreateSourceBodySchema = z
+  .object({
+    name: z.string().openapi({ example: "Hacker News" }),
+    url: z.string().openapi({ example: "https://news.ycombinator.com" }),
+    feed_url: z.string().optional().nullable().openapi({ example: "https://hnrss.org/frontpage" }),
+    authors: z.array(SourceAuthorInputSchema).optional().nullable(),
+    social_accounts: z.array(SocialAccountInputSchema).optional().nullable(),
+    ...SourceMetadataBodySchema,
+  })
+  .openapi("CreateSourceBody");
+
+const UpdateSourceBodySchema = z
+  .object({
+    name: z.string().optional().nullable(),
+    url: z.string().optional().nullable(),
+    feed_url: z.string().optional().nullable(),
+    authors: z.array(SourceAuthorInputSchema).optional().nullable(),
+    social_accounts: z.array(SocialAccountInputSchema).optional().nullable(),
+    ...SourceMetadataBodySchema,
+  })
+  .openapi("UpdateSourceBody");
+
 const CreatePersonBodySchema = z
   .object({
     name: z.string().openapi({ example: "Ethan Mollick" }),
     url: z.string().optional().nullable().openapi({ example: "https://example.com" }),
-    social_accounts: z.array(PersonSocialAccountInputSchema).optional().nullable(),
+    social_accounts: z.array(SocialAccountInputSchema).optional().nullable(),
   })
   .openapi("CreatePersonBody");
 
@@ -348,7 +357,7 @@ const UpdatePersonBodySchema = z
   .object({
     name: z.string().optional().nullable().openapi({ example: "Ethan Mollick" }),
     url: z.string().optional().nullable().openapi({ example: "https://example.com" }),
-    social_accounts: z.array(PersonSocialAccountInputSchema).optional().nullable(),
+    social_accounts: z.array(SocialAccountInputSchema).optional().nullable(),
     default_social_account_id: z.number().int().optional().nullable(),
   })
   .openapi("UpdatePersonBody");
@@ -361,9 +370,22 @@ function parseNullableString(input: unknown): string | null | undefined {
   return typeof input === "string" ? input.trim() || null : null;
 }
 
-function parsePersonSocialAccounts(
+function normalizeSocialAccountUrl(label: string, url: string): string {
+  if (label.trim().toLowerCase() !== "email") {
+    return url.trim();
+  }
+
+  const trimmedUrl = url.trim();
+  if (trimmedUrl.toLowerCase().startsWith("mailto:")) {
+    return trimmedUrl;
+  }
+
+  return `mailto:${trimmedUrl}`;
+}
+
+function parseSocialAccounts<T extends PersonSocialAccountInput | SourceSocialAccountInput>(
   input: unknown
-): PersonSocialAccountInput[] | string | undefined {
+): T[] | string | undefined {
   if (input === undefined) {
     return undefined;
   }
@@ -376,7 +398,7 @@ function parsePersonSocialAccounts(
     return "Social accounts must be an array";
   }
 
-  const accounts: PersonSocialAccountInput[] = [];
+  const accounts: T[] = [];
 
   for (const [index, account] of input.entries()) {
     if (!account || typeof account !== "object") {
@@ -408,16 +430,29 @@ function parsePersonSocialAccounts(
       return `Social account at index ${index} has invalid default flag`;
     }
 
+    const label = candidate.label.trim();
     accounts.push({
-      label: candidate.label.trim(),
-      url: candidate.url.trim(),
+      label,
+      url: normalizeSocialAccountUrl(label, candidate.url),
       avatar_url: parseNullableString(candidate.avatar_url) ?? null,
       is_activitypub: candidate.is_activitypub ?? false,
       is_default: candidate.is_default ?? false,
-    });
+    } as T);
   }
 
   return accounts;
+}
+
+function parsePersonSocialAccounts(
+  input: unknown
+): PersonSocialAccountInput[] | string | undefined {
+  return parseSocialAccounts<PersonSocialAccountInput>(input);
+}
+
+function parseSourceSocialAccounts(
+  input: unknown
+): SourceSocialAccountInput[] | string | undefined {
+  return parseSocialAccounts<SourceSocialAccountInput>(input);
 }
 
 function parseSourceAuthors(input: unknown): SourceAuthorInput[] | string | undefined {
@@ -1785,6 +1820,7 @@ registerProtectedRoute(
       preview_image_url,
       preview_site_name,
       favicon_url,
+      social_accounts,
     } = body;
 
     if (!name || typeof name !== "string" || name.trim().length === 0) {
@@ -1800,6 +1836,11 @@ registerProtectedRoute(
       return c.json({ error: parsedAuthors }, 400);
     }
 
+    const parsedSocialAccounts = parseSourceSocialAccounts(social_accounts);
+    if (typeof parsedSocialAccounts === "string") {
+      return c.json({ error: parsedSocialAccounts }, 400);
+    }
+
     try {
       const sourceUrl = url.trim();
       const fetchedPreview = await getSourcePreviewData(sourceUrl);
@@ -1808,6 +1849,7 @@ registerProtectedRoute(
         url: sourceUrl,
         feed_url: feed_url?.trim() || null,
         authors: parsedAuthors,
+        social_accounts: parsedSocialAccounts,
         preview_title: parseNullableString(preview_title) ?? fetchedPreview?.preview_title ?? null,
         preview_description:
           parseNullableString(preview_description) ?? fetchedPreview?.preview_description ?? null,
@@ -1878,6 +1920,7 @@ registerProtectedRoute(
       preview_image_url,
       preview_site_name,
       favicon_url,
+      social_accounts,
     } = body;
 
     if (name !== undefined && (typeof name !== "string" || name.trim().length === 0)) {
@@ -1893,6 +1936,11 @@ registerProtectedRoute(
       return c.json({ error: parsedAuthors }, 400);
     }
 
+    const parsedSocialAccounts = parseSourceSocialAccounts(social_accounts);
+    if (typeof parsedSocialAccounts === "string") {
+      return c.json({ error: parsedSocialAccounts }, 400);
+    }
+
     try {
       const existingSource = getSource(id);
       const sourceUrl = url?.trim() || existingSource?.url;
@@ -1903,6 +1951,7 @@ registerProtectedRoute(
         url: url?.trim(),
         feed_url: feed_url !== undefined ? feed_url?.trim() || null : undefined,
         authors: parsedAuthors,
+        social_accounts: parsedSocialAccounts,
         preview_title:
           preview_title !== undefined
             ? parseNullableString(preview_title)

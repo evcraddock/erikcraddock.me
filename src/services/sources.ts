@@ -1,10 +1,21 @@
 import { asc, eq } from "drizzle-orm";
-import { db, people, sourceAuthors, sources } from "@/db";
+import { db, people, sourceAuthors, sourceSocialAccounts, sources } from "@/db";
 
 export interface SourceAuthor {
   id: number;
   name: string;
   url: string | null;
+  sort_order: number;
+}
+
+export interface SourceSocialAccount {
+  id: number;
+  source_id: number;
+  label: string;
+  url: string;
+  avatar_url: string | null;
+  is_activitypub: boolean;
+  is_default: boolean;
   sort_order: number;
 }
 
@@ -19,11 +30,20 @@ export interface Source {
   preview_site_name: string | null;
   favicon_url: string | null;
   authors: SourceAuthor[];
+  social_accounts: SourceSocialAccount[];
 }
 
 export interface SourceAuthorInput {
   name: string;
   url?: string | null;
+}
+
+export interface SourceSocialAccountInput {
+  label: string;
+  url: string;
+  avatar_url?: string | null;
+  is_activitypub?: boolean;
+  is_default?: boolean;
 }
 
 type SourceRecord = typeof sources.$inferSelect;
@@ -43,8 +63,21 @@ function listAuthorsForSource(sourceId: number): SourceAuthor[] {
     .all();
 }
 
-function attachAuthors(source: SourceRecord): Source {
-  return { ...source, authors: listAuthorsForSource(source.id) };
+function listSocialAccountsForSource(sourceId: number): SourceSocialAccount[] {
+  return db
+    .select()
+    .from(sourceSocialAccounts)
+    .where(eq(sourceSocialAccounts.source_id, sourceId))
+    .orderBy(asc(sourceSocialAccounts.sort_order), asc(sourceSocialAccounts.id))
+    .all();
+}
+
+function attachSourceDetails(source: SourceRecord): Source {
+  return {
+    ...source,
+    authors: listAuthorsForSource(source.id),
+    social_accounts: listSocialAccountsForSource(source.id),
+  };
 }
 
 function getOrCreatePerson(author: SourceAuthorInput): number {
@@ -83,15 +116,35 @@ function replaceSourceAuthors(sourceId: number, authors: SourceAuthorInput[]): v
     .run();
 }
 
+function replaceSourceSocialAccounts(sourceId: number, accounts: SourceSocialAccountInput[]): void {
+  db.delete(sourceSocialAccounts).where(eq(sourceSocialAccounts.source_id, sourceId)).run();
+
+  if (accounts.length === 0) {
+    return;
+  }
+
+  const defaultIndex = accounts.findIndex((account) => account.is_default);
+
+  db.insert(sourceSocialAccounts)
+    .values(
+      accounts.map((account, index) => ({
+        source_id: sourceId,
+        label: account.label,
+        url: account.url,
+        avatar_url: account.avatar_url ?? null,
+        is_activitypub: account.is_activitypub ?? false,
+        is_default: defaultIndex === index,
+        sort_order: index,
+      }))
+    )
+    .run();
+}
+
 /**
  * List all sources
  */
 export function listSources(): Source[] {
-  return db
-    .select()
-    .from(sources)
-    .all()
-    .map((source) => attachAuthors(source));
+  return db.select().from(sources).all().map(attachSourceDetails);
 }
 
 /**
@@ -99,7 +152,7 @@ export function listSources(): Source[] {
  */
 export function getSource(id: number): Source | null {
   const source = db.select().from(sources).where(eq(sources.id, id)).get();
-  return source ? attachAuthors(source) : null;
+  return source ? attachSourceDetails(source) : null;
 }
 
 export interface SourceMetadataInput {
@@ -115,6 +168,7 @@ export interface CreateSourceInput extends SourceMetadataInput {
   url: string;
   feed_url?: string | null;
   authors?: SourceAuthorInput[];
+  social_accounts?: SourceSocialAccountInput[];
 }
 
 /**
@@ -126,6 +180,7 @@ export function createSource(input: CreateSourceInput): Source {
     url,
     feed_url,
     authors,
+    social_accounts,
     preview_title,
     preview_description,
     preview_image_url,
@@ -149,8 +204,9 @@ export function createSource(input: CreateSourceInput): Source {
     .get();
 
   replaceSourceAuthors(source.id, authors ?? []);
+  replaceSourceSocialAccounts(source.id, social_accounts ?? []);
 
-  return attachAuthors(source);
+  return attachSourceDetails(source);
 }
 
 export interface UpdateSourceInput extends SourceMetadataInput {
@@ -158,6 +214,7 @@ export interface UpdateSourceInput extends SourceMetadataInput {
   url?: string;
   feed_url?: string | null;
   authors?: SourceAuthorInput[];
+  social_accounts?: SourceSocialAccountInput[];
 }
 
 /**
@@ -211,6 +268,10 @@ export function updateSource(id: number, input: UpdateSourceInput): Source | nul
 
   if (input.authors !== undefined) {
     replaceSourceAuthors(id, input.authors);
+  }
+
+  if (input.social_accounts !== undefined) {
+    replaceSourceSocialAccounts(id, input.social_accounts);
   }
 
   return getSource(id);

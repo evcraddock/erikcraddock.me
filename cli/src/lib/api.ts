@@ -234,6 +234,13 @@ export class ApiClient {
     preview_site_name?: string | null;
     favicon_url?: string | null;
     authors?: Array<{ name: string }>;
+    social_accounts?: Array<{
+      label: string;
+      url: string;
+      avatar_url?: string | null;
+      is_activitypub?: boolean;
+      is_default?: boolean;
+    }>;
   }): Promise<ApiResponse<Source>> {
     return this.request<Source>("POST", "/sources", data);
   }
@@ -250,6 +257,13 @@ export class ApiClient {
       preview_site_name?: string | null;
       favicon_url?: string | null;
       authors?: Array<{ name: string }>;
+      social_accounts?: Array<{
+        label: string;
+        url: string;
+        avatar_url?: string | null;
+        is_activitypub?: boolean;
+        is_default?: boolean;
+      }>;
     }
   ): Promise<ApiResponse<Source>> {
     return this.request<Source>("PUT", `/sources/${id}`, data);
