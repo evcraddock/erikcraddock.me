@@ -1,7 +1,9 @@
 import { and, asc, eq, inArray } from "drizzle-orm";
+import type { BunSQLiteDatabase } from "drizzle-orm/bun-sqlite";
 import { Follow, type Recipient } from "@fedify/fedify";
 
-import { db, people, personSocialAccounts, remoteFollows } from "@/db";
+import * as schema from "@/db/schema";
+import { people, personSocialAccounts, remoteFollows } from "@/db/schema";
 import { logger } from "@/utils/logger";
 import { baseUrl, dateToInstant } from "./utils";
 
@@ -18,8 +20,15 @@ export type RemoteFollowStatus =
   | typeof REMOTE_FOLLOW_FAILED_STATUS
   | typeof REMOTE_FOLLOW_CANCELLED_STATUS;
 
-type FollowingDatabase = typeof db;
+type FollowingDatabase = BunSQLiteDatabase<typeof schema>;
 export type RemoteFollow = typeof remoteFollows.$inferSelect;
+
+function getDefaultDatabase(): FollowingDatabase {
+  // Keep the production database import lazy so tests that inject an in-memory DB
+  // do not open ./data/site.db at module load time.
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  return require("@/db").db as FollowingDatabase;
+}
 
 type FetchLike = typeof fetch;
 
@@ -347,7 +356,7 @@ export async function sendFollowActivity(follow: RemoteFollow): Promise<void> {
 
 export async function createOrRetryRemoteFollow({
   actor,
-  database = db,
+  database = getDefaultDatabase(),
   deliver = sendFollowActivity,
 }: {
   actor: ResolvedRemoteActor;
@@ -403,7 +412,9 @@ export async function createOrRetryRemoteFollow({
   }
 }
 
-export function listRemoteFollows(database: FollowingDatabase = db): RemoteFollow[] {
+export function listRemoteFollows(
+  database: FollowingDatabase = getDefaultDatabase()
+): RemoteFollow[] {
   return database
     .select()
     .from(remoteFollows)
@@ -413,7 +424,7 @@ export function listRemoteFollows(database: FollowingDatabase = db): RemoteFollo
 
 export function getRemoteFollowForActor(
   actorUri: string,
-  database: FollowingDatabase = db
+  database: FollowingDatabase = getDefaultDatabase()
 ): RemoteFollow | null {
   return (
     database.select().from(remoteFollows).where(eq(remoteFollows.actor_uri, actorUri)).get() ?? null
@@ -422,7 +433,7 @@ export function getRemoteFollowForActor(
 
 export function getRemoteFollowForPerson(
   personId: number,
-  database: FollowingDatabase = db
+  database: FollowingDatabase = getDefaultDatabase()
 ): RemoteFollow | null {
   return (
     database.select().from(remoteFollows).where(eq(remoteFollows.person_id, personId)).get() ?? null
