@@ -1,6 +1,6 @@
 import { and, asc, eq, inArray } from "drizzle-orm";
 import type { BunSQLiteDatabase } from "drizzle-orm/bun-sqlite";
-import { Accept, Follow, Reject, Undo, type Recipient } from "@fedify/fedify";
+import { Accept, Follow, Reject, Undo, type DocumentLoader, type Recipient } from "@fedify/fedify";
 
 import * as schema from "@/db/schema";
 import { people, personSocialAccounts, remoteFollows } from "@/db/schema";
@@ -31,6 +31,17 @@ function getDefaultDatabase(): FollowingDatabase {
 }
 
 type FetchLike = typeof fetch;
+type DocumentLoaderLike = DocumentLoader;
+
+class RemoteFetchError extends Error {
+  constructor(
+    message: string,
+    readonly status: number | null = null
+  ) {
+    super(message);
+    this.name = "RemoteFetchError";
+  }
+}
 
 export interface ResolvedRemoteActor {
   actorUri: string;
@@ -135,7 +146,10 @@ async function fetchJson<T>(url: URL, fetcher: FetchLike): Promise<T> {
       signal: controller.signal,
     });
     if (!response.ok) {
-      throw new Error(`Fetch failed for ${url.href}: ${response.status}`);
+      throw new RemoteFetchError(
+        `Fetch failed for ${url.href}: ${response.status}`,
+        response.status
+      );
     }
 
     const text = await response.text();
@@ -146,6 +160,49 @@ async function fetchJson<T>(url: URL, fetcher: FetchLike): Promise<T> {
     return JSON.parse(text) as T;
   } finally {
     clearTimeout(timeout);
+  }
+}
+
+async function fetchJsonWithDocumentLoader<T>(
+  url: URL,
+  documentLoader: DocumentLoaderLike
+): Promise<T> {
+  if (!isSafeRemoteUrl(url)) {
+    throw new Error(`Unsafe remote URL: ${url.href}`);
+  }
+
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 5000);
+  try {
+    const remoteDocument = await documentLoader(url.href, { signal: controller.signal });
+    return remoteDocument.document as T;
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
+async function getLocalActorDocumentLoader(): Promise<DocumentLoaderLike> {
+  const { federation } = await import("./setup");
+  const ctx = federation.createContext(new URL(baseUrl), undefined);
+  return ctx.getDocumentLoader({ identifier: "erik" });
+}
+
+async function fetchActorDocument<T>(
+  url: URL,
+  fetcher: FetchLike,
+  documentLoader?: DocumentLoaderLike
+): Promise<T> {
+  try {
+    return await fetchJson<T>(url, fetcher);
+  } catch (cause) {
+    const shouldRetrySigned =
+      fetcher === fetch &&
+      cause instanceof RemoteFetchError &&
+      [401, 403].includes(cause.status ?? 0);
+    if (!shouldRetrySigned && !documentLoader) throw cause;
+
+    const loader = documentLoader ?? (await getLocalActorDocumentLoader());
+    return fetchJsonWithDocumentLoader<T>(url, loader);
   }
 }
 
@@ -185,19 +242,30 @@ function validateRemoteUrl(value: string | null): string | null {
   }
 }
 
+function parseMastodonProfileUrl(url: URL): { username: string; host: string } | null {
+  const match = url.pathname.match(/^\/(@[A-Za-z0-9._-]+)\/?$/);
+  const username = match?.[1]?.slice(1);
+  if (!username) return null;
+  if (!isSafeRemoteUrl(url)) return null;
+  return { username, host: url.hostname.toLowerCase() };
+}
+
 export async function resolveRemoteActor(
   input: string,
-  fetcher: FetchLike = fetch
+  fetcher: FetchLike = fetch,
+  documentLoader?: DocumentLoaderLike
 ): Promise<ResolvedRemoteActor> {
   let directActorUrl: URL | null = null;
+  let parsedProfileUrl: { username: string; host: string } | null = null;
   if (input.trim().includes("://")) {
     try {
       directActorUrl = new URL(input.trim());
+      parsedProfileUrl = parseMastodonProfileUrl(directActorUrl);
     } catch {
       throw new Error("Actor URL is invalid");
     }
   }
-  const parsed = directActorUrl ? null : parseFediverseHandle(input);
+  const parsed = parsedProfileUrl ?? (directActorUrl ? null : parseFediverseHandle(input));
   if (!parsed && !directActorUrl) {
     throw new Error("Enter a Fediverse handle like @alice@example.social");
   }
@@ -206,7 +274,7 @@ export async function resolveRemoteActor(
   let handle: string | null = null;
   let fallbackUsername: string | null = null;
 
-  if (directActorUrl) {
+  if (directActorUrl && !parsedProfileUrl) {
     if (!isSafeRemoteUrl(directActorUrl)) {
       throw new Error("Actor URL is not safe to fetch");
     }
@@ -237,7 +305,7 @@ export async function resolveRemoteActor(
     throw new Error("Resolved actor URL is not safe to fetch");
   }
 
-  const actor = await fetchJson<ActorDocument>(actorUrl, fetcher);
+  const actor = await fetchActorDocument<ActorDocument>(actorUrl, fetcher, documentLoader);
   const actorUri = validateRemoteUrl(actor.id ?? actorUrl.href);
   const inboxUri = validateRemoteUrl(actor.inbox ?? null);
   if (!actorUri || !inboxUri) {
