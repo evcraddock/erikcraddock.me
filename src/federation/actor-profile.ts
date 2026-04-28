@@ -17,7 +17,18 @@ const PUBLIC_PROFILE_FIELDS: ActorProfileField[] = [
     href: "https://www.linkedin.com/in/erik-craddock-42aa9815",
     text: "linkedin.com/in/erik-craddock-42aa9815",
   },
+  {
+    name: "Facebook",
+    href: "https://www.facebook.com/evcraddock",
+    text: "facebook.com/evcraddock",
+  },
   { name: "YouTube", href: "https://youtube.com/@ErikCraddock", text: "youtube.com/@ErikCraddock" },
+  {
+    name: "Instagram",
+    href: "https://www.instagram.com/evcraddock",
+    text: "instagram.com/evcraddock",
+  },
+  { name: "Email", href: "mailto:erik@craddock.me", text: "erik@craddock.me" },
 ];
 
 export interface ActorProfileUris {
