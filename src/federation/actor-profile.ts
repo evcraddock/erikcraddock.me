@@ -25,6 +25,7 @@ export interface ActorProfileUris {
   inbox: URL;
   outbox: URL;
   followers: URL;
+  following: URL;
   sharedInbox: URL;
 }
 
@@ -83,6 +84,7 @@ export function buildActorProfile(options: BuildActorProfileOptions): Person {
     inbox: uris.inbox,
     outbox: uris.outbox,
     followers: uris.followers,
+    following: uris.following,
     endpoints: new Endpoints({ sharedInbox: uris.sharedInbox }),
     publicKey: keys[0]?.cryptographicKey,
     assertionMethods: keys.map((key) => key.multikey),

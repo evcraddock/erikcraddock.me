@@ -19,6 +19,7 @@ const uris: ActorProfileUris = {
   inbox: new URL("/users/erik/inbox", origin),
   outbox: new URL("/users/erik/outbox", origin),
   followers: new URL("/users/erik/followers", origin),
+  following: new URL("/users/erik/following", origin),
   sharedInbox: new URL("/inbox", origin),
 };
 
@@ -95,6 +96,7 @@ describe("actor profile metadata", () => {
       inbox: "https://erikcraddock.me/users/erik/inbox",
       outbox: "https://erikcraddock.me/users/erik/outbox",
       followers: "https://erikcraddock.me/users/erik/followers",
+      following: "https://erikcraddock.me/users/erik/following",
       url: "https://erikcraddock.me/",
     });
     expect(json.publicKey).toBeDefined();

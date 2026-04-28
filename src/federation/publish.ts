@@ -325,6 +325,7 @@ export async function sendActorUpdateActivity(): Promise<boolean> {
       inbox: ctx.getInboxUri("erik"),
       outbox: ctx.getOutboxUri("erik"),
       followers: ctx.getFollowersUri("erik"),
+      following: ctx.getFollowingUri("erik"),
       sharedInbox: ctx.getInboxUri(),
     },
     keys,

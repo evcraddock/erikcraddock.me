@@ -95,6 +95,7 @@ export function createFedifyFederation() {
           inbox: ctx.getInboxUri(identifier),
           outbox: ctx.getOutboxUri(identifier),
           followers: ctx.getFollowersUri(identifier),
+          following: ctx.getFollowingUri(identifier),
           sharedInbox: ctx.getInboxUri(),
         },
         keys,
@@ -207,6 +208,17 @@ export function createFedifyFederation() {
       // First page starts at offset 0
       return "0";
     });
+
+  // Set up following collection dispatcher - this single-user site does not follow actors yet
+  federation
+    .setFollowingDispatcher("/users/{identifier}/following", async (_ctx, identifier) => {
+      if (identifier !== "erik") {
+        return null;
+      }
+
+      return { items: [] };
+    })
+    .setCounter((_ctx, identifier) => (identifier === "erik" ? 0 : null));
 
   // Set up followers collection dispatcher - returns list of followers
   federation
