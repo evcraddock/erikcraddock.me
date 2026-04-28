@@ -1089,11 +1089,11 @@ describe("pages routes", () => {
       const followedHtml = await followedRes.text();
 
       expect(followedHtml).toContain(">Pending</span>");
-      expect(followedHtml).toContain('action="/people/1/follow/cancel"');
+      expect(followedHtml).toContain('action="/people/1/follow/unfollow"');
       expect(followedHtml).not.toContain('action="/people/1/follow"');
 
       mockContextSendActivity.mockClear();
-      const cancelRes = await app.request("/people/1/follow/cancel", {
+      const cancelRes = await app.request("/people/1/follow/unfollow", {
         method: "POST",
         headers: { Cookie: `session=${sessionId}` },
       });
@@ -1102,6 +1102,79 @@ describe("pages routes", () => {
       expect(
         testDb.select().from(remoteFollows).where(eq(remoteFollows.person_id, 1)).get()?.status
       ).toBe("cancelled");
+      expect(mockContextSendActivity).toHaveBeenCalledTimes(1);
+    });
+
+    it("lets authenticated users unfollow accepted follows from person cards", async () => {
+      testDb.delete(remoteFollows).run();
+      const author = testDb
+        .insert(authors)
+        .values({
+          email: `person-unfollow-${crypto.randomUUID()}@example.com`,
+          created_at: new Date(),
+        })
+        .returning()
+        .get();
+      const sessionId = `person-unfollow-session-${crypto.randomUUID()}`;
+      testDb
+        .insert(sessions)
+        .values({
+          id: sessionId,
+          author_id: author.id,
+          expires_at: new Date(Date.now() + 60 * 60 * 1000),
+          created_at: new Date(),
+        })
+        .run();
+      testDb
+        .insert(remoteFollows)
+        .values({
+          person_id: 1,
+          actor_uri: "https://mastodon.social/users/testauthor",
+          handle: "@testauthor@mastodon.social",
+          preferred_username: "testauthor",
+          display_name: "Test Author",
+          profile_url: "https://mastodon.social/@testauthor",
+          inbox_uri: "https://mastodon.social/users/testauthor/inbox",
+          follow_activity_uri: "http://localhost:5000/activities/follow/testauthor",
+          status: "accepted",
+          followed_at: new Date(),
+          accepted_at: new Date(),
+          created_at: new Date(),
+          updated_at: new Date(),
+        })
+        .run();
+
+      const app = getApp();
+      const pageRes = await app.request("/people/1", {
+        headers: { Cookie: `session=${sessionId}` },
+      });
+      const html = await pageRes.text();
+
+      expect(html).toContain(">Following</span>");
+      expect(html).toContain('action="/people/1/follow/unfollow"');
+
+      mockContextSendActivity.mockClear();
+      const unfollowRes = await app.request("/people/1/follow/unfollow", {
+        method: "POST",
+        headers: { Cookie: `session=${sessionId}` },
+      });
+
+      const stored = testDb
+        .select()
+        .from(remoteFollows)
+        .where(eq(remoteFollows.person_id, 1))
+        .get();
+      expect(unfollowRes.status).toBe(302);
+      expect(stored?.status).toBe("cancelled");
+      expect(stored?.unfollowed_at).toBeInstanceOf(Date);
+      expect(testDb.select().from(people).where(eq(people.id, 1)).get()).toBeTruthy();
+      expect(
+        testDb
+          .select()
+          .from(personSocialAccounts)
+          .where(eq(personSocialAccounts.person_id, 1))
+          .all()
+      ).not.toHaveLength(0);
       expect(mockContextSendActivity).toHaveBeenCalledTimes(1);
     });
 

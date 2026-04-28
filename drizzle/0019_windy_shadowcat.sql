@@ -1,0 +1,1 @@
+ALTER TABLE `remote_follows` ADD `unfollowed_at` integer;
