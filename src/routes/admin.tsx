@@ -1,6 +1,8 @@
 import { Hono } from "hono";
+import { desc } from "drizzle-orm";
 import { Layout } from "@/templates/layout";
 import { requireAuth, requireAdmin } from "@/auth/middleware";
+import { db, followers } from "@/db";
 import { listApiKeys, createApiKey, revokeApiKey, getAuthorByEmail } from "@/auth/api-key";
 import { listAuthors, addAuthor, deleteAuthor } from "@/auth/authors";
 import {
@@ -40,6 +42,11 @@ function AdminNav({ isAdmin }: { isAdmin: boolean }) {
         <li>
           <a href="/admin/passkeys" class="text-blue-600 dark:text-blue-400 hover:underline">
             Passkeys
+          </a>
+        </li>
+        <li>
+          <a href="/admin/followers" class="text-blue-600 dark:text-blue-400 hover:underline">
+            Followers
           </a>
         </li>
         {isAdmin && (
@@ -87,6 +94,23 @@ function formatDate(date: Date | null): string {
 }
 
 /**
+ * Format date and time for ActivityPub admin records.
+ */
+function formatDateTime(date: Date): string {
+  return date.toLocaleString("en-US", {
+    year: "numeric",
+    month: "short",
+    day: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+  });
+}
+
+function MissingValue() {
+  return <span class="text-gray-400 dark:text-gray-500">Not provided</span>;
+}
+
+/**
  * GET /admin - Admin dashboard
  */
 admin.get("/", (c) => {
@@ -97,14 +121,115 @@ admin.get("/", (c) => {
       <div class="max-w-4xl mx-auto">
         <AdminHeader title="Admin Dashboard" isAdmin={auth.isAdmin} />
 
-        <div class="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
-          <h2 class="text-lg font-semibold mb-4">Welcome</h2>
-          <p class="text-gray-600 dark:text-gray-300 mb-2">
-            Logged in as <span class="font-medium text-gray-900 dark:text-white">{auth.email}</span>
-          </p>
-          <p class="text-sm text-gray-500 dark:text-gray-400">
-            Role: {auth.isAdmin ? "Admin" : "Author"}
-          </p>
+        <div class="grid gap-6 md:grid-cols-2">
+          <div class="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
+            <h2 class="text-lg font-semibold mb-4">Welcome</h2>
+            <p class="text-gray-600 dark:text-gray-300 mb-2">
+              Logged in as{" "}
+              <span class="font-medium text-gray-900 dark:text-white">{auth.email}</span>
+            </p>
+            <p class="text-sm text-gray-500 dark:text-gray-400">
+              Role: {auth.isAdmin ? "Admin" : "Author"}
+            </p>
+          </div>
+
+          <a
+            href="/admin/followers"
+            class="block bg-white dark:bg-gray-800 rounded-lg shadow p-6 hover:ring-2 hover:ring-blue-500"
+          >
+            <h2 class="text-lg font-semibold mb-2">ActivityPub Followers</h2>
+            <p class="text-sm text-gray-500 dark:text-gray-400">
+              Inspect remote Fediverse accounts that follow this site.
+            </p>
+          </a>
+        </div>
+      </div>
+    </Layout>
+  );
+});
+
+/**
+ * GET /admin/followers - ActivityPub follower inspection
+ */
+admin.get("/followers", (c) => {
+  const auth = c.get("auth");
+  const storedFollowers = db.select().from(followers).orderBy(desc(followers.followed_at)).all();
+  const followerCount = storedFollowers.length;
+
+  return c.html(
+    <Layout title="Followers | Admin">
+      <div class="max-w-5xl mx-auto">
+        <AdminHeader title="ActivityPub Followers" isAdmin={auth.isAdmin} />
+
+        <div class="mb-6 grid gap-4 sm:grid-cols-2">
+          <div class="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
+            <p class="text-sm font-medium text-gray-500 dark:text-gray-400">Stored followers</p>
+            <p class="mt-2 text-3xl font-bold text-gray-950 dark:text-white">{followerCount}</p>
+          </div>
+          <div class="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
+            <p class="text-sm font-medium text-gray-500 dark:text-gray-400">Page status</p>
+            <p class="mt-2 text-lg font-semibold text-gray-950 dark:text-white">Read-only</p>
+            <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">
+              Approval, rejection, and removal are handled by separate tasks.
+            </p>
+          </div>
+        </div>
+
+        <div class="bg-white dark:bg-gray-800 rounded-lg shadow overflow-hidden">
+          {storedFollowers.length === 0 ? (
+            <div class="p-6 text-gray-600 dark:text-gray-300">
+              <h2 class="text-lg font-semibold text-gray-950 dark:text-white mb-2">
+                No ActivityPub followers yet
+              </h2>
+              <p>When remote Fediverse accounts follow this site, they will appear here.</p>
+            </div>
+          ) : (
+            <div class="overflow-x-auto">
+              <table class="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+                <thead class="bg-gray-50 dark:bg-gray-900">
+                  <tr>
+                    <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">
+                      Actor
+                    </th>
+                    <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">
+                      Inbox
+                    </th>
+                    <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">
+                      Shared inbox
+                    </th>
+                    <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">
+                      Followed
+                    </th>
+                  </tr>
+                </thead>
+                <tbody class="divide-y divide-gray-200 dark:divide-gray-700">
+                  {storedFollowers.map((follower) => (
+                    <tr>
+                      <td class="px-4 py-3 align-top text-sm">
+                        <a
+                          href={follower.actor_uri}
+                          class="break-all text-blue-600 hover:underline dark:text-blue-400"
+                          rel="noopener noreferrer"
+                          target="_blank"
+                        >
+                          {follower.actor_uri}
+                        </a>
+                      </td>
+                      <td class="px-4 py-3 align-top text-sm text-gray-700 dark:text-gray-300 break-all">
+                        {follower.inbox_uri}
+                      </td>
+                      <td class="px-4 py-3 align-top text-sm text-gray-700 dark:text-gray-300 break-all">
+                        {follower.shared_inbox_uri ?? <MissingValue />}
+                      </td>
+                      <td class="px-4 py-3 align-top text-sm text-gray-700 dark:text-gray-300 whitespace-nowrap">
+                        {formatDateTime(follower.followed_at)}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
         </div>
       </div>
     </Layout>
