@@ -69,9 +69,16 @@ mock.module("@/auth/api-key", () => {
     validateApiKey: async () => ({ email: "test@example.com" }),
     // Mock middleware to bypass auth
     requireApiKey: async (
-      c: { set: (key: string, value: unknown) => void },
+      c: {
+        req: { header: (name: string) => string | undefined };
+        json: (body: unknown, status: number) => Response;
+        set: (key: string, value: unknown) => void;
+      },
       next: () => Promise<void>
     ) => {
+      if (c.req.header("Authorization") !== "Bearer ek_test") {
+        return c.json({ error: "Invalid or missing API key" }, 401);
+      }
       c.set("apiAuth", { email: "test@example.com" });
       await next();
     },
@@ -1855,6 +1862,109 @@ describe("Remote following API", () => {
     expect(createBody.data.status).toBe("pending");
     expect(listBody.data).toHaveLength(1);
     expect(listBody.data[0].actor_uri).toBe("https://example.social/users/alice");
+  });
+
+  it("unfollows accepted follows and preserves historical rows", async () => {
+    const person = testDb
+      .insert(people)
+      .values({ name: "Alice Example", url: "https://example.social/@alice" })
+      .returning()
+      .get();
+    testDb
+      .insert(personSocialAccounts)
+      .values({
+        person_id: person.id,
+        label: "ActivityPub",
+        url: "https://example.social/@alice",
+        is_activitypub: true,
+        is_default: true,
+        sort_order: 0,
+      })
+      .run();
+    const follow = testDb
+      .insert(remoteFollows)
+      .values({
+        person_id: person.id,
+        actor_uri: "https://example.social/users/alice",
+        handle: "@alice@example.social",
+        display_name: "Alice Example",
+        profile_url: "https://example.social/@alice",
+        inbox_uri: "https://example.social/users/alice/inbox",
+        follow_activity_uri: "http://localhost:5000/activities/follow/alice",
+        status: "accepted",
+        followed_at: new Date(),
+        accepted_at: new Date(),
+        created_at: new Date(),
+        updated_at: new Date(),
+      })
+      .returning()
+      .get();
+    const { api } = await import("../api");
+
+    const res = await api.request("/following/unfollow", {
+      method: "POST",
+      headers: { ...authHeader, "Content-Type": "application/json" },
+      body: JSON.stringify({ id: follow.id }),
+    });
+    const body = await res.json();
+    const stored = testDb.select().from(remoteFollows).get();
+
+    expect(res.status).toBe(200);
+    expect(body.data.status).toBe("cancelled");
+    expect(typeof body.data.unfollowed_at).toBe("string");
+    expect(stored?.status).toBe("cancelled");
+    expect(stored?.unfollowed_at).toBeInstanceOf(Date);
+    expect(testDb.select().from(people).all()).toHaveLength(1);
+    expect(testDb.select().from(personSocialAccounts).all()).toHaveLength(1);
+    expect(mockContextSendActivity).toHaveBeenCalledTimes(1);
+    const sentActivity = (mockContextSendActivity.mock.calls[0] as unknown[] | undefined)?.[2] as
+      | { objectId?: URL }
+      | undefined;
+    expect(sentActivity?.objectId?.href).toBe(follow.follow_activity_uri);
+  });
+
+  it("does not send duplicate Undo activities for already cancelled follows", async () => {
+    const follow = testDb
+      .insert(remoteFollows)
+      .values({
+        actor_uri: "https://example.social/users/alice",
+        handle: "@alice@example.social",
+        display_name: "Alice Example",
+        profile_url: "https://example.social/@alice",
+        inbox_uri: "https://example.social/users/alice/inbox",
+        follow_activity_uri: "http://localhost:5000/activities/follow/alice",
+        status: "cancelled",
+        followed_at: new Date(),
+        unfollowed_at: new Date(),
+        created_at: new Date(),
+        updated_at: new Date(),
+      })
+      .returning()
+      .get();
+    const { api } = await import("../api");
+
+    const res = await api.request("/following/unfollow", {
+      method: "POST",
+      headers: { ...authHeader, "Content-Type": "application/json" },
+      body: JSON.stringify({ id: follow.id }),
+    });
+    const body = await res.json();
+
+    expect(res.status).toBe(200);
+    expect(body.data.status).toBe("cancelled");
+    expect(mockContextSendActivity).not.toHaveBeenCalled();
+  });
+
+  it("requires authentication for unfollow API requests", async () => {
+    const { api } = await import("../api");
+
+    const res = await api.request("/following/unfollow", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ id: 1 }),
+    });
+
+    expect(res.status).toBe(401);
   });
 
   it("cancels pending follows", async () => {

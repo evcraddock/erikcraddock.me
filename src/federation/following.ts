@@ -538,6 +538,51 @@ export function handleRejectActivity(
   });
 }
 
+function canUndoRemoteFollow(status: string): boolean {
+  return status === REMOTE_FOLLOW_PENDING_STATUS || status === REMOTE_FOLLOW_ACCEPTED_STATUS;
+}
+
+export async function unfollowRemoteFollow({
+  followId,
+  database = getDefaultDatabase(),
+  deliver = sendUndoFollowActivity,
+}: {
+  followId: number;
+  database?: FollowingDatabase;
+  deliver?: (follow: RemoteFollow) => Promise<void>;
+}): Promise<RemoteFollow | null> {
+  const follow = database.select().from(remoteFollows).where(eq(remoteFollows.id, followId)).get();
+  if (!follow) return null;
+  if (!canUndoRemoteFollow(follow.status)) {
+    return follow;
+  }
+
+  try {
+    await deliver(follow);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    database
+      .update(remoteFollows)
+      .set({ last_error: message, updated_at: new Date() })
+      .where(eq(remoteFollows.id, follow.id))
+      .run();
+    throw error;
+  }
+
+  const now = new Date();
+  return database
+    .update(remoteFollows)
+    .set({
+      status: REMOTE_FOLLOW_CANCELLED_STATUS,
+      last_error: null,
+      unfollowed_at: now,
+      updated_at: now,
+    })
+    .where(eq(remoteFollows.id, follow.id))
+    .returning()
+    .get();
+}
+
 export async function cancelPendingRemoteFollow({
   followId,
   database = getDefaultDatabase(),
@@ -553,24 +598,7 @@ export async function cancelPendingRemoteFollow({
     throw new Error("Only pending follow requests can be cancelled");
   }
 
-  try {
-    await deliver(follow);
-  } catch (error) {
-    const message = error instanceof Error ? error.message : String(error);
-    database
-      .update(remoteFollows)
-      .set({ status: REMOTE_FOLLOW_FAILED_STATUS, last_error: message, updated_at: new Date() })
-      .where(eq(remoteFollows.id, follow.id))
-      .run();
-    throw error;
-  }
-
-  return database
-    .update(remoteFollows)
-    .set({ status: REMOTE_FOLLOW_CANCELLED_STATUS, last_error: null, updated_at: new Date() })
-    .where(eq(remoteFollows.id, follow.id))
-    .returning()
-    .get();
+  return unfollowRemoteFollow({ followId, database, deliver });
 }
 
 export function listRemoteFollows(

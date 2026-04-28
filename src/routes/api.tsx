@@ -51,6 +51,7 @@ import {
   createOrRetryRemoteFollow,
   listRemoteFollows,
   resolveRemoteActor,
+  unfollowRemoteFollow,
 } from "@/federation/following";
 import {
   federatePost,
@@ -2546,6 +2547,7 @@ protectedApi.get("/following", (c) => {
     followed_at: follow.followed_at.toISOString(),
     accepted_at: follow.accepted_at?.toISOString() ?? null,
     rejected_at: follow.rejected_at?.toISOString() ?? null,
+    unfollowed_at: follow.unfollowed_at?.toISOString() ?? null,
   }));
   return c.json({ data: follows });
 });
@@ -2562,6 +2564,32 @@ protectedApi.post("/following/resolve", async (c) => {
   } catch (cause) {
     const message = cause instanceof Error ? cause.message : String(cause);
     return c.json({ error: message }, 400);
+  }
+});
+
+protectedApi.post("/following/unfollow", async (c) => {
+  const body = (await c.req.json().catch(() => null)) as { id?: number } | null;
+  const id = Number(body?.id);
+  if (!Number.isInteger(id) || id < 1) {
+    return c.json({ error: "Invalid follow ID" }, 400);
+  }
+
+  try {
+    const follow = await unfollowRemoteFollow({ followId: id });
+    if (!follow) {
+      return c.json({ error: "Follow not found" }, 404);
+    }
+    return c.json({
+      data: {
+        id: follow.id,
+        actor_uri: follow.actor_uri,
+        status: follow.status,
+        unfollowed_at: follow.unfollowed_at?.toISOString() ?? null,
+      },
+    });
+  } catch (cause) {
+    const message = cause instanceof Error ? cause.message : String(cause);
+    return c.json({ error: message }, 409);
   }
 });
 

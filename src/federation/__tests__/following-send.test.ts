@@ -1,3 +1,4 @@
+import { eq } from "drizzle-orm";
 import { Accept, Follow, Reject } from "@fedify/fedify";
 import { describe, it, expect } from "bun:test";
 import { createTestDb } from "../../db/test-utils";
@@ -14,6 +15,7 @@ import {
   REMOTE_FOLLOW_REJECTED_STATUS,
   handleAcceptActivity,
   handleRejectActivity,
+  unfollowRemoteFollow,
   type ResolvedRemoteActor,
 } from "../following";
 
@@ -173,6 +175,90 @@ describe("ActivityPub following send workflow", () => {
     expect(delivered).toEqual([follow.follow_activity_uri]);
     expect(testDb.select().from(people).all()).toHaveLength(1);
     expect(testDb.select().from(remoteFollows).all()).toHaveLength(1);
+  });
+
+  it("unfollows accepted follows with the original Follow activity URI", async () => {
+    const testDb = createTestDb();
+    const follow = await createOrRetryRemoteFollow({
+      actor: actor(),
+      database: testDb,
+      deliver: async () => {},
+    });
+    await handleAcceptActivity(
+      new Accept({
+        actor: new URL(follow.actor_uri),
+        object: new Follow({
+          id: new URL(follow.follow_activity_uri),
+          actor: new URL("/users/erik", new URL(follow.follow_activity_uri).origin),
+          object: new URL(follow.actor_uri),
+        }),
+      }),
+      testDb
+    );
+    const delivered: string[] = [];
+
+    const unfollowed = await unfollowRemoteFollow({
+      followId: follow.id,
+      database: testDb,
+      deliver: async (storedFollow) => {
+        delivered.push(storedFollow.follow_activity_uri);
+      },
+    });
+
+    expect(unfollowed?.status).toBe(REMOTE_FOLLOW_CANCELLED_STATUS);
+    expect(unfollowed?.unfollowed_at).toBeInstanceOf(Date);
+    expect(delivered).toEqual([follow.follow_activity_uri]);
+    expect(testDb.select().from(people).all()).toHaveLength(1);
+    expect(testDb.select().from(personSocialAccounts).all()).toHaveLength(1);
+  });
+
+  it("does not resend Undo activities for terminal follows", async () => {
+    const testDb = createTestDb();
+    const follow = await createOrRetryRemoteFollow({
+      actor: actor(),
+      database: testDb,
+      deliver: async () => {},
+    });
+    await cancelPendingRemoteFollow({
+      followId: follow.id,
+      database: testDb,
+      deliver: async () => {},
+    });
+    const delivered: string[] = [];
+
+    const unchanged = await unfollowRemoteFollow({
+      followId: follow.id,
+      database: testDb,
+      deliver: async (storedFollow) => {
+        delivered.push(storedFollow.follow_activity_uri);
+      },
+    });
+
+    expect(unchanged?.status).toBe(REMOTE_FOLLOW_CANCELLED_STATUS);
+    expect(delivered).toEqual([]);
+  });
+
+  it("stores delivery errors without corrupting follow status", async () => {
+    const testDb = createTestDb();
+    const follow = await createOrRetryRemoteFollow({
+      actor: actor(),
+      database: testDb,
+      deliver: async () => {},
+    });
+
+    await expect(
+      unfollowRemoteFollow({
+        followId: follow.id,
+        database: testDb,
+        deliver: async () => {
+          throw new Error("Inbox unavailable");
+        },
+      })
+    ).rejects.toThrow("Inbox unavailable");
+
+    const stored = testDb.select().from(remoteFollows).where(eq(remoteFollows.id, follow.id)).get();
+    expect(stored?.status).toBe(REMOTE_FOLLOW_PENDING_STATUS);
+    expect(stored?.last_error).toBe("Inbox unavailable");
   });
 
   it("marks pending follows accepted from valid Accept activities", async () => {

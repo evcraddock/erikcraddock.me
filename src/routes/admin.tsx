@@ -12,12 +12,13 @@ import {
   deletePasskey,
 } from "@/auth/passkey";
 import {
+  REMOTE_FOLLOW_ACCEPTED_STATUS,
   REMOTE_FOLLOW_PENDING_STATUS,
-  cancelPendingRemoteFollow,
   createOrRetryRemoteFollow,
   getRemoteFollowStatusLabel,
   listRemoteFollows,
   resolveRemoteActor,
+  unfollowRemoteFollow,
   type ResolvedRemoteActor,
 } from "@/federation/following";
 
@@ -390,7 +391,9 @@ admin.get("/following", async (c) => {
                       </td>
                       <td class="px-3 py-2 text-sm">{formatDateTime(follow.followed_at)}</td>
                       <td class="px-3 py-2 text-sm">
-                        {follow.accepted_at ? (
+                        {follow.unfollowed_at ? (
+                          <span>Unfollowed {formatDateTime(follow.unfollowed_at)}</span>
+                        ) : follow.accepted_at ? (
                           <span>Accepted {formatDateTime(follow.accepted_at)}</span>
                         ) : follow.rejected_at ? (
                           <span>Rejected {formatDateTime(follow.rejected_at)}</span>
@@ -399,13 +402,16 @@ admin.get("/following", async (c) => {
                         )}
                       </td>
                       <td class="px-3 py-2 text-sm">
-                        {follow.status === REMOTE_FOLLOW_PENDING_STATUS ? (
-                          <form method="post" action={`/admin/following/${follow.id}/cancel`}>
+                        {follow.status === REMOTE_FOLLOW_PENDING_STATUS ||
+                        follow.status === REMOTE_FOLLOW_ACCEPTED_STATUS ? (
+                          <form method="post" action={`/admin/following/${follow.id}/unfollow`}>
                             <button
                               class="rounded bg-gray-200 px-3 py-1 text-sm font-semibold text-gray-800 hover:bg-gray-300 dark:bg-gray-700 dark:text-gray-100 dark:hover:bg-gray-600"
                               type="submit"
                             >
-                              Cancel request
+                              {follow.status === REMOTE_FOLLOW_PENDING_STATUS
+                                ? "Cancel request"
+                                : "Unfollow"}
                             </button>
                           </form>
                         ) : (
@@ -424,15 +430,18 @@ admin.get("/following", async (c) => {
   );
 });
 
-admin.post("/following/:id/cancel", async (c) => {
+admin.post("/following/:id/unfollow", async (c) => {
   const id = Number(c.req.param("id"));
   if (!Number.isInteger(id) || id < 1) {
     return c.redirect("/admin/following?error=Invalid follow request");
   }
 
   try {
-    await cancelPendingRemoteFollow({ followId: id });
-    return c.redirect("/admin/following?success=Follow request cancelled");
+    const follow = await unfollowRemoteFollow({ followId: id });
+    if (!follow) {
+      return c.redirect("/admin/following?error=Follow not found");
+    }
+    return c.redirect("/admin/following?success=Account unfollowed");
   } catch (cause) {
     const message = cause instanceof Error ? cause.message : String(cause);
     return c.redirect(`/admin/following?error=${encodeURIComponent(message)}`);

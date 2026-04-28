@@ -125,6 +125,7 @@ export const remoteFollows = sqliteTable("remote_follows", {
   followed_at: integer("followed_at", { mode: "timestamp" }).notNull(),
   accepted_at: integer("accepted_at", { mode: "timestamp" }),
   rejected_at: integer("rejected_at", { mode: "timestamp" }),
+  unfollowed_at: integer("unfollowed_at", { mode: "timestamp" }),
   created_at: integer("created_at", { mode: "timestamp" }).notNull(),
   updated_at: integer("updated_at", { mode: "timestamp" }).notNull(),
 });

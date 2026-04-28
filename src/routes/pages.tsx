@@ -33,12 +33,14 @@ import { logger } from "../utils/logger";
 import { getRemoteLikeCountForPost } from "../federation/likes";
 import { getRemoteBoostCountForPost } from "../federation/boosts";
 import {
+  REMOTE_FOLLOW_ACCEPTED_STATUS,
   REMOTE_FOLLOW_PENDING_STATUS,
   cancelPendingRemoteFollow,
   createOrRetryRemoteFollow,
   getRemoteFollowForPerson,
   getRemoteFollowStatusLabel,
   resolveRemoteActor,
+  unfollowRemoteFollow,
 } from "../federation/following";
 import {
   approveRemoteComment,
@@ -270,13 +272,14 @@ function PersonCard({
                     <span class="inline-flex rounded-full bg-teal-100 px-3 py-1 text-sm font-semibold text-teal-800 dark:bg-teal-900/40 dark:text-teal-200">
                       {getRemoteFollowStatusLabel(followStatus)}
                     </span>
-                    {followStatus === REMOTE_FOLLOW_PENDING_STATUS ? (
-                      <form method="post" action={`/people/${person.id}/follow/cancel`}>
+                    {followStatus === REMOTE_FOLLOW_PENDING_STATUS ||
+                    followStatus === REMOTE_FOLLOW_ACCEPTED_STATUS ? (
+                      <form method="post" action={`/people/${person.id}/follow/unfollow`}>
                         <button
                           type="submit"
                           class="inline-flex rounded-full bg-gray-200 px-3 py-1 text-sm font-semibold text-gray-800 transition hover:bg-gray-300 dark:bg-gray-700 dark:text-gray-100 dark:hover:bg-gray-600"
                         >
-                          Cancel
+                          {followStatus === REMOTE_FOLLOW_PENDING_STATUS ? "Cancel" : "Unfollow"}
                         </button>
                       </form>
                     ) : null}
@@ -2840,6 +2843,30 @@ export function createPagesRoutes(db: Database): Hono {
         </div>
       </Layout>
     );
+  });
+
+  pages.post("/people/:id/follow/unfollow", async (c) => {
+    if (!getAuthenticatedUserEmail(c, db)) {
+      return c.redirect("/login");
+    }
+
+    const id = Number(c.req.param("id"));
+    if (!Number.isInteger(id) || id < 1) {
+      return c.redirect("/people?error=Invalid person");
+    }
+
+    const follow = getRemoteFollowForPerson(id, db);
+    if (!follow) {
+      return c.redirect(`/people/${id}?error=${encodeURIComponent("No follow record found")}`);
+    }
+
+    try {
+      await unfollowRemoteFollow({ followId: follow.id, database: db });
+      return c.redirect(`/people/${id}?success=${encodeURIComponent("Account unfollowed")}`);
+    } catch (cause) {
+      const message = cause instanceof Error ? cause.message : String(cause);
+      return c.redirect(`/people/${id}?error=${encodeURIComponent(message)}`);
+    }
   });
 
   pages.post("/people/:id/follow/cancel", async (c) => {

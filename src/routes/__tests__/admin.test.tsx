@@ -252,38 +252,65 @@ describe("admin following page", () => {
     expect(html).toContain("Rejected Apr 20, 2026");
   });
 
-  it("lets admins cancel pending follow requests", async () => {
-    const follow = testDb
+  it("lets admins unfollow pending and accepted follow requests", async () => {
+    const now = new Date();
+    const [pending, accepted] = testDb
       .insert(remoteFollows)
-      .values({
-        actor_uri: "https://example.social/users/alice",
-        handle: "@alice@example.social",
-        display_name: "Alice Example",
-        profile_url: "https://example.social/@alice",
-        inbox_uri: "https://example.social/users/alice/inbox",
-        follow_activity_uri: "http://localhost:5000/activities/follow/alice",
-        status: "pending",
-        followed_at: new Date(),
-        created_at: new Date(),
-        updated_at: new Date(),
-      })
+      .values([
+        {
+          actor_uri: "https://example.social/users/alice",
+          handle: "@alice@example.social",
+          display_name: "Alice Example",
+          profile_url: "https://example.social/@alice",
+          inbox_uri: "https://example.social/users/alice/inbox",
+          follow_activity_uri: "http://localhost:5000/activities/follow/alice",
+          status: "pending",
+          followed_at: now,
+          created_at: now,
+          updated_at: now,
+        },
+        {
+          actor_uri: "https://example.social/users/bob",
+          handle: "@bob@example.social",
+          display_name: "Bob Example",
+          profile_url: "https://example.social/@bob",
+          inbox_uri: "https://example.social/users/bob/inbox",
+          follow_activity_uri: "http://localhost:5000/activities/follow/bob",
+          status: "accepted",
+          followed_at: now,
+          accepted_at: now,
+          created_at: now,
+          updated_at: now,
+        },
+      ])
       .returning()
-      .get();
+      .all();
 
     const { admin } = await import("../admin");
 
     const pageRes = await admin.request(authenticatedRequest("/following"));
     const html = await pageRes.text();
-    expect(html).toContain(`action="/admin/following/${follow.id}/cancel"`);
+    expect(html).toContain(`action="/admin/following/${pending!.id}/unfollow"`);
+    expect(html).toContain(`action="/admin/following/${accepted!.id}/unfollow"`);
     expect(html).toContain("Cancel request");
+    expect(html).toContain("Unfollow");
 
-    const cancelRes = await admin.request(authenticatedRequest(`/following/${follow.id}/cancel`), {
-      method: "POST",
-    });
+    const pendingRes = await admin.request(
+      authenticatedRequest(`/following/${pending!.id}/unfollow`),
+      {
+        method: "POST",
+      }
+    );
+    const acceptedRes = await admin.request(
+      authenticatedRequest(`/following/${accepted!.id}/unfollow`),
+      { method: "POST" }
+    );
 
-    const stored = testDb.select().from(remoteFollows).get();
-    expect(cancelRes.status).toBe(302);
-    expect(stored?.status).toBe("cancelled");
-    expect(mockContextSendActivity).toHaveBeenCalledTimes(1);
+    const stored = testDb.select().from(remoteFollows).all();
+    expect(pendingRes.status).toBe(302);
+    expect(acceptedRes.status).toBe(302);
+    expect(stored.every((follow) => follow.status === "cancelled")).toBe(true);
+    expect(stored.every((follow) => follow.unfollowed_at instanceof Date)).toBe(true);
+    expect(mockContextSendActivity).toHaveBeenCalledTimes(2);
   });
 });
