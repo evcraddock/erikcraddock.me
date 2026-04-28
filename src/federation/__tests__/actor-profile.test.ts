@@ -9,6 +9,7 @@ import {
   buildActorMetadata,
   buildActorProfile,
   buildActorUpdateActivity,
+  getPublicProfileFields,
   type ActorProfileUris,
 } from "../actor-profile";
 
@@ -59,10 +60,42 @@ function attachmentMap(json: Record<string, unknown>): Map<string, Record<string
 }
 
 describe("actor profile metadata", () => {
+  it("exposes structured public profile fields for page rendering", () => {
+    expect(getPublicProfileFields(origin)).toEqual([
+      { name: "Website", href: "https://erikcraddock.me/", text: "erikcraddock.me" },
+      {
+        name: "GitHub",
+        href: "https://github.com/evcraddock",
+        text: "github.com/evcraddock",
+      },
+      {
+        name: "LinkedIn",
+        href: "https://www.linkedin.com/in/erik-craddock-42aa9815",
+        text: "linkedin.com/in/erik-craddock-42aa9815",
+      },
+      {
+        name: "Facebook",
+        href: "https://www.facebook.com/evcraddock",
+        text: "facebook.com/evcraddock",
+      },
+      {
+        name: "YouTube",
+        href: "https://youtube.com/@ErikCraddock",
+        text: "youtube.com/@ErikCraddock",
+      },
+      {
+        name: "Instagram",
+        href: "https://www.instagram.com/evcraddock",
+        text: "instagram.com/evcraddock",
+      },
+      { name: "Email", href: "mailto:erik@craddock.me", text: "erik@craddock.me" },
+    ]);
+  });
+
   it("builds Mastodon-compatible PropertyValue profile fields", async () => {
     const metadata = buildActorMetadata(origin);
 
-    expect(metadata).toHaveLength(4);
+    expect(metadata).toHaveLength(7);
 
     const json = await Promise.all(
       metadata.map((propertyValue) => propertyValue.toJsonLd() as Promise<Record<string, unknown>>)
@@ -107,6 +140,10 @@ describe("actor profile metadata", () => {
     );
     expect(attachments.get("LinkedIn")?.type).toBe("PropertyValue");
     expect(attachments.get("YouTube")?.type).toBe("PropertyValue");
+    expect(attachments.get("Instagram")?.type).toBe("PropertyValue");
+    expect(attachments.get("Email")?.value).toBe(
+      '<a href="mailto:erik@craddock.me" rel="me">erik@craddock.me</a>'
+    );
   });
 
   it("uses the same metadata for actor Update activities as the actor profile", async () => {

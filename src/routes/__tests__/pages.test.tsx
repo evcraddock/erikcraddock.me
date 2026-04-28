@@ -580,21 +580,37 @@ describe("pages routes", () => {
       expect(html).toContain("Follow");
     });
 
-    it("shows a social media card above recommended sites", async () => {
+    it("renders centralized public profile links in the actor card", async () => {
       const app = getApp();
       const res = await app.request("/feed");
       const html = await res.text();
 
-      expect(html).toContain("Follow me");
+      expect(html).toMatch(/href="http:\/\/[^"]+\/"/);
+      expect(html).toContain("erikcraddock.me");
       expect(html).toContain('href="https://github.com/evcraddock"');
+      expect(html).toContain("github.com/evcraddock");
       expect(html).toContain('href="https://www.linkedin.com/in/erik-craddock-42aa9815"');
+      expect(html).toContain("linkedin.com/in/erik-craddock-42aa9815");
       expect(html).toContain('href="https://www.facebook.com/evcraddock"');
+      expect(html).toContain("facebook.com/evcraddock");
       expect(html).toContain('href="https://youtube.com/@ErikCraddock"');
-      expect(html).toContain('href="/feed.xml"');
-      expect(html.indexOf("Follow me")).toBeLessThan(html.indexOf("Recommended Sites"));
+      expect(html).toContain("youtube.com/@ErikCraddock");
+      expect(html).toContain('href="https://www.instagram.com/evcraddock"');
+      expect(html).toContain("instagram.com/evcraddock");
+      expect(html).toContain('href="mailto:erik@craddock.me"');
+      expect(html).toContain("erik@craddock.me");
     });
 
-    it("shows articles below social media and above recommended sites in the feed sidebar", async () => {
+    it("hides the separate social media card", async () => {
+      const app = getApp();
+      const res = await app.request("/feed");
+      const html = await res.text();
+
+      expect(html).not.toContain("Follow me");
+      expect(html).not.toContain('aria-label="RSS"');
+    });
+
+    it("shows articles above recommended sites in the feed sidebar", async () => {
       const app = getApp();
       const res = await app.request("/feed");
       const html = await res.text();
@@ -605,7 +621,6 @@ describe("pages routes", () => {
       expect(html).toContain("Explore Articles");
       expect(html).toContain('href="/sources"');
       expect(html).toContain("Recommended Sites");
-      expect(html.indexOf("Follow me")).toBeLessThan(html.indexOf("Articles"));
       expect(html.indexOf("Articles")).toBeLessThan(html.indexOf("Recommended Sites"));
     });
 
@@ -1380,10 +1395,9 @@ describe("pages routes", () => {
       expect(html).toContain("Articles");
       expect(html).toContain("Read longer essays, project notes, and polished writing");
       expect(html).toContain("Explore Articles");
-      expect(html).toContain("Follow me");
+      expect(html).not.toContain("Follow me");
       expect(html).toContain("Recommended Sites");
       expect(html).toContain("Explore sources");
-      expect(html.indexOf("Follow me")).toBeLessThan(html.indexOf("Articles"));
       expect(html.indexOf("Articles")).toBeLessThan(html.indexOf("Recommended Sites"));
     });
   });

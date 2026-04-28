@@ -3,7 +3,7 @@ import { Endpoints, Image, Person, PropertyValue, Update, type ActorKeyPair } fr
 const ACTOR_NAME = "Erik Craddock";
 const ACTOR_SUMMARY = "Writer, coder, and musician — not always in that order.";
 
-interface ActorProfileField {
+export interface ActorProfileField {
   name: string;
   href: string;
   text: string;
@@ -17,7 +17,18 @@ const PUBLIC_PROFILE_FIELDS: ActorProfileField[] = [
     href: "https://www.linkedin.com/in/erik-craddock-42aa9815",
     text: "linkedin.com/in/erik-craddock-42aa9815",
   },
+  {
+    name: "Facebook",
+    href: "https://www.facebook.com/evcraddock",
+    text: "facebook.com/evcraddock",
+  },
   { name: "YouTube", href: "https://youtube.com/@ErikCraddock", text: "youtube.com/@ErikCraddock" },
+  {
+    name: "Instagram",
+    href: "https://www.instagram.com/evcraddock",
+    text: "instagram.com/evcraddock",
+  },
+  { name: "Email", href: "mailto:erik@craddock.me", text: "erik@craddock.me" },
 ];
 
 export interface ActorProfileUris {
@@ -51,6 +62,13 @@ function escapeHtml(value: string): string {
 
 function resolveProfileFieldUrl(field: ActorProfileField, canonicalOrigin: string | URL): URL {
   return new URL(field.href, canonicalOrigin);
+}
+
+export function getPublicProfileFields(canonicalOrigin: string | URL): ActorProfileField[] {
+  return PUBLIC_PROFILE_FIELDS.map((field) => ({
+    ...field,
+    href: resolveProfileFieldUrl(field, canonicalOrigin).toString(),
+  }));
 }
 
 function profileFieldToHtml(field: ActorProfileField, canonicalOrigin: string | URL): string {

@@ -23,6 +23,7 @@ import { listTags } from "../services/tags";
 import { fetchLinkPreview } from "../services/link-preview";
 import { postToObject, PublishedPost } from "../federation/post-object";
 import { baseUrl } from "../federation/utils";
+import { getPublicProfileFields } from "../federation/actor-profile";
 import { logger } from "../utils/logger";
 import { getRemoteLikeCountForPost } from "../federation/likes";
 
@@ -438,6 +439,25 @@ async function buildFediverseFollowUrl(input: string): Promise<string | null> {
 }
 
 /** Social link icons */
+function WebsiteIcon() {
+  return (
+    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+      <path
+        stroke-linecap="round"
+        stroke-linejoin="round"
+        stroke-width="2"
+        d="M3 12h18M12 3a15.3 15.3 0 0 1 4 9 15.3 15.3 0 0 1-4 9 15.3 15.3 0 0 1-4-9 15.3 15.3 0 0 1 4-9Z"
+      />
+      <path
+        stroke-linecap="round"
+        stroke-linejoin="round"
+        stroke-width="2"
+        d="M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z"
+      />
+    </svg>
+  );
+}
+
 function GitHubIcon() {
   return (
     <svg class="w-6 h-6" fill="currentColor" viewBox="0 0 24 24" aria-hidden="true">
@@ -600,6 +620,8 @@ const SOCIAL_LINKS = [
 
 function getSocialAccountIcon(account: SocialAccount) {
   switch (account.label.trim().toLowerCase()) {
+    case "website":
+      return <WebsiteIcon />;
     case "github":
       return <GitHubIcon />;
     case "linkedin":
@@ -1066,29 +1088,30 @@ function FeedProfileCard({
               <dd class="font-semibold text-gray-950 dark:text-gray-50">{postCount}</dd>
             </div>
           </dl>
+          <div class="mt-4 grid grid-cols-4 gap-2 border-t border-gray-200 pt-4 dark:border-gray-800">
+            {getPublicProfileFields(baseUrl).map((field) => (
+              <a
+                key={field.name}
+                href={field.href}
+                rel="me noopener noreferrer"
+                target={field.href.startsWith(baseUrl) ? undefined : "_blank"}
+                aria-label={field.name}
+                title={field.name}
+                class="flex aspect-square items-center justify-center rounded-xl border border-gray-200 text-gray-600 transition hover:border-teal-200 hover:bg-teal-50 hover:text-teal-700 dark:border-gray-800 dark:text-gray-400 dark:hover:border-teal-900/70 dark:hover:bg-teal-950/20 dark:hover:text-teal-300"
+              >
+                {getSocialAccountIcon({
+                  id: 0,
+                  label: field.name,
+                  url: field.href,
+                  avatar_url: null,
+                  is_activitypub: false,
+                  is_default: false,
+                })}
+                <span class="sr-only">{field.text}</span>
+              </a>
+            ))}
+          </div>
         </div>
-      </div>
-    </section>
-  );
-}
-
-function SocialMediaFeedCard() {
-  return (
-    <section class="border-b border-gray-200 bg-white p-5 dark:border-gray-800 dark:bg-gray-900 lg:mt-4 lg:rounded-2xl lg:border">
-      <h2 class="text-lg font-bold text-gray-950 dark:text-gray-50">Follow me</h2>
-      <div class="mt-4 grid grid-cols-5 gap-2">
-        {SOCIAL_LINKS.map((link) => (
-          <a
-            href={link.url}
-            target={link.url.startsWith("/") ? undefined : "_blank"}
-            rel={link.url.startsWith("/") ? undefined : "noopener noreferrer"}
-            aria-label={link.name}
-            title={link.name}
-            class="flex aspect-square items-center justify-center rounded-xl border border-gray-200 text-gray-600 transition hover:border-teal-200 hover:bg-teal-50 hover:text-teal-700 dark:border-gray-800 dark:text-gray-400 dark:hover:border-teal-900/70 dark:hover:bg-teal-950/20 dark:hover:text-teal-300"
-          >
-            {link.icon}
-          </a>
-        ))}
       </div>
     </section>
   );
@@ -1843,7 +1866,6 @@ export function createPagesRoutes(db: Database): Hono {
                 followingCount={followingCount}
                 postCount={totalPosts}
               />
-              <SocialMediaFeedCard />
               <ArticlesFeedCard />
               <RecommendedSitesFeedCard />
             </aside>
@@ -1947,7 +1969,6 @@ export function createPagesRoutes(db: Database): Hono {
               followingCount={followingCount}
               postCount={totalPosts}
             />
-            <SocialMediaFeedCard />
             <ArticlesFeedCard />
             <RecommendedSitesFeedCard />
           </aside>
@@ -2804,7 +2825,6 @@ export function createPagesRoutes(db: Database): Hono {
               followingCount={followingCount}
               postCount={totalPosts}
             />
-            <SocialMediaFeedCard />
             <ArticlesFeedCard />
             <RecommendedSitesFeedCard />
           </aside>
