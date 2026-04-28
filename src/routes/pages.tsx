@@ -802,8 +802,8 @@ function ArticleCard({
     : null;
 
   return (
-    <article class="bg-white dark:bg-gray-800 rounded-lg overflow-hidden shadow-md hover:shadow-lg transition-shadow">
-      <a href={`/posts/${post.slug}`} class="block">
+    <article class="flex h-full flex-col bg-white dark:bg-gray-800 rounded-lg overflow-hidden shadow-md hover:shadow-lg transition-shadow">
+      <a href={`/posts/${post.slug}`} class="flex h-full flex-col">
         {/* Banner image with date badge */}
         <div class="relative aspect-video bg-gray-200 dark:bg-gray-700">
           {bannerUrl ? (
@@ -826,18 +826,20 @@ function ArticleCard({
         </div>
 
         {/* Content */}
-        <div class="p-4">
-          <h3 class="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-2 line-clamp-2 group-hover:text-blue-600">
-            {post.title}
-          </h3>
-          <p class="text-gray-600 dark:text-gray-400 text-sm line-clamp-3 mb-2">
-            {post.excerpt || truncate(post.content, 150)}
-          </p>
-          {postTags.length > 0 && (
-            <div class="mt-3">
-              <TagBadges tags={postTags} />
-            </div>
-          )}
+        <div class="flex flex-1 flex-col p-4">
+          <div class="flex-1">
+            <h3 class="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-2 line-clamp-2 group-hover:text-blue-600">
+              {post.title}
+            </h3>
+            <p class="text-gray-600 dark:text-gray-400 text-sm line-clamp-3 mb-2">
+              {post.excerpt || truncate(post.content, 150)}
+            </p>
+            {postTags.length > 0 && (
+              <div class="mt-3">
+                <TagBadges tags={postTags} />
+              </div>
+            )}
+          </div>
           <EngagementRow likeCount={post.like_count} />
         </div>
       </a>
