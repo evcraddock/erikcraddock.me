@@ -539,7 +539,7 @@ describe("Remote comment moderation API", () => {
     expect(json.data[0].raw_source).toBeUndefined();
   });
 
-  it("approves a remote comment", async () => {
+  it("approves a remote comment and queues a post Update", async () => {
     const comment = createCommentFixture("pending");
 
     const res = await api.request(`/comments/${comment.id}/approve`, {
@@ -551,9 +551,10 @@ describe("Remote comment moderation API", () => {
     expect(res.status).toBe(200);
     expect(json.data.moderation_status).toBe("approved");
     expect(typeof json.data.moderated_at).toBe("string");
+    expect(mockSendUpdateActivity).toHaveBeenCalledWith(comment.post_id);
   });
 
-  it("hides a remote comment", async () => {
+  it("hides a remote comment and queues a post Update", async () => {
     const comment = createCommentFixture("approved");
 
     const res = await api.request(`/comments/${comment.id}/hide`, {
@@ -565,6 +566,7 @@ describe("Remote comment moderation API", () => {
     expect(res.status).toBe(200);
     expect(json.data.moderation_status).toBe("hidden");
     expect(typeof json.data.moderated_at).toBe("string");
+    expect(mockSendUpdateActivity).toHaveBeenCalledWith(comment.post_id);
   });
 
   it("returns 404 for missing remote comments", async () => {

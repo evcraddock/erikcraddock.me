@@ -29,10 +29,20 @@ import {
 // Create test db immediately
 const testDb = createTestDb();
 
+const mockSendUpdateActivity = mock(async () => true);
+
 // Mock the db module
 mock.module("../../db", () => ({
   db: testDb,
   ...require("../../db/schema"),
+}));
+
+mock.module("../federation/publish", () => ({
+  sendUpdateActivity: mockSendUpdateActivity,
+}));
+
+mock.module("@/federation/publish", () => ({
+  sendUpdateActivity: mockSendUpdateActivity,
 }));
 
 // Set up test data
@@ -1651,7 +1661,7 @@ describe("pages routes", () => {
       return sessionId;
     }
 
-    it("shows approved comments publicly and hides non-approved comments", async () => {
+    it("shows approved comments publicly, updates replies count, and hides non-approved comments", async () => {
       const post = createCommentPost("comments-public-post");
       insertRemoteComment({
         postId: post.id,
@@ -1671,8 +1681,9 @@ describe("pages routes", () => {
       const html = await res.text();
 
       expect(res.status).toBe(200);
-      expect(html).toContain("Fediverse comments");
+      expect(html).toContain("Comments");
       expect(html).toContain("Approved public reply");
+      expect(html).toContain("1 Reply");
       expect(html).not.toContain("Pending private reply");
       expect(html).not.toContain("/approve");
       expect(html).not.toContain("/hide");
@@ -1768,6 +1779,8 @@ describe("pages routes", () => {
       expect(hiddenComment?.moderation_status).toBe("hidden");
       expect(approvedComment?.moderated_at).toBeInstanceOf(Date);
       expect(hiddenComment?.moderated_at).toBeInstanceOf(Date);
+      expect(mockSendUpdateActivity).toHaveBeenCalledWith(post.id);
+      expect(mockSendUpdateActivity).toHaveBeenCalledTimes(2);
     });
 
     it("redirects anonymous moderation attempts to login", async () => {
@@ -1789,6 +1802,39 @@ describe("pages routes", () => {
 
       expect(res.status).toBe(302);
       expect(res.headers.get("Location")).toBe("/login");
+    });
+
+    it("exposes approved comments as an ActivityPub replies collection", async () => {
+      const post = createCommentPost("comments-activitypub-post");
+      insertRemoteComment({
+        postId: post.id,
+        suffix: "activitypub-approved",
+        status: "approved",
+        content: "Approved ActivityPub reply",
+      });
+      insertRemoteComment({
+        postId: post.id,
+        suffix: "activitypub-pending",
+        status: "pending",
+        content: "Pending ActivityPub reply",
+      });
+
+      const app = getApp();
+      const objectRes = await app.request("/posts/comments-activitypub-post", {
+        headers: { Accept: "application/activity+json" },
+      });
+      const repliesRes = await app.request("/posts/comments-activitypub-post/replies", {
+        headers: { Accept: "application/activity+json" },
+      });
+      const objectJson = await objectRes.json();
+      const repliesJson = await repliesRes.json();
+
+      expect(objectJson.replies).toContain("/posts/comments-activitypub-post/replies");
+      expect(repliesRes.status).toBe(200);
+      expect(repliesJson.type).toBe("OrderedCollection");
+      expect(repliesJson.totalItems).toBe(1);
+      expect(JSON.stringify(repliesJson)).toContain("Approved ActivityPub reply");
+      expect(JSON.stringify(repliesJson)).not.toContain("Pending ActivityPub reply");
     });
 
     it("redirects valid reply-from-server submissions and rejects invalid servers", async () => {

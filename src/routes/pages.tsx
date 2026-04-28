@@ -1,4 +1,5 @@
 import { Hono, type Context } from "hono";
+import { Note, OrderedCollection } from "@fedify/fedify";
 import { getCookie } from "hono/cookie";
 import { raw } from "hono/html";
 import { asc, desc, eq, isNotNull, and } from "drizzle-orm";
@@ -25,12 +26,14 @@ import { mediaUrl } from "../services/media";
 import { listTags } from "../services/tags";
 import { fetchLinkPreview } from "../services/link-preview";
 import { postToObject, PublishedPost } from "../federation/post-object";
-import { baseUrl } from "../federation/utils";
+import { sendUpdateActivity } from "../federation/publish";
+import { baseUrl, dateToInstant } from "../federation/utils";
 import { getPublicProfileFields } from "../federation/actor-profile";
 import { logger } from "../utils/logger";
 import { getRemoteLikeCountForPost } from "../federation/likes";
 import {
   approveRemoteComment,
+  getApprovedRemoteCommentCountForPost,
   getVisibleRemoteCommentsForPost,
   hideRemoteComment,
   REMOTE_COMMENT_APPROVED_STATUS,
@@ -62,7 +65,7 @@ type SourceWithAuthors = Source & {
   social_accounts: SourceSocialAccount[];
 };
 type Tag = { id: number; name: string; slug: string };
-type PostWithLikeCount = Post & { like_count?: number };
+type PostWithLikeCount = Post & { like_count?: number; reply_count?: number };
 type PostWithSource = PostWithLikeCount & { source?: Source | null; author?: Person | null };
 
 /** Max length for showing full note content inline */
@@ -795,14 +798,26 @@ function TagBadges({ tags }: { tags: Tag[] }) {
 }
 
 /** Article card for grid display */
-function EngagementRow({ likeCount = 0 }: { likeCount?: number }) {
+function EngagementRow({
+  likeCount = 0,
+  replyCount = 0,
+}: {
+  likeCount?: number;
+  replyCount?: number;
+}) {
   const likeLabel = likeCount === 1 ? "Like" : "Likes";
+  const replyLabel = replyCount === 1 ? "Reply" : "Replies";
 
   return (
     <div class="mt-4 flex items-center justify-around border-t border-gray-100 pt-3 text-sm text-gray-500 dark:border-gray-800 dark:text-gray-400">
-      <span class="inline-flex items-center gap-2" aria-label="0 ActivityPub replies">
+      <span
+        class="inline-flex items-center gap-2"
+        aria-label={`${replyCount} ActivityPub ${replyLabel.toLowerCase()}`}
+      >
         <span aria-hidden="true">↩</span>
-        <span>0 Replies</span>
+        <span>
+          {replyCount} {replyLabel}
+        </span>
       </span>
       <span class="inline-flex items-center gap-2" aria-label="0 ActivityPub boosts">
         <span aria-hidden="true">↻</span>
@@ -879,7 +894,7 @@ function ArticleCard({
               </div>
             )}
           </div>
-          <EngagementRow likeCount={post.like_count} />
+          <EngagementRow likeCount={post.like_count} replyCount={post.reply_count} />
         </div>
       </a>
     </article>
@@ -1357,7 +1372,7 @@ function FeedPost({
       {isLink && <FeedLinkPreview post={post} />}
 
       <FeedPostMeta post={post} tags={postTags} />
-      <EngagementRow likeCount={post.like_count} />
+      <EngagementRow likeCount={post.like_count} replyCount={post.reply_count} />
     </article>
   );
 }
@@ -1412,7 +1427,7 @@ function SingleFeedPost({
       {isLink && <FeedLinkPreview post={post} />}
 
       <FeedPostMeta post={post} tags={postTags} />
-      <EngagementRow likeCount={post.like_count} />
+      <EngagementRow likeCount={post.like_count} replyCount={post.reply_count} />
     </article>
   );
 }
@@ -1519,7 +1534,7 @@ function PostCard({ post, tags: postTags = [] }: { post: PostWithSource; tags?: 
           )}
         </div>
       </a>
-      <EngagementRow likeCount={post.like_count} />
+      <EngagementRow likeCount={post.like_count} replyCount={post.reply_count} />
     </article>
   );
 }
@@ -1616,6 +1631,7 @@ function withLikeCounts<T extends { id: number }>(
   return postList.map((post) => ({
     ...post,
     like_count: getRemoteLikeCountForPost(post.id, db),
+    reply_count: getApprovedRemoteCommentCountForPost(post.id, db),
   }));
 }
 
@@ -1640,6 +1656,12 @@ function getAuthenticatedUserEmail(c: Context, db: Database): string | null {
 
   const author = db.select().from(authors).where(eq(authors.id, session.author_id)).get();
   return author?.email ?? null;
+}
+
+function queuePostUpdate(postId: number): void {
+  sendUpdateActivity(postId).catch(() => {
+    // Error already logged in sendUpdateActivity
+  });
 }
 
 function requirePageAuth(c: Context, db: Database): string | Response {
@@ -1672,10 +1694,7 @@ function RemoteCommentsSection({
     <section class="border-t border-gray-200 bg-white px-4 py-6 dark:border-gray-800 dark:bg-gray-900 sm:px-6">
       <div class="mb-5 flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h2 class="text-xl font-bold text-gray-950 dark:text-gray-50">Fediverse comments</h2>
-          <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">
-            Replies from Mastodon and other Fediverse servers.
-          </p>
+          <h2 class="text-xl font-bold text-gray-950 dark:text-gray-50">Comments</h2>
         </div>
       </div>
 
@@ -1692,11 +1711,11 @@ function RemoteCommentsSection({
         </div>
       ) : (
         <p class="rounded-2xl border border-dashed border-gray-300 p-4 text-sm text-gray-500 dark:border-gray-700 dark:text-gray-400">
-          No approved Fediverse comments yet.
+          No comments yet.
         </p>
       )}
 
-      <ReplyFromServerForm postSlug={postSlug} />
+      {!isAuthenticated && <ReplyFromServerForm postSlug={postSlug} />}
     </section>
   );
 }
@@ -1791,6 +1810,19 @@ function CommentModerationControls({
       )}
     </div>
   );
+}
+
+function remoteCommentToActivityPubNote(comment: RemoteComment, postSlug: string): Note {
+  const published = comment.published_at ?? comment.received_at;
+
+  return new Note({
+    id: new URL(comment.object_uri),
+    attribution: new URL(comment.actor_uri),
+    content: comment.content_html,
+    replyTarget: new URL(`/posts/${postSlug}`, baseUrl),
+    url: new URL(comment.object_uri),
+    published: dateToInstant(published),
+  });
 }
 
 function ReplyFromServerForm({ postSlug }: { postSlug: string }) {
@@ -2891,6 +2923,31 @@ export function createPagesRoutes(db: Database): Hono {
     );
   });
 
+  pages.get("/posts/:slug/replies", async (c) => {
+    const slug = c.req.param("slug");
+    const post = db
+      .select({ id: posts.id, slug: posts.slug, published_at: posts.published_at })
+      .from(posts)
+      .where(eq(posts.slug, slug))
+      .get();
+
+    if (!post?.published_at) {
+      return c.json({ error: "Not found" }, 404);
+    }
+
+    const comments = getVisibleRemoteCommentsForPost(post.id, { database: db });
+    const collection = new OrderedCollection({
+      id: new URL(`/posts/${post.slug}/replies`, baseUrl),
+      totalItems: comments.length,
+      repliesOf: new URL(`/posts/${post.slug}`, baseUrl),
+      items: comments.map((comment) => remoteCommentToActivityPubNote(comment, post.slug)),
+    });
+
+    return c.json(await collection.toJsonLd(), 200, {
+      "Content-Type": "application/activity+json",
+    });
+  });
+
   pages.post("/posts/:slug/comments/:id/approve", (c) => {
     const auth = requirePageAuth(c, db);
     if (auth instanceof Response) {
@@ -2903,7 +2960,10 @@ export function createPagesRoutes(db: Database): Hono {
       return c.redirect(`/posts/${slug}`);
     }
 
-    approveRemoteComment(commentId, db);
+    const comment = approveRemoteComment(commentId, db);
+    if (comment) {
+      queuePostUpdate(comment.post_id);
+    }
     return c.redirect(`/posts/${slug}`);
   });
 
@@ -2919,7 +2979,10 @@ export function createPagesRoutes(db: Database): Hono {
       return c.redirect(`/posts/${slug}`);
     }
 
-    hideRemoteComment(commentId, db);
+    const comment = hideRemoteComment(commentId, db);
+    if (comment) {
+      queuePostUpdate(comment.post_id);
+    }
     return c.redirect(`/posts/${slug}`);
   });
 
@@ -3083,6 +3146,7 @@ export function createPagesRoutes(db: Database): Hono {
       source,
       author,
       like_count: getRemoteLikeCountForPost(post.id, db),
+      reply_count: getApprovedRemoteCommentCountForPost(post.id, db),
     };
     const isAuthenticated = Boolean(getAuthenticatedUserEmail(c, db));
     const remoteComments = getVisibleRemoteCommentsForPost(post.id, {

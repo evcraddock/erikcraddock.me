@@ -206,6 +206,14 @@ describe("postToObject", () => {
 
       expect(result.published).toBeDefined();
     });
+
+    it("exposes a replies collection URL", async () => {
+      const post = createPost({ type: "note", slug: "replyable-post", title: null });
+      const result = postToObject(post, actorUri, followersUri);
+      const json = (await result.toJsonLd()) as Record<string, unknown>;
+
+      expect(String(json.replies)).toContain("/posts/replyable-post/replies");
+    });
   });
 
   describe("hashtags", () => {

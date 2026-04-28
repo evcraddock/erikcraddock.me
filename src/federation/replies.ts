@@ -218,6 +218,23 @@ export function getRemoteCommentCountForPost(
   return result?.count ?? 0;
 }
 
+export function getApprovedRemoteCommentCountForPost(
+  postId: number,
+  database: RepliesDatabase = db
+): number {
+  const result = database
+    .select({ count: count() })
+    .from(remoteComments)
+    .where(
+      and(
+        eq(remoteComments.post_id, postId),
+        eq(remoteComments.moderation_status, REMOTE_COMMENT_APPROVED_STATUS)
+      )
+    )
+    .get();
+  return result?.count ?? 0;
+}
+
 export function deleteRemoteCommentByActivityUri(
   activityUri: string,
   database: RepliesDatabase = db

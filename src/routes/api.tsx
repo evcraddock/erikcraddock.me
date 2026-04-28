@@ -1,4 +1,5 @@
 import { readFileSync } from "fs";
+import { eq } from "drizzle-orm";
 import type { Context } from "hono";
 import { join } from "path";
 import { bodyLimit } from "hono/body-limit";
@@ -38,6 +39,7 @@ import {
 } from "@/services/people";
 import { fetchLinkPreview } from "@/services/link-preview";
 import { logger } from "@/utils/logger";
+import { db as defaultDb, posts } from "@/db";
 import { getRemoteLikeCountForPost, listRemoteLikeSummariesForPost } from "@/federation/likes";
 import {
   approveRemoteComment,
@@ -594,6 +596,24 @@ function serializeRemoteComment(comment: ReturnType<typeof listPendingRemoteComm
     received_at: comment.received_at.toISOString(),
     moderated_at: comment.moderated_at?.toISOString() ?? null,
   };
+}
+
+function queuePostUpdateForModeratedComment(
+  comment: ReturnType<typeof listPendingRemoteComments>[number]
+) {
+  const post = defaultDb
+    .select({ id: posts.id, published_at: posts.published_at })
+    .from(posts)
+    .where(eq(posts.id, comment.post_id))
+    .get();
+
+  if (!post?.published_at) {
+    return;
+  }
+
+  sendUpdateActivity(post.id).catch(() => {
+    // Error already logged in sendUpdateActivity
+  });
 }
 
 function hasStoredLinkPreview(post: {
@@ -2459,6 +2479,7 @@ registerProtectedRoute(
       return c.json({ error: "Comment not found" }, 404);
     }
 
+    queuePostUpdateForModeratedComment(comment);
     return c.json({ data: serializeRemoteComment(comment) });
   }
 );
@@ -2502,6 +2523,7 @@ registerProtectedRoute(
       return c.json({ error: "Comment not found" }, 404);
     }
 
+    queuePostUpdateForModeratedComment(comment);
     return c.json({ data: serializeRemoteComment(comment) });
   }
 );
