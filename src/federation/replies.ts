@@ -1,4 +1,4 @@
-import { and, count, eq, isNotNull, or } from "drizzle-orm";
+import { and, count, desc, eq, isNotNull, or } from "drizzle-orm";
 import { Create, isActor, Link, Note } from "@fedify/fedify";
 
 import { db, posts, remoteComments } from "@/db";
@@ -10,6 +10,8 @@ const domain = process.env.DOMAIN || "localhost:5000";
 type RepliesDatabase = typeof db;
 
 export const REMOTE_COMMENT_PENDING_STATUS = "pending";
+export const REMOTE_COMMENT_APPROVED_STATUS = "approved";
+export const REMOTE_COMMENT_HIDDEN_STATUS = "hidden";
 
 export interface RemoteComment {
   id: number;
@@ -26,6 +28,7 @@ export interface RemoteComment {
   raw_source: string;
   published_at: Date | null;
   received_at: Date;
+  moderated_at: Date | null;
 }
 
 export interface NewRemoteComment {
@@ -132,7 +135,75 @@ export function getRemoteCommentsForPost(
   postId: number,
   database: RepliesDatabase = db
 ): RemoteComment[] {
-  return database.select().from(remoteComments).where(eq(remoteComments.post_id, postId)).all();
+  return database
+    .select()
+    .from(remoteComments)
+    .where(eq(remoteComments.post_id, postId))
+    .orderBy(desc(remoteComments.published_at), desc(remoteComments.received_at))
+    .all();
+}
+
+export function getVisibleRemoteCommentsForPost(
+  postId: number,
+  options: { includeNonPublic?: boolean; database?: RepliesDatabase } = {}
+): RemoteComment[] {
+  const database = options.database ?? db;
+  const filters = options.includeNonPublic
+    ? eq(remoteComments.post_id, postId)
+    : and(
+        eq(remoteComments.post_id, postId),
+        eq(remoteComments.moderation_status, REMOTE_COMMENT_APPROVED_STATUS)
+      );
+
+  return database
+    .select()
+    .from(remoteComments)
+    .where(filters)
+    .orderBy(desc(remoteComments.published_at), desc(remoteComments.received_at))
+    .all();
+}
+
+export function listPendingRemoteComments(database: RepliesDatabase = db): RemoteComment[] {
+  return database
+    .select()
+    .from(remoteComments)
+    .where(eq(remoteComments.moderation_status, REMOTE_COMMENT_PENDING_STATUS))
+    .orderBy(desc(remoteComments.received_at))
+    .all();
+}
+
+export function approveRemoteComment(
+  commentId: number,
+  database: RepliesDatabase = db
+): RemoteComment | null {
+  return (
+    database
+      .update(remoteComments)
+      .set({
+        moderation_status: REMOTE_COMMENT_APPROVED_STATUS,
+        moderated_at: new Date(),
+      })
+      .where(eq(remoteComments.id, commentId))
+      .returning()
+      .get() ?? null
+  );
+}
+
+export function hideRemoteComment(
+  commentId: number,
+  database: RepliesDatabase = db
+): RemoteComment | null {
+  return (
+    database
+      .update(remoteComments)
+      .set({
+        moderation_status: REMOTE_COMMENT_HIDDEN_STATUS,
+        moderated_at: new Date(),
+      })
+      .where(eq(remoteComments.id, commentId))
+      .returning()
+      .get() ?? null
+  );
 }
 
 export function getRemoteCommentCountForPost(
@@ -143,6 +214,23 @@ export function getRemoteCommentCountForPost(
     .select({ count: count() })
     .from(remoteComments)
     .where(eq(remoteComments.post_id, postId))
+    .get();
+  return result?.count ?? 0;
+}
+
+export function getApprovedRemoteCommentCountForPost(
+  postId: number,
+  database: RepliesDatabase = db
+): number {
+  const result = database
+    .select({ count: count() })
+    .from(remoteComments)
+    .where(
+      and(
+        eq(remoteComments.post_id, postId),
+        eq(remoteComments.moderation_status, REMOTE_COMMENT_APPROVED_STATUS)
+      )
+    )
     .get();
   return result?.count ?? 0;
 }

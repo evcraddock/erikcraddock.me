@@ -114,6 +114,8 @@ export function postToObject(
     updated: post.updated_at ? dateToInstant(new Date(post.updated_at)) : undefined,
     // For links, url points to external article so Mastodon links there and generates preview
     url: post.type === "link" && post.url ? new URL(post.url) : postUri,
+    // Expose approved remote replies as a first-class ActivityPub replies collection.
+    replies: new URL(`/posts/${post.slug}/replies`, baseUrl),
     attachments: attachments.length > 0 ? attachments : undefined,
     // Include tags as ActivityPub Hashtag objects for discoverability
     tags: hashtags.length > 0 ? hashtags : undefined,

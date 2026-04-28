@@ -153,6 +153,7 @@ export const remoteComments = sqliteTable("remote_comments", {
   raw_source: text("raw_source").notNull(),
   published_at: integer("published_at", { mode: "timestamp" }),
   received_at: integer("received_at", { mode: "timestamp" }).notNull(),
+  moderated_at: integer("moderated_at", { mode: "timestamp" }),
 });
 
 // Actor keys for ActivityPub signing

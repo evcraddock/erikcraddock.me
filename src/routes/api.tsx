@@ -1,4 +1,5 @@
 import { readFileSync } from "fs";
+import { eq } from "drizzle-orm";
 import type { Context } from "hono";
 import { join } from "path";
 import { bodyLimit } from "hono/body-limit";
@@ -38,7 +39,13 @@ import {
 } from "@/services/people";
 import { fetchLinkPreview } from "@/services/link-preview";
 import { logger } from "@/utils/logger";
+import { db as defaultDb, posts } from "@/db";
 import { getRemoteLikeCountForPost, listRemoteLikeSummariesForPost } from "@/federation/likes";
+import {
+  approveRemoteComment,
+  hideRemoteComment,
+  listPendingRemoteComments,
+} from "@/federation/replies";
 import {
   federatePost,
   sendDeleteActivity,
@@ -221,6 +228,25 @@ const PostLikesSchema = z
     likes: z.array(RemoteLikeSchema),
   })
   .openapi("PostLikes");
+
+const RemoteCommentSchema = z
+  .object({
+    id: z.number().int().openapi({ example: 1 }),
+    post_id: z.number().int().openapi({ example: 42 }),
+    activity_uri: z.string().url().openapi({ example: "https://mastodon.social/activities/1" }),
+    object_uri: z.string().url().openapi({ example: "https://mastodon.social/objects/1" }),
+    actor_uri: z.string().url().openapi({ example: "https://mastodon.social/users/alice" }),
+    actor_name: NullableStringSchema.openapi({ example: "Alice" }),
+    actor_url: NullableStringSchema.openapi({ example: "https://mastodon.social/@alice" }),
+    content_html: z.string().openapi({ example: "Hello from Mastodon" }),
+    content_text: z.string().openapi({ example: "Hello from Mastodon" }),
+    in_reply_to_uri: z.string().url().openapi({ example: "https://erikcraddock.me/posts/post" }),
+    moderation_status: z.string().openapi({ example: "pending" }),
+    published_at: IsoDateTimeSchema.nullable(),
+    received_at: IsoDateTimeSchema,
+    moderated_at: IsoDateTimeSchema.nullable(),
+  })
+  .openapi("RemoteComment");
 
 const PostSchema = z
   .object({
@@ -552,6 +578,43 @@ const registerProtectedRoute = protectedApi.openapi.bind(protectedApi) as unknow
   route: unknown,
   handler: (c: Context) => unknown
 ) => unknown;
+
+function serializeRemoteComment(comment: ReturnType<typeof listPendingRemoteComments>[number]) {
+  return {
+    id: comment.id,
+    post_id: comment.post_id,
+    activity_uri: comment.activity_uri,
+    object_uri: comment.object_uri,
+    actor_uri: comment.actor_uri,
+    actor_name: comment.actor_name,
+    actor_url: comment.actor_url,
+    content_html: comment.content_html,
+    content_text: comment.content_text,
+    in_reply_to_uri: comment.in_reply_to_uri,
+    moderation_status: comment.moderation_status,
+    published_at: comment.published_at?.toISOString() ?? null,
+    received_at: comment.received_at.toISOString(),
+    moderated_at: comment.moderated_at?.toISOString() ?? null,
+  };
+}
+
+function queuePostUpdateForModeratedComment(
+  comment: ReturnType<typeof listPendingRemoteComments>[number]
+) {
+  const post = defaultDb
+    .select({ id: posts.id, published_at: posts.published_at })
+    .from(posts)
+    .where(eq(posts.id, comment.post_id))
+    .get();
+
+  if (!post?.published_at) {
+    return;
+  }
+
+  sendUpdateActivity(post.id).catch(() => {
+    // Error already logged in sendUpdateActivity
+  });
+}
 
 function hasStoredLinkPreview(post: {
   og_title?: string | null;
@@ -2351,6 +2414,117 @@ registerProtectedRoute(
     } catch (error) {
       return c.json({ error: String(error) }, 500);
     }
+  }
+);
+
+registerProtectedRoute(
+  protectedRoute({
+    method: "get",
+    path: "/comments/pending",
+    tags: ["comments"],
+    summary: "List pending remote comments",
+    responses: {
+      200: {
+        description: "Pending remote comments awaiting moderation.",
+        content: { "application/json": { schema: dataEnvelope(z.array(RemoteCommentSchema)) } },
+      },
+      401: {
+        description: "Missing or invalid API key.",
+        content: { "application/json": { schema: ErrorSchema } },
+      },
+    },
+  }),
+  (c: Context) => {
+    const comments = listPendingRemoteComments().map(serializeRemoteComment);
+    return c.json({ data: comments });
+  }
+);
+
+registerProtectedRoute(
+  protectedRoute({
+    method: "post",
+    path: "/comments/{id}/approve",
+    tags: ["comments"],
+    summary: "Approve a remote comment",
+    request: {
+      params: z.object({ id: z.string().openapi({ example: "1" }) }),
+    },
+    responses: {
+      200: {
+        description: "The approved remote comment.",
+        content: { "application/json": { schema: dataEnvelope(RemoteCommentSchema) } },
+      },
+      400: {
+        description: "The comment ID was invalid.",
+        content: { "application/json": { schema: ErrorSchema } },
+      },
+      404: {
+        description: "The comment was not found.",
+        content: { "application/json": { schema: ErrorSchema } },
+      },
+      401: {
+        description: "Missing or invalid API key.",
+        content: { "application/json": { schema: ErrorSchema } },
+      },
+    },
+  }),
+  (c: Context) => {
+    const id = Number(c.req.param("id"));
+    if (!Number.isInteger(id) || id < 1) {
+      return c.json({ error: "Invalid comment ID" }, 400);
+    }
+
+    const comment = approveRemoteComment(id);
+    if (!comment) {
+      return c.json({ error: "Comment not found" }, 404);
+    }
+
+    queuePostUpdateForModeratedComment(comment);
+    return c.json({ data: serializeRemoteComment(comment) });
+  }
+);
+
+registerProtectedRoute(
+  protectedRoute({
+    method: "post",
+    path: "/comments/{id}/hide",
+    tags: ["comments"],
+    summary: "Hide a remote comment",
+    request: {
+      params: z.object({ id: z.string().openapi({ example: "1" }) }),
+    },
+    responses: {
+      200: {
+        description: "The hidden remote comment.",
+        content: { "application/json": { schema: dataEnvelope(RemoteCommentSchema) } },
+      },
+      400: {
+        description: "The comment ID was invalid.",
+        content: { "application/json": { schema: ErrorSchema } },
+      },
+      404: {
+        description: "The comment was not found.",
+        content: { "application/json": { schema: ErrorSchema } },
+      },
+      401: {
+        description: "Missing or invalid API key.",
+        content: { "application/json": { schema: ErrorSchema } },
+      },
+    },
+  }),
+  (c: Context) => {
+    const id = Number(c.req.param("id"));
+    if (!Number.isInteger(id) || id < 1) {
+      return c.json({ error: "Invalid comment ID" }, 400);
+    }
+
+    const comment = hideRemoteComment(id);
+    if (!comment) {
+      return c.json({ error: "Comment not found" }, 404);
+    }
+
+    queuePostUpdateForModeratedComment(comment);
+    return c.json({ data: serializeRemoteComment(comment) });
   }
 );
 
