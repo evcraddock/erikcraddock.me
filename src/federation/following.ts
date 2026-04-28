@@ -3,7 +3,6 @@ import { Follow, type Recipient } from "@fedify/fedify";
 
 import { db, people, personSocialAccounts, remoteFollows } from "@/db";
 import { logger } from "@/utils/logger";
-import { federation } from "./setup";
 import { baseUrl, dateToInstant } from "./utils";
 
 export const REMOTE_FOLLOW_PENDING_STATUS = "pending";
@@ -327,6 +326,7 @@ function followActivityUri(actorUri: string): string {
 }
 
 export async function sendFollowActivity(follow: RemoteFollow): Promise<void> {
+  const { federation } = await import("./setup");
   const ctx = federation.createContext(new URL(baseUrl), undefined);
   const actorUri = ctx.getActorUri("erik");
   const activity = new Follow({
