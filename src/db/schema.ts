@@ -107,6 +107,26 @@ export const followers = sqliteTable("followers", {
   followed_at: integer("followed_at", { mode: "timestamp" }).notNull(),
 });
 
+// ActivityPub accounts followed by the local site actor
+export const remoteFollows = sqliteTable("remote_follows", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  person_id: integer("person_id").references(() => people.id, { onDelete: "set null" }),
+  actor_uri: text("actor_uri").notNull().unique(),
+  handle: text("handle"),
+  preferred_username: text("preferred_username"),
+  display_name: text("display_name"),
+  profile_url: text("profile_url"),
+  inbox_uri: text("inbox_uri").notNull(),
+  shared_inbox_uri: text("shared_inbox_uri"),
+  avatar_url: text("avatar_url"),
+  follow_activity_uri: text("follow_activity_uri").notNull().unique(),
+  status: text("status").notNull().default("pending"),
+  last_error: text("last_error"),
+  followed_at: integer("followed_at", { mode: "timestamp" }).notNull(),
+  created_at: integer("created_at", { mode: "timestamp" }).notNull(),
+  updated_at: integer("updated_at", { mode: "timestamp" }).notNull(),
+});
+
 // ActivityPub likes received from remote actors
 export const remoteLikes = sqliteTable("remote_likes", {
   id: integer("id").primaryKey({ autoIncrement: true }),
