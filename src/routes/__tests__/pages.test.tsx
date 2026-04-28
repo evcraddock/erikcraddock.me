@@ -1521,7 +1521,9 @@ describe("pages routes", () => {
       const html = await res.text();
 
       expect(res.status).toBe(200);
-      expect(html).toContain("♡ 1 Like");
+      expect(html).toContain('aria-label="1 ActivityPub like"');
+      expect(html).toContain("0 Replies");
+      expect(html).toContain("0 Boosts");
     });
 
     it("shows like counts on feed cards", async () => {
@@ -1543,8 +1545,10 @@ describe("pages routes", () => {
       const html = await res.text();
 
       expect(res.status).toBe(200);
-      expect(html).toContain("♡ 1 Like");
-      expect(html).toContain("♡ 0 Likes");
+      expect(html).toContain('aria-label="1 ActivityPub like"');
+      expect(html).toContain('aria-label="0 ActivityPub likes"');
+      expect(html).toContain("0 Replies");
+      expect(html).toContain("0 Boosts");
     });
 
     it("shows zero likes on article cards when there are no stored likes", async () => {
@@ -1553,7 +1557,7 @@ describe("pages routes", () => {
       const html = await res.text();
 
       expect(res.status).toBe(200);
-      expect(html).toContain("♡ 0 Likes");
+      expect(html).toContain('aria-label="0 ActivityPub likes"');
     });
   });
 

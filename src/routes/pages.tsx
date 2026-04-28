@@ -756,14 +756,29 @@ function TagBadges({ tags }: { tags: Tag[] }) {
 }
 
 /** Article card for grid display */
-function LikeCount({ count }: { count?: number }) {
-  const likeCount = count ?? 0;
-  const label = likeCount === 1 ? "Like" : "Likes";
+function EngagementRow({ likeCount = 0 }: { likeCount?: number }) {
+  const likeLabel = likeCount === 1 ? "Like" : "Likes";
 
   return (
-    <span aria-label={`${likeCount} ActivityPub ${label.toLowerCase()}`}>
-      ♡ {likeCount} {label}
-    </span>
+    <div class="mt-4 flex items-center justify-around border-t border-gray-100 pt-3 text-sm text-gray-500 dark:border-gray-800 dark:text-gray-400">
+      <span class="inline-flex items-center gap-2" aria-label="0 ActivityPub replies">
+        <span aria-hidden="true">↩</span>
+        <span>0 Replies</span>
+      </span>
+      <span class="inline-flex items-center gap-2" aria-label="0 ActivityPub boosts">
+        <span aria-hidden="true">↻</span>
+        <span>0 Boosts</span>
+      </span>
+      <span
+        class="inline-flex items-center gap-2"
+        aria-label={`${likeCount} ActivityPub ${likeLabel.toLowerCase()}`}
+      >
+        <span aria-hidden="true">♡</span>
+        <span>
+          {likeCount} {likeLabel}
+        </span>
+      </span>
+    </div>
   );
 }
 
@@ -818,10 +833,12 @@ function ArticleCard({
           <p class="text-gray-600 dark:text-gray-400 text-sm line-clamp-3 mb-2">
             {post.excerpt || truncate(post.content, 150)}
           </p>
-          <div class="mt-3 flex flex-wrap items-center gap-2 text-sm text-gray-500 dark:text-gray-400">
-            <LikeCount count={post.like_count} />
-            {postTags.length > 0 && <TagBadges tags={postTags} />}
-          </div>
+          {postTags.length > 0 && (
+            <div class="mt-3">
+              <TagBadges tags={postTags} />
+            </div>
+          )}
+          <EngagementRow likeCount={post.like_count} />
         </div>
       </a>
     </article>
@@ -1207,8 +1224,6 @@ function FeedPostMeta({ post, tags: postTags }: { post: PostWithSource; tags: Ta
       <time>{formattedDate}</time>
       <span aria-hidden="true">·</span>
       <span class="capitalize">{post.type}</span>
-      <span aria-hidden="true">·</span>
-      <LikeCount count={post.like_count} />
       {post.author && (
         <>
           <span aria-hidden="true">·</span>
@@ -1300,6 +1315,7 @@ function FeedPost({
       {isLink && <FeedLinkPreview post={post} />}
 
       <FeedPostMeta post={post} tags={postTags} />
+      <EngagementRow likeCount={post.like_count} />
     </article>
   );
 }
@@ -1354,6 +1370,7 @@ function SingleFeedPost({
       {isLink && <FeedLinkPreview post={post} />}
 
       <FeedPostMeta post={post} tags={postTags} />
+      <EngagementRow likeCount={post.like_count} />
     </article>
   );
 }
@@ -1449,10 +1466,6 @@ function PostCard({ post, tags: postTags = [] }: { post: PostWithSource; tags?: 
             </span>
           )}
 
-          <span class="ml-2">
-            • <LikeCount count={post.like_count} />
-          </span>
-
           {/* Tags */}
           {postTags.length > 0 && (
             <span class="ml-2 flex flex-wrap gap-1">
@@ -1464,6 +1477,7 @@ function PostCard({ post, tags: postTags = [] }: { post: PostWithSource; tags?: 
           )}
         </div>
       </a>
+      <EngagementRow likeCount={post.like_count} />
     </article>
   );
 }
