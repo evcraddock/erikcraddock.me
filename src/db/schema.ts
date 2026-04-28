@@ -135,6 +135,26 @@ export const remoteBoosts = sqliteTable("remote_boosts", {
   received_at: integer("received_at", { mode: "timestamp" }).notNull(),
 });
 
+// ActivityPub replies received from remote actors and stored as moderated comments
+export const remoteComments = sqliteTable("remote_comments", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  post_id: integer("post_id")
+    .notNull()
+    .references(() => posts.id, { onDelete: "cascade" }),
+  activity_uri: text("activity_uri").notNull().unique(),
+  object_uri: text("object_uri").notNull().unique(),
+  actor_uri: text("actor_uri").notNull(),
+  actor_name: text("actor_name"),
+  actor_url: text("actor_url"),
+  content_html: text("content_html").notNull(),
+  content_text: text("content_text").notNull(),
+  in_reply_to_uri: text("in_reply_to_uri").notNull(),
+  moderation_status: text("moderation_status").notNull().default("pending"),
+  raw_source: text("raw_source").notNull(),
+  published_at: integer("published_at", { mode: "timestamp" }),
+  received_at: integer("received_at", { mode: "timestamp" }).notNull(),
+});
+
 // Actor keys for ActivityPub signing
 export const actorKeys = sqliteTable("actor_keys", {
   id: integer("id").primaryKey({ autoIncrement: true }),
