@@ -31,7 +31,11 @@ import {
 // Create test db immediately
 const testDb = createTestDb();
 
+const mockFederatePost = mock(async () => true);
+const mockSendDeleteActivity = mock(async () => true);
+const mockSendDeleteActivityForUri = mock(async () => true);
 const mockSendUpdateActivity = mock(async () => true);
+const mockSendActorUpdateActivity = mock(async () => true);
 
 // Mock the db module
 mock.module("../../db", () => ({
@@ -40,11 +44,19 @@ mock.module("../../db", () => ({
 }));
 
 mock.module("../federation/publish", () => ({
+  federatePost: mockFederatePost,
+  sendDeleteActivity: mockSendDeleteActivity,
+  sendDeleteActivityForUri: mockSendDeleteActivityForUri,
   sendUpdateActivity: mockSendUpdateActivity,
+  sendActorUpdateActivity: mockSendActorUpdateActivity,
 }));
 
 mock.module("@/federation/publish", () => ({
+  federatePost: mockFederatePost,
+  sendDeleteActivity: mockSendDeleteActivity,
+  sendDeleteActivityForUri: mockSendDeleteActivityForUri,
   sendUpdateActivity: mockSendUpdateActivity,
+  sendActorUpdateActivity: mockSendActorUpdateActivity,
 }));
 
 // Set up test data
