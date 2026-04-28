@@ -38,6 +38,7 @@ import {
 } from "@/services/people";
 import { fetchLinkPreview } from "@/services/link-preview";
 import { logger } from "@/utils/logger";
+import { getRemoteLikeCountForPost, listRemoteLikeSummariesForPost } from "@/federation/likes";
 import {
   federatePost,
   sendDeleteActivity,
@@ -200,6 +201,26 @@ const PostListItemSchema = z
     tags: z.array(z.string()).openapi({ example: ["Tech", "Writing"] }),
   })
   .openapi("PostListItem");
+
+const RemoteLikeSchema = z
+  .object({
+    actor_uri: z.string().url().openapi({ example: "https://mastodon.social/users/alice" }),
+    actor_name: NullableStringSchema.openapi({ example: "Alice" }),
+    activity_uri: z
+      .string()
+      .url()
+      .openapi({ example: "https://mastodon.social/users/alice/statuses/1/activity" }),
+    object_uri: z.string().url().openapi({ example: "https://erikcraddock.me/posts/my-post" }),
+    received_at: IsoDateTimeSchema,
+  })
+  .openapi("RemoteLike");
+
+const PostLikesSchema = z
+  .object({
+    count: z.number().int().openapi({ example: 1 }),
+    likes: z.array(RemoteLikeSchema),
+  })
+  .openapi("PostLikes");
 
 const PostSchema = z
   .object({
@@ -1231,6 +1252,43 @@ registerProtectedRoute(
     }
 
     return c.json({ data: post });
+  }
+);
+
+registerProtectedRoute(
+  protectedRoute({
+    method: "get",
+    path: "/posts/by-slug/{slug}/likes",
+    tags: ["posts"],
+    summary: "List ActivityPub likes for a post by slug",
+    request: { params: SlugParamSchema },
+    responses: {
+      200: {
+        description: "The stored ActivityPub likes for the requested post.",
+        content: { "application/json": { schema: dataEnvelope(PostLikesSchema) } },
+      },
+      401: {
+        description: "Missing or invalid API key.",
+        content: { "application/json": { schema: ErrorSchema } },
+      },
+      404: {
+        description: "The post was not found.",
+        content: { "application/json": { schema: ErrorSchema } },
+      },
+    },
+  }),
+  (c: Context) => {
+    const post = getPostBySlug(c.req.param("slug") ?? "");
+    if (!post) {
+      return c.json({ error: "Post not found" }, 404);
+    }
+
+    return c.json({
+      data: {
+        count: getRemoteLikeCountForPost(post.id),
+        likes: listRemoteLikeSummariesForPost(post.id),
+      },
+    });
   }
 );
 

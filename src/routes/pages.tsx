@@ -24,6 +24,7 @@ import { fetchLinkPreview } from "../services/link-preview";
 import { postToObject, PublishedPost } from "../federation/post-object";
 import { baseUrl } from "../federation/utils";
 import { logger } from "../utils/logger";
+import { getRemoteLikeCountForPost } from "../federation/likes";
 
 // Database type for dependency injection
 type Database = typeof defaultDb;
@@ -49,7 +50,8 @@ type SourceWithAuthors = Source & {
   social_accounts: SourceSocialAccount[];
 };
 type Tag = { id: number; name: string; slug: string };
-type PostWithSource = Post & { source?: Source | null; author?: Person | null };
+type PostWithLikeCount = Post & { like_count?: number };
+type PostWithSource = PostWithLikeCount & { source?: Source | null; author?: Person | null };
 
 /** Max length for showing full note content inline */
 const NOTE_INLINE_MAX_LENGTH = 280;
@@ -754,12 +756,38 @@ function TagBadges({ tags }: { tags: Tag[] }) {
 }
 
 /** Article card for grid display */
+function EngagementRow({ likeCount = 0 }: { likeCount?: number }) {
+  const likeLabel = likeCount === 1 ? "Like" : "Likes";
+
+  return (
+    <div class="mt-4 flex items-center justify-around border-t border-gray-100 pt-3 text-sm text-gray-500 dark:border-gray-800 dark:text-gray-400">
+      <span class="inline-flex items-center gap-2" aria-label="0 ActivityPub replies">
+        <span aria-hidden="true">↩</span>
+        <span>0 Replies</span>
+      </span>
+      <span class="inline-flex items-center gap-2" aria-label="0 ActivityPub boosts">
+        <span aria-hidden="true">↻</span>
+        <span>0 Boosts</span>
+      </span>
+      <span
+        class="inline-flex items-center gap-2"
+        aria-label={`${likeCount} ActivityPub ${likeLabel.toLowerCase()}`}
+      >
+        <span aria-hidden="true">♡</span>
+        <span>
+          {likeCount} {likeLabel}
+        </span>
+      </span>
+    </div>
+  );
+}
+
 function ArticleCard({
   post,
   getBannerUrl,
   tags: postTags = [],
 }: {
-  post: Post;
+  post: PostWithLikeCount;
   getBannerUrl: (id: number) => string | null;
   tags?: Tag[];
 }) {
@@ -774,8 +802,8 @@ function ArticleCard({
     : null;
 
   return (
-    <article class="bg-white dark:bg-gray-800 rounded-lg overflow-hidden shadow-md hover:shadow-lg transition-shadow">
-      <a href={`/posts/${post.slug}`} class="block">
+    <article class="flex h-full flex-col bg-white dark:bg-gray-800 rounded-lg overflow-hidden shadow-md hover:shadow-lg transition-shadow">
+      <a href={`/posts/${post.slug}`} class="flex h-full flex-col">
         {/* Banner image with date badge */}
         <div class="relative aspect-video bg-gray-200 dark:bg-gray-700">
           {bannerUrl ? (
@@ -798,14 +826,21 @@ function ArticleCard({
         </div>
 
         {/* Content */}
-        <div class="p-4">
-          <h3 class="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-2 line-clamp-2 group-hover:text-blue-600">
-            {post.title}
-          </h3>
-          <p class="text-gray-600 dark:text-gray-400 text-sm line-clamp-3 mb-2">
-            {post.excerpt || truncate(post.content, 150)}
-          </p>
-          {postTags.length > 0 && <TagBadges tags={postTags} />}
+        <div class="flex flex-1 flex-col p-4">
+          <div class="flex-1">
+            <h3 class="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-2 line-clamp-2 group-hover:text-blue-600">
+              {post.title}
+            </h3>
+            <p class="text-gray-600 dark:text-gray-400 text-sm line-clamp-3 mb-2">
+              {post.excerpt || truncate(post.content, 150)}
+            </p>
+            {postTags.length > 0 && (
+              <div class="mt-3">
+                <TagBadges tags={postTags} />
+              </div>
+            )}
+          </div>
+          <EngagementRow likeCount={post.like_count} />
         </div>
       </a>
     </article>
@@ -819,7 +854,7 @@ function ArticleCardsSection({
   getTagsForPost,
   hasMore,
 }: {
-  articles: Post[];
+  articles: PostWithLikeCount[];
   getBannerUrl: (id: number) => string | null;
   getTagsForPost: (postId: number) => Tag[];
   hasMore: boolean;
@@ -1282,6 +1317,7 @@ function FeedPost({
       {isLink && <FeedLinkPreview post={post} />}
 
       <FeedPostMeta post={post} tags={postTags} />
+      <EngagementRow likeCount={post.like_count} />
     </article>
   );
 }
@@ -1336,6 +1372,7 @@ function SingleFeedPost({
       {isLink && <FeedLinkPreview post={post} />}
 
       <FeedPostMeta post={post} tags={postTags} />
+      <EngagementRow likeCount={post.like_count} />
     </article>
   );
 }
@@ -1442,6 +1479,7 @@ function PostCard({ post, tags: postTags = [] }: { post: PostWithSource; tags?: 
           )}
         </div>
       </a>
+      <EngagementRow likeCount={post.like_count} />
     </article>
   );
 }
@@ -1531,6 +1569,16 @@ function getSourcesAuthoredByPerson(db: Database, personId: number): Source[] {
     .map((row) => row.source);
 }
 
+function withLikeCounts<T extends { id: number }>(
+  db: Database,
+  postList: T[]
+): Array<T & { like_count: number }> {
+  return postList.map((post) => ({
+    ...post,
+    like_count: getRemoteLikeCountForPost(post.id, db),
+  }));
+}
+
 /**
  * Creates page routes with the given database instance.
  * Allows dependency injection for testing.
@@ -1553,7 +1601,7 @@ export function createPagesRoutes(db: Database): Hono {
 
     // Check if there are more articles beyond what we display
     const hasMoreArticles = fetchedArticles.length > HOME_ARTICLES_LIMIT;
-    const recentArticles = fetchedArticles.slice(0, HOME_ARTICLES_LIMIT);
+    const recentArticles = withLikeCounts(db, fetchedArticles.slice(0, HOME_ARTICLES_LIMIT));
 
     // Get all banner IDs for the articles
     const bannerIds = recentArticles
@@ -1667,14 +1715,17 @@ export function createPagesRoutes(db: Database): Hono {
 
     // Fetch articles for current page
     const offset = (page - 1) * ARTICLES_PER_PAGE;
-    const pageArticles = db
-      .select()
-      .from(posts)
-      .where(and(eq(posts.type, "article"), isNotNull(posts.published_at)))
-      .orderBy(desc(posts.published_at))
-      .limit(ARTICLES_PER_PAGE)
-      .offset(offset)
-      .all();
+    const pageArticles = withLikeCounts(
+      db,
+      db
+        .select()
+        .from(posts)
+        .where(and(eq(posts.type, "article"), isNotNull(posts.published_at)))
+        .orderBy(desc(posts.published_at))
+        .limit(ARTICLES_PER_PAGE)
+        .offset(offset)
+        .all()
+    );
 
     // Get banner URLs
     const bannerIds = pageArticles
@@ -1831,11 +1882,14 @@ export function createPagesRoutes(db: Database): Hono {
       .offset(offset)
       .all();
 
-    const pagePosts: PostWithSource[] = results.map((row) => ({
-      ...row.post,
-      source: row.source,
-      author: row.author,
-    }));
+    const pagePosts: PostWithSource[] = withLikeCounts(
+      db,
+      results.map((row) => ({
+        ...row.post,
+        source: row.source,
+        author: row.author,
+      }))
+    );
 
     // Fetch tags for all displayed posts
     const postIds = pagePosts.map((p) => p.id);
@@ -2450,19 +2504,22 @@ export function createPagesRoutes(db: Database): Hono {
 
     const authoredSources = getSourcesAuthoredByPerson(db, person.id);
     const socialAccounts = getPersonSocialAccounts(db, person.id);
-    const personLinks: PostWithSource[] = db
-      .select({
-        post: posts,
-        source: sources,
-      })
-      .from(posts)
-      .leftJoin(sources, eq(posts.source_id, sources.id))
-      .where(
-        and(eq(posts.author_id, person.id), eq(posts.type, "link"), isNotNull(posts.published_at))
-      )
-      .orderBy(desc(posts.published_at))
-      .all()
-      .map((row) => ({ ...row.post, source: row.source, author: person }));
+    const personLinks: PostWithSource[] = withLikeCounts(
+      db,
+      db
+        .select({
+          post: posts,
+          source: sources,
+        })
+        .from(posts)
+        .leftJoin(sources, eq(posts.source_id, sources.id))
+        .where(
+          and(eq(posts.author_id, person.id), eq(posts.type, "link"), isNotNull(posts.published_at))
+        )
+        .orderBy(desc(posts.published_at))
+        .all()
+        .map((row) => ({ ...row.post, source: row.source, author: person }))
+    );
 
     return c.html(
       <Layout title={`${person.name} | erikcraddock.me`} description={person.url ?? undefined}>
@@ -2523,19 +2580,22 @@ export function createPagesRoutes(db: Database): Hono {
       );
     }
 
-    const sourceLinks: PostWithSource[] = db
-      .select({
-        post: posts,
-        author: people,
-      })
-      .from(posts)
-      .leftJoin(people, eq(posts.author_id, people.id))
-      .where(
-        and(eq(posts.source_id, source.id), eq(posts.type, "link"), isNotNull(posts.published_at))
-      )
-      .orderBy(desc(posts.published_at))
-      .all()
-      .map((row) => ({ ...row.post, source, author: row.author }));
+    const sourceLinks: PostWithSource[] = withLikeCounts(
+      db,
+      db
+        .select({
+          post: posts,
+          author: people,
+        })
+        .from(posts)
+        .leftJoin(people, eq(posts.author_id, people.id))
+        .where(
+          and(eq(posts.source_id, source.id), eq(posts.type, "link"), isNotNull(posts.published_at))
+        )
+        .orderBy(desc(posts.published_at))
+        .all()
+        .map((row) => ({ ...row.post, source, author: row.author }))
+    );
 
     return c.html(
       <Layout
@@ -2723,7 +2783,12 @@ export function createPagesRoutes(db: Database): Hono {
       .all().length;
     const followerCount = db.select().from(followers).all().length;
     const followingCount = 0;
-    const feedPost: PostWithSource = { ...post, source, author };
+    const feedPost: PostWithSource = {
+      ...post,
+      source,
+      author,
+      like_count: getRemoteLikeCountForPost(post.id, db),
+    };
 
     return c.html(
       <Layout
@@ -2825,11 +2890,14 @@ export function createPagesRoutes(db: Database): Hono {
       .all();
 
     // Transform to PostWithSource
-    const taggedPosts: PostWithSource[] = results.map((row) => ({
-      ...row.post,
-      source: row.source,
-      author: row.author,
-    }));
+    const taggedPosts: PostWithSource[] = withLikeCounts(
+      db,
+      results.map((row) => ({
+        ...row.post,
+        source: row.source,
+        author: row.author,
+      }))
+    );
 
     // Fetch all tags for the displayed posts
     const taggedPostIds = taggedPosts.map((p) => p.id);

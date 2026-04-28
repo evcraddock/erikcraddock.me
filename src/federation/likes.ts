@@ -1,4 +1,4 @@
-import { and, count, eq, isNotNull } from "drizzle-orm";
+import { and, count, desc, eq, isNotNull } from "drizzle-orm";
 import { Like } from "@fedify/fedify";
 
 import { db, posts, remoteLikes } from "@/db";
@@ -6,6 +6,7 @@ import { logger } from "@/utils/logger";
 import { getOrigin } from "./utils";
 
 const domain = process.env.DOMAIN || "localhost:5000";
+type LikesDatabase = typeof db;
 
 export interface RemoteLike {
   id: number;
@@ -25,6 +26,14 @@ export interface NewRemoteLike {
   actor_uri: string;
   actor_name?: string | null;
   raw_object_uri: string;
+}
+
+export interface RemoteLikeSummary {
+  actor_uri: string;
+  actor_name: string | null;
+  activity_uri: string;
+  object_uri: string;
+  received_at: string;
 }
 
 export function resolveLocalPublishedPostFromObjectUri(objectUri: string) {
@@ -54,8 +63,11 @@ export function resolveLocalPublishedPostFromObjectUri(objectUri: string) {
     .get();
 }
 
-export function addRemoteLike(input: NewRemoteLike): RemoteLike | null {
-  const existing = db
+export function addRemoteLike(
+  input: NewRemoteLike,
+  database: LikesDatabase = db
+): RemoteLike | null {
+  const existing = database
     .select()
     .from(remoteLikes)
     .where(eq(remoteLikes.activity_uri, input.activity_uri))
@@ -66,7 +78,7 @@ export function addRemoteLike(input: NewRemoteLike): RemoteLike | null {
     return existing;
   }
 
-  return db
+  return database
     .insert(remoteLikes)
     .values({
       post_id: input.post_id,
@@ -81,12 +93,12 @@ export function addRemoteLike(input: NewRemoteLike): RemoteLike | null {
     .get();
 }
 
-export function getRemoteLikesForPost(postId: number): RemoteLike[] {
-  return db.select().from(remoteLikes).where(eq(remoteLikes.post_id, postId)).all();
+export function getRemoteLikesForPost(postId: number, database: LikesDatabase = db): RemoteLike[] {
+  return database.select().from(remoteLikes).where(eq(remoteLikes.post_id, postId)).all();
 }
 
-export function getRemoteLikeCountForPost(postId: number): number {
-  const result = db
+export function getRemoteLikeCountForPost(postId: number, database: LikesDatabase = db): number {
+  const result = database
     .select({ count: count() })
     .from(remoteLikes)
     .where(eq(remoteLikes.post_id, postId))
@@ -94,8 +106,30 @@ export function getRemoteLikeCountForPost(postId: number): number {
   return result?.count ?? 0;
 }
 
-export function deleteRemoteLike(activityUri: string): boolean {
-  const deleted = db
+export function listRemoteLikeSummariesForPost(
+  postId: number,
+  database: LikesDatabase = db
+): RemoteLikeSummary[] {
+  return database
+    .select({
+      actor_uri: remoteLikes.actor_uri,
+      actor_name: remoteLikes.actor_name,
+      activity_uri: remoteLikes.activity_uri,
+      object_uri: remoteLikes.object_uri,
+      received_at: remoteLikes.received_at,
+    })
+    .from(remoteLikes)
+    .where(eq(remoteLikes.post_id, postId))
+    .orderBy(desc(remoteLikes.received_at))
+    .all()
+    .map((like) => ({
+      ...like,
+      received_at: like.received_at.toISOString(),
+    }));
+}
+
+export function deleteRemoteLike(activityUri: string, database: LikesDatabase = db): boolean {
+  const deleted = database
     .delete(remoteLikes)
     .where(eq(remoteLikes.activity_uri, activityUri))
     .returning()

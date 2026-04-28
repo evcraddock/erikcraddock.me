@@ -11,6 +11,7 @@ import {
   personSocialAccounts,
   tags,
   postTags,
+  remoteLikes,
 } from "../../db/schema";
 import { eq } from "drizzle-orm";
 
@@ -71,6 +72,7 @@ mock.module("@/auth/api-key", () => {
 });
 
 beforeEach(() => {
+  testDb.delete(remoteLikes).run();
   testDb.delete(postTags).run();
   testDb.delete(tags).run();
   testDb.delete(posts).run();
@@ -469,6 +471,89 @@ describe("GET /api/posts/by-slug/:slug", () => {
 
     expect(res.status).toBe(404);
     const json = await res.json();
+    expect(json.error).toBe("Post not found");
+  });
+});
+
+describe("GET /api/posts/by-slug/:slug/likes", () => {
+  let api: typeof import("../api").api;
+
+  beforeAll(async () => {
+    const module = await import("../api");
+    api = module.api;
+  });
+
+  it("returns like count and safe metadata for a post", async () => {
+    const now = new Date("2026-01-01T00:00:00.000Z");
+    const post = testDb
+      .insert(posts)
+      .values({
+        slug: "liked-api-post",
+        type: "note",
+        content: "Liked API post",
+        published_at: now,
+        created_at: now,
+        updated_at: now,
+      })
+      .returning()
+      .get();
+
+    testDb
+      .insert(remoteLikes)
+      .values({
+        post_id: post.id,
+        object_uri: "https://erikcraddock.me/posts/liked-api-post",
+        activity_uri: "https://remote.example/activities/like-api-post",
+        actor_uri: "https://remote.example/users/alice",
+        actor_name: "Alice",
+        raw_object_uri: "https://erikcraddock.me/posts/liked-api-post",
+        received_at: now,
+      })
+      .run();
+
+    const res = await api.request("/posts/by-slug/liked-api-post/likes", { headers: authHeader });
+    const json = await res.json();
+
+    expect(res.status).toBe(200);
+    expect(json.data.count).toBe(1);
+    expect(json.data.likes).toEqual([
+      {
+        actor_uri: "https://remote.example/users/alice",
+        actor_name: "Alice",
+        activity_uri: "https://remote.example/activities/like-api-post",
+        object_uri: "https://erikcraddock.me/posts/liked-api-post",
+        received_at: now.toISOString(),
+      },
+    ]);
+    expect(JSON.stringify(json)).not.toContain("raw_object_uri");
+  });
+
+  it("returns zero and an empty list for posts with no likes", async () => {
+    const now = new Date();
+    testDb
+      .insert(posts)
+      .values({
+        slug: "no-api-likes",
+        type: "note",
+        content: "No likes",
+        published_at: now,
+        created_at: now,
+        updated_at: now,
+      })
+      .run();
+
+    const res = await api.request("/posts/by-slug/no-api-likes/likes", { headers: authHeader });
+    const json = await res.json();
+
+    expect(res.status).toBe(200);
+    expect(json.data).toEqual({ count: 0, likes: [] });
+  });
+
+  it("returns 404 for missing posts", async () => {
+    const res = await api.request("/posts/by-slug/missing-post/likes", { headers: authHeader });
+    const json = await res.json();
+
+    expect(res.status).toBe(404);
     expect(json.error).toBe("Post not found");
   });
 });

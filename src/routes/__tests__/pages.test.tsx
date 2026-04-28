@@ -20,6 +20,7 @@ import {
   people,
   personSocialAccounts,
   media,
+  remoteLikes,
 } from "../../db/schema";
 
 // Create test db immediately
@@ -1497,6 +1498,66 @@ describe("pages routes", () => {
 
       const html = await res.text();
       expect(html).toContain("Tag Not Found");
+    });
+  });
+
+  describe("ActivityPub like counts", () => {
+    it("shows the stored like count on individual post pages", async () => {
+      testDb
+        .insert(remoteLikes)
+        .values({
+          post_id: 1,
+          object_uri: "http://localhost:5000/posts/test-post",
+          activity_uri: "https://remote.example/activities/page-like",
+          actor_uri: "https://remote.example/users/alice",
+          actor_name: "Alice",
+          raw_object_uri: "http://localhost:5000/posts/test-post",
+          received_at: new Date("2026-01-01T00:00:00.000Z"),
+        })
+        .run();
+
+      const app = getApp();
+      const res = await app.request("/posts/test-post");
+      const html = await res.text();
+
+      expect(res.status).toBe(200);
+      expect(html).toContain('aria-label="1 ActivityPub like"');
+      expect(html).toContain("0 Replies");
+      expect(html).toContain("0 Boosts");
+    });
+
+    it("shows like counts on feed cards", async () => {
+      testDb
+        .insert(remoteLikes)
+        .values({
+          post_id: 3,
+          object_uri: "http://localhost:5000/posts/another-post",
+          activity_uri: "https://remote.example/activities/feed-like",
+          actor_uri: "https://remote.example/users/bob",
+          actor_name: "Bob",
+          raw_object_uri: "http://localhost:5000/posts/another-post",
+          received_at: new Date("2026-01-02T00:00:00.000Z"),
+        })
+        .run();
+
+      const app = getApp();
+      const res = await app.request("/feed");
+      const html = await res.text();
+
+      expect(res.status).toBe(200);
+      expect(html).toContain('aria-label="1 ActivityPub like"');
+      expect(html).toContain('aria-label="0 ActivityPub likes"');
+      expect(html).toContain("0 Replies");
+      expect(html).toContain("0 Boosts");
+    });
+
+    it("shows zero likes on article cards when there are no stored likes", async () => {
+      const app = getApp();
+      const res = await app.request("/articles");
+      const html = await res.text();
+
+      expect(res.status).toBe(200);
+      expect(html).toContain('aria-label="0 ActivityPub likes"');
     });
   });
 
