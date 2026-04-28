@@ -208,8 +208,52 @@ describe("admin following page", () => {
     expect(html).toContain(">Follow<");
   });
 
-  it("lets admins cancel pending follow requests", async () => {
+  it("shows accepted and rejected timestamps", async () => {
+    const now = new Date("2026-04-20T12:34:00.000Z");
     testDb
+      .insert(remoteFollows)
+      .values([
+        {
+          actor_uri: "https://example.social/users/accepted",
+          handle: "@accepted@example.social",
+          display_name: "Accepted Example",
+          profile_url: "https://example.social/@accepted",
+          inbox_uri: "https://example.social/users/accepted/inbox",
+          follow_activity_uri: "http://localhost:5000/activities/follow/accepted",
+          status: "accepted",
+          followed_at: now,
+          accepted_at: now,
+          created_at: now,
+          updated_at: now,
+        },
+        {
+          actor_uri: "https://example.social/users/rejected",
+          handle: "@rejected@example.social",
+          display_name: "Rejected Example",
+          profile_url: "https://example.social/@rejected",
+          inbox_uri: "https://example.social/users/rejected/inbox",
+          follow_activity_uri: "http://localhost:5000/activities/follow/rejected",
+          status: "rejected",
+          followed_at: now,
+          rejected_at: now,
+          created_at: now,
+          updated_at: now,
+        },
+      ])
+      .run();
+
+    const { admin } = await import("../admin");
+
+    const res = await admin.request(authenticatedRequest("/following"));
+    const html = await res.text();
+
+    expect(res.status).toBe(200);
+    expect(html).toContain("Accepted Apr 20, 2026");
+    expect(html).toContain("Rejected Apr 20, 2026");
+  });
+
+  it("lets admins cancel pending follow requests", async () => {
+    const follow = testDb
       .insert(remoteFollows)
       .values({
         actor_uri: "https://example.social/users/alice",
@@ -223,16 +267,17 @@ describe("admin following page", () => {
         created_at: new Date(),
         updated_at: new Date(),
       })
-      .run();
+      .returning()
+      .get();
 
     const { admin } = await import("../admin");
 
     const pageRes = await admin.request(authenticatedRequest("/following"));
     const html = await pageRes.text();
-    expect(html).toContain('action="/admin/following/1/cancel"');
+    expect(html).toContain(`action="/admin/following/${follow.id}/cancel"`);
     expect(html).toContain("Cancel request");
 
-    const cancelRes = await admin.request(authenticatedRequest("/following/1/cancel"), {
+    const cancelRes = await admin.request(authenticatedRequest(`/following/${follow.id}/cancel`), {
       method: "POST",
     });
 

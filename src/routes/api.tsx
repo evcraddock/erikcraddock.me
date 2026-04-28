@@ -2544,6 +2544,8 @@ protectedApi.get("/following", (c) => {
     profile_url: follow.profile_url,
     status: follow.status,
     followed_at: follow.followed_at.toISOString(),
+    accepted_at: follow.accepted_at?.toISOString() ?? null,
+    rejected_at: follow.rejected_at?.toISOString() ?? null,
   }));
   return c.json({ data: follows });
 });

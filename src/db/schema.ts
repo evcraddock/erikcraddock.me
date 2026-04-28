@@ -123,6 +123,8 @@ export const remoteFollows = sqliteTable("remote_follows", {
   status: text("status").notNull().default("pending"),
   last_error: text("last_error"),
   followed_at: integer("followed_at", { mode: "timestamp" }).notNull(),
+  accepted_at: integer("accepted_at", { mode: "timestamp" }),
+  rejected_at: integer("rejected_at", { mode: "timestamp" }),
   created_at: integer("created_at", { mode: "timestamp" }).notNull(),
   updated_at: integer("updated_at", { mode: "timestamp" }).notNull(),
 });

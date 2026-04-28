@@ -1,6 +1,6 @@
 import { and, asc, eq, inArray } from "drizzle-orm";
 import type { BunSQLiteDatabase } from "drizzle-orm/bun-sqlite";
-import { Follow, Undo, type Recipient } from "@fedify/fedify";
+import { Accept, Follow, Reject, Undo, type Recipient } from "@fedify/fedify";
 
 import * as schema from "@/db/schema";
 import { people, personSocialAccounts, remoteFollows } from "@/db/schema";
@@ -438,6 +438,106 @@ export async function createOrRetryRemoteFollow({
   }
 }
 
+function localActorUri(): string {
+  return new URL("/users/erik", baseUrl).href;
+}
+
+function getFollowActivityIdFromResponse(
+  activity: Accept | Reject,
+  object: unknown
+): string | null {
+  if (object instanceof Follow && object.id) return object.id.href;
+  return activity.objectId?.href ?? null;
+}
+
+function isLocalFollowObject(object: unknown): boolean {
+  if (!(object instanceof Follow)) return true;
+  return object.actorId?.href === localActorUri();
+}
+
+async function applyRemoteFollowResponse({
+  activity,
+  status,
+  timestampField,
+  database,
+}: {
+  activity: Accept | Reject;
+  status: typeof REMOTE_FOLLOW_ACCEPTED_STATUS | typeof REMOTE_FOLLOW_REJECTED_STATUS;
+  timestampField: "accepted_at" | "rejected_at";
+  database: FollowingDatabase;
+}): Promise<RemoteFollow | null> {
+  const object = await activity.getObject({ suppressError: true });
+  const followActivityUri = getFollowActivityIdFromResponse(activity, object);
+  if (!followActivityUri) {
+    logger.warn("federation", "Follow response missing follow object id");
+    return null;
+  }
+
+  if (!isLocalFollowObject(object)) {
+    logger.warn("federation", `Follow response does not target local actor: ${followActivityUri}`);
+    return null;
+  }
+
+  const follow = database
+    .select()
+    .from(remoteFollows)
+    .where(eq(remoteFollows.follow_activity_uri, followActivityUri))
+    .get();
+  if (!follow) {
+    logger.warn(
+      "federation",
+      `Follow response did not match a stored follow: ${followActivityUri}`
+    );
+    return null;
+  }
+
+  const responseActorUri = activity.actorId?.href;
+  if (responseActorUri && responseActorUri !== follow.actor_uri) {
+    logger.warn("federation", `Follow response actor mismatch: ${responseActorUri}`);
+    return null;
+  }
+
+  if (follow.status !== REMOTE_FOLLOW_PENDING_STATUS) {
+    logger.debug(
+      "federation",
+      `Ignoring follow response for ${follow.status} follow: ${follow.id}`
+    );
+    return follow;
+  }
+
+  const now = new Date();
+  return database
+    .update(remoteFollows)
+    .set({ status, [timestampField]: now, last_error: null, updated_at: now })
+    .where(eq(remoteFollows.id, follow.id))
+    .returning()
+    .get();
+}
+
+export function handleAcceptActivity(
+  activity: Accept,
+  database: FollowingDatabase = getDefaultDatabase()
+): Promise<RemoteFollow | null> {
+  return applyRemoteFollowResponse({
+    activity,
+    status: REMOTE_FOLLOW_ACCEPTED_STATUS,
+    timestampField: "accepted_at",
+    database,
+  });
+}
+
+export function handleRejectActivity(
+  activity: Reject,
+  database: FollowingDatabase = getDefaultDatabase()
+): Promise<RemoteFollow | null> {
+  return applyRemoteFollowResponse({
+    activity,
+    status: REMOTE_FOLLOW_REJECTED_STATUS,
+    timestampField: "rejected_at",
+    database,
+  });
+}
+
 export async function cancelPendingRemoteFollow({
   followId,
   database = getDefaultDatabase(),
@@ -479,6 +579,17 @@ export function listRemoteFollows(
   return database
     .select()
     .from(remoteFollows)
+    .orderBy(asc(remoteFollows.display_name), asc(remoteFollows.id))
+    .all();
+}
+
+export function listAcceptedRemoteFollows(
+  database: FollowingDatabase = getDefaultDatabase()
+): RemoteFollow[] {
+  return database
+    .select()
+    .from(remoteFollows)
+    .where(eq(remoteFollows.status, REMOTE_FOLLOW_ACCEPTED_STATUS))
     .orderBy(asc(remoteFollows.display_name), asc(remoteFollows.id))
     .all();
 }

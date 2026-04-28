@@ -1,3 +1,4 @@
+import { Accept, Follow, Reject } from "@fedify/fedify";
 import { describe, it, expect } from "bun:test";
 import { createTestDb } from "../../db/test-utils";
 import { people, personSocialAccounts, remoteFollows } from "../../db/schema";
@@ -7,8 +8,12 @@ import {
   parseFediverseHandle,
   resolveRemoteActor,
   isSafeRemoteUrl,
+  REMOTE_FOLLOW_ACCEPTED_STATUS,
   REMOTE_FOLLOW_CANCELLED_STATUS,
   REMOTE_FOLLOW_PENDING_STATUS,
+  REMOTE_FOLLOW_REJECTED_STATUS,
+  handleAcceptActivity,
+  handleRejectActivity,
   type ResolvedRemoteActor,
 } from "../following";
 
@@ -168,5 +173,81 @@ describe("ActivityPub following send workflow", () => {
     expect(delivered).toEqual([follow.follow_activity_uri]);
     expect(testDb.select().from(people).all()).toHaveLength(1);
     expect(testDb.select().from(remoteFollows).all()).toHaveLength(1);
+  });
+
+  it("marks pending follows accepted from valid Accept activities", async () => {
+    const testDb = createTestDb();
+    const follow = await createOrRetryRemoteFollow({
+      actor: actor(),
+      database: testDb,
+      deliver: async () => {},
+    });
+
+    const localActor = new URL("/users/erik", new URL(follow.follow_activity_uri).origin);
+    const updated = await handleAcceptActivity(
+      new Accept({
+        actor: new URL(follow.actor_uri),
+        object: new Follow({
+          id: new URL(follow.follow_activity_uri),
+          actor: localActor,
+          object: new URL(follow.actor_uri),
+        }),
+      }),
+      testDb
+    );
+
+    expect(updated?.status).toBe(REMOTE_FOLLOW_ACCEPTED_STATUS);
+    expect(updated?.accepted_at).toBeInstanceOf(Date);
+    expect(testDb.select().from(remoteFollows).get()?.status).toBe(REMOTE_FOLLOW_ACCEPTED_STATUS);
+  });
+
+  it("marks pending follows rejected from valid Reject activities", async () => {
+    const testDb = createTestDb();
+    const follow = await createOrRetryRemoteFollow({
+      actor: actor(),
+      database: testDb,
+      deliver: async () => {},
+    });
+
+    const localActor = new URL("/users/erik", new URL(follow.follow_activity_uri).origin);
+    const updated = await handleRejectActivity(
+      new Reject({
+        actor: new URL(follow.actor_uri),
+        object: new Follow({
+          id: new URL(follow.follow_activity_uri),
+          actor: localActor,
+          object: new URL(follow.actor_uri),
+        }),
+      }),
+      testDb
+    );
+
+    expect(updated?.status).toBe(REMOTE_FOLLOW_REJECTED_STATUS);
+    expect(updated?.rejected_at).toBeInstanceOf(Date);
+    expect(testDb.select().from(remoteFollows).get()?.status).toBe(REMOTE_FOLLOW_REJECTED_STATUS);
+  });
+
+  it("ignores mismatched Accept activities", async () => {
+    const testDb = createTestDb();
+    const follow = await createOrRetryRemoteFollow({
+      actor: actor(),
+      database: testDb,
+      deliver: async () => {},
+    });
+
+    const updated = await handleAcceptActivity(
+      new Accept({
+        actor: new URL("https://other.example/users/mallory"),
+        object: new Follow({
+          id: new URL(follow.follow_activity_uri),
+          actor: new URL("http://localhost:5000/users/erik"),
+          object: new URL(follow.actor_uri),
+        }),
+      }),
+      testDb
+    );
+
+    expect(updated).toBeNull();
+    expect(testDb.select().from(remoteFollows).get()?.status).toBe(REMOTE_FOLLOW_PENDING_STATUS);
   });
 });

@@ -6,6 +6,7 @@ import {
   Announce,
   Create,
   Accept,
+  Reject,
   isActor,
   InProcessMessageQueue,
   type KvStore,
@@ -19,6 +20,7 @@ import { buildActorProfile } from "./actor-profile";
 import { handleLikeActivity } from "./likes";
 import { handleAnnounceActivity } from "./boosts";
 import { handleCreateActivity } from "./replies";
+import { handleAcceptActivity, handleRejectActivity, listAcceptedRemoteFollows } from "./following";
 
 // Context type for federation - we use void since we don't need request-specific data
 export type FederationContext = void;
@@ -182,6 +184,12 @@ export function createFedifyFederation() {
     })
     .on(Create, async (_ctx, create) => {
       await handleCreateActivity(create);
+    })
+    .on(Accept, async (_ctx, accept) => {
+      await handleAcceptActivity(accept);
+    })
+    .on(Reject, async (_ctx, reject) => {
+      await handleRejectActivity(reject);
     });
 
   // Set up outbox dispatcher - lists activities sent by this actor
@@ -224,16 +232,18 @@ export function createFedifyFederation() {
       return "0";
     });
 
-  // Set up following collection dispatcher - this single-user site does not follow actors yet
+  // Set up following collection dispatcher - returns accepted remote follows
   federation
     .setFollowingDispatcher("/users/{identifier}/following", async (_ctx, identifier) => {
       if (identifier !== "erik") {
         return null;
       }
 
-      return { items: [] };
+      return { items: listAcceptedRemoteFollows().map((follow) => new URL(follow.actor_uri)) };
     })
-    .setCounter((_ctx, identifier) => (identifier === "erik" ? 0 : null));
+    .setCounter((_ctx, identifier) =>
+      identifier === "erik" ? listAcceptedRemoteFollows().length : null
+    );
 
   // Set up followers collection dispatcher - returns list of followers
   federation
