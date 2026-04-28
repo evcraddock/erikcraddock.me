@@ -12,6 +12,7 @@ import {
   tags,
   postTags,
   remoteLikes,
+  remoteComments,
 } from "../../db/schema";
 import { eq } from "drizzle-orm";
 
@@ -72,6 +73,7 @@ mock.module("@/auth/api-key", () => {
 });
 
 beforeEach(() => {
+  testDb.delete(remoteComments).run();
   testDb.delete(remoteLikes).run();
   testDb.delete(postTags).run();
   testDb.delete(tags).run();
@@ -472,6 +474,108 @@ describe("GET /api/posts/by-slug/:slug", () => {
     expect(res.status).toBe(404);
     const json = await res.json();
     expect(json.error).toBe("Post not found");
+  });
+});
+
+describe("Remote comment moderation API", () => {
+  let api: typeof import("../api").api;
+
+  beforeAll(async () => {
+    const module = await import("../api");
+    api = module.api;
+  });
+
+  function createCommentFixture(status = "pending") {
+    const now = new Date("2026-03-01T00:00:00.000Z");
+    const post = testDb
+      .insert(posts)
+      .values({
+        slug: `comment-api-post-${status}`,
+        type: "note",
+        content: "Comment API post",
+        published_at: now,
+        created_at: now,
+        updated_at: now,
+      })
+      .returning()
+      .get();
+
+    return testDb
+      .insert(remoteComments)
+      .values({
+        post_id: post.id,
+        activity_uri: `https://remote.example/activities/comment-${status}`,
+        object_uri: `https://remote.example/objects/comment-${status}`,
+        actor_uri: "https://remote.example/users/alice",
+        actor_name: "Alice",
+        actor_url: "https://remote.example/@alice",
+        content_html: "Hello from remote",
+        content_text: "Hello from remote",
+        in_reply_to_uri: `http://localhost:5000/posts/${post.slug}`,
+        moderation_status: status,
+        raw_source: "{}",
+        published_at: now,
+        received_at: now,
+      })
+      .returning()
+      .get();
+  }
+
+  it("lists pending remote comments", async () => {
+    const comment = createCommentFixture("pending");
+    createCommentFixture("approved");
+
+    const res = await api.request("/comments/pending", { headers: authHeader });
+    const json = await res.json();
+
+    expect(res.status).toBe(200);
+    expect(json.data).toHaveLength(1);
+    expect(json.data[0]).toMatchObject({
+      id: comment.id,
+      moderation_status: "pending",
+      actor_name: "Alice",
+      content_html: "Hello from remote",
+    });
+    expect(json.data[0].raw_source).toBeUndefined();
+  });
+
+  it("approves a remote comment", async () => {
+    const comment = createCommentFixture("pending");
+
+    const res = await api.request(`/comments/${comment.id}/approve`, {
+      method: "POST",
+      headers: authHeader,
+    });
+    const json = await res.json();
+
+    expect(res.status).toBe(200);
+    expect(json.data.moderation_status).toBe("approved");
+    expect(typeof json.data.moderated_at).toBe("string");
+  });
+
+  it("hides a remote comment", async () => {
+    const comment = createCommentFixture("approved");
+
+    const res = await api.request(`/comments/${comment.id}/hide`, {
+      method: "POST",
+      headers: authHeader,
+    });
+    const json = await res.json();
+
+    expect(res.status).toBe(200);
+    expect(json.data.moderation_status).toBe("hidden");
+    expect(typeof json.data.moderated_at).toBe("string");
+  });
+
+  it("returns 404 for missing remote comments", async () => {
+    const res = await api.request("/comments/999999/approve", {
+      method: "POST",
+      headers: authHeader,
+    });
+    const json = await res.json();
+
+    expect(res.status).toBe(404);
+    expect(json.error).toBe("Comment not found");
   });
 });
 

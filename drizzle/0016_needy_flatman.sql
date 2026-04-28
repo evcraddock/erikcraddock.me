@@ -1,0 +1,1 @@
+ALTER TABLE `remote_comments` ADD `moderated_at` integer;

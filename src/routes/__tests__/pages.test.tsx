@@ -21,6 +21,9 @@ import {
   personSocialAccounts,
   media,
   remoteLikes,
+  remoteComments,
+  authors,
+  sessions,
 } from "../../db/schema";
 
 // Create test db immediately
@@ -1572,6 +1575,241 @@ describe("pages routes", () => {
 
       expect(res.status).toBe(200);
       expect(html).toContain('aria-label="0 ActivityPub likes"');
+    });
+  });
+
+  describe("Fediverse comments", () => {
+    function createCommentPost(slug: string) {
+      const now = new Date("2026-04-01T00:00:00.000Z");
+      return testDb
+        .insert(posts)
+        .values({
+          slug,
+          type: "note",
+          title: null,
+          content: "Post with remote comments",
+          published_at: now,
+          created_at: now,
+          updated_at: now,
+        })
+        .returning()
+        .get();
+    }
+
+    function insertRemoteComment({
+      postId,
+      suffix,
+      status,
+      content,
+    }: {
+      postId: number;
+      suffix: string;
+      status: string;
+      content: string;
+    }) {
+      const now = new Date("2026-04-02T00:00:00.000Z");
+      return testDb
+        .insert(remoteComments)
+        .values({
+          post_id: postId,
+          activity_uri: `https://remote.example/activities/${suffix}`,
+          object_uri: `https://remote.example/objects/${suffix}`,
+          actor_uri: "https://remote.example/users/alice",
+          actor_name: "Alice",
+          actor_url: "https://remote.example/@alice",
+          content_html: content,
+          content_text: content,
+          in_reply_to_uri: `http://localhost:5000/posts/${suffix}`,
+          moderation_status: status,
+          raw_source: "{}",
+          published_at: now,
+          received_at: now,
+        })
+        .returning()
+        .get();
+    }
+
+    function createAuthenticatedSession(): string {
+      const author = testDb
+        .insert(authors)
+        .values({
+          email: `comment-admin-${crypto.randomUUID()}@example.com`,
+          created_at: new Date(),
+        })
+        .returning()
+        .get();
+      const sessionId = `comment-session-${crypto.randomUUID()}`;
+      testDb
+        .insert(sessions)
+        .values({
+          id: sessionId,
+          author_id: author.id,
+          expires_at: new Date(Date.now() + 60 * 60 * 1000),
+          created_at: new Date(),
+        })
+        .run();
+      return sessionId;
+    }
+
+    it("shows approved comments publicly and hides non-approved comments", async () => {
+      const post = createCommentPost("comments-public-post");
+      insertRemoteComment({
+        postId: post.id,
+        suffix: "public-approved",
+        status: "approved",
+        content: "Approved public reply",
+      });
+      insertRemoteComment({
+        postId: post.id,
+        suffix: "public-pending",
+        status: "pending",
+        content: "Pending private reply",
+      });
+
+      const app = getApp();
+      const res = await app.request("/posts/comments-public-post");
+      const html = await res.text();
+
+      expect(res.status).toBe(200);
+      expect(html).toContain("Fediverse comments");
+      expect(html).toContain("Approved public reply");
+      expect(html).not.toContain("Pending private reply");
+      expect(html).not.toContain("/approve");
+      expect(html).not.toContain("/hide");
+    });
+
+    it("shows all comments and moderation controls to authenticated users", async () => {
+      const post = createCommentPost("comments-auth-post");
+      insertRemoteComment({
+        postId: post.id,
+        suffix: "auth-approved",
+        status: "approved",
+        content: "Approved authenticated reply",
+      });
+      insertRemoteComment({
+        postId: post.id,
+        suffix: "auth-pending",
+        status: "pending",
+        content: "Pending authenticated reply",
+      });
+      insertRemoteComment({
+        postId: post.id,
+        suffix: "auth-hidden",
+        status: "hidden",
+        content: "Hidden authenticated reply",
+      });
+      const sessionId = createAuthenticatedSession();
+
+      const app = getApp();
+      const res = await app.request("/posts/comments-auth-post", {
+        headers: { Cookie: `session=${sessionId}` },
+      });
+      const html = await res.text();
+
+      expect(res.status).toBe(200);
+      expect(html).toContain("Approved authenticated reply");
+      expect(html).toContain("Pending authenticated reply");
+      expect(html).toContain("Hidden authenticated reply");
+      expect(html).toContain(">pending</span>");
+      expect(html).toContain(">hidden</span>");
+      expect(html).toContain("/posts/comments-auth-post/comments/");
+      expect(html).toContain("Approve");
+      expect(html).toContain("Hide");
+    });
+
+    it("allows authenticated users to approve and hide comments from the post page", async () => {
+      const post = createCommentPost("comments-actions-post");
+      const pending = insertRemoteComment({
+        postId: post.id,
+        suffix: "action-pending",
+        status: "pending",
+        content: "Pending action reply",
+      });
+      const approved = insertRemoteComment({
+        postId: post.id,
+        suffix: "action-approved",
+        status: "approved",
+        content: "Approved action reply",
+      });
+      const sessionId = createAuthenticatedSession();
+      const app = getApp();
+
+      const approveRes = await app.request(
+        `/posts/comments-actions-post/comments/${pending.id}/approve`,
+        {
+          method: "POST",
+          headers: { Cookie: `session=${sessionId}` },
+        }
+      );
+      const hideRes = await app.request(
+        `/posts/comments-actions-post/comments/${approved.id}/hide`,
+        {
+          method: "POST",
+          headers: { Cookie: `session=${sessionId}` },
+        }
+      );
+
+      const approvedComment = testDb
+        .select()
+        .from(remoteComments)
+        .where(eq(remoteComments.id, pending.id))
+        .get();
+      const hiddenComment = testDb
+        .select()
+        .from(remoteComments)
+        .where(eq(remoteComments.id, approved.id))
+        .get();
+
+      expect(approveRes.status).toBe(302);
+      expect(hideRes.status).toBe(302);
+      expect(approveRes.headers.get("Location")).toBe("/posts/comments-actions-post");
+      expect(hideRes.headers.get("Location")).toBe("/posts/comments-actions-post");
+      expect(approvedComment?.moderation_status).toBe("approved");
+      expect(hiddenComment?.moderation_status).toBe("hidden");
+      expect(approvedComment?.moderated_at).toBeInstanceOf(Date);
+      expect(hiddenComment?.moderated_at).toBeInstanceOf(Date);
+    });
+
+    it("redirects anonymous moderation attempts to login", async () => {
+      const post = createCommentPost("comments-anon-action-post");
+      const pending = insertRemoteComment({
+        postId: post.id,
+        suffix: "anon-action-pending",
+        status: "pending",
+        content: "Pending anonymous action reply",
+      });
+
+      const app = getApp();
+      const res = await app.request(
+        `/posts/comments-anon-action-post/comments/${pending.id}/approve`,
+        {
+          method: "POST",
+        }
+      );
+
+      expect(res.status).toBe(302);
+      expect(res.headers.get("Location")).toBe("/login");
+    });
+
+    it("redirects valid reply-from-server submissions and rejects invalid servers", async () => {
+      createCommentPost("comments-reply-post");
+      const app = getApp();
+
+      const validRes = await app.request(
+        "/fediverse/reply?post=comments-reply-post&server=mastodon.social"
+      );
+      const invalidRes = await app.request(
+        "/fediverse/reply?post=comments-reply-post&server=http://mastodon.social"
+      );
+
+      expect(validRes.status).toBe(302);
+      const validLocation = validRes.headers.get("Location") ?? "";
+      expect(validLocation.startsWith("https://mastodon.social/share?text=")).toBe(true);
+      expect(validLocation).toContain("comments-reply-post");
+      expect(invalidRes.status).toBe(302);
+      expect(invalidRes.headers.get("Location")).toBe(
+        "/posts/comments-reply-post?replyError=invalid-server"
+      );
     });
   });
 
