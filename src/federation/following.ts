@@ -1,6 +1,6 @@
 import { and, asc, eq, inArray } from "drizzle-orm";
 import type { BunSQLiteDatabase } from "drizzle-orm/bun-sqlite";
-import { Follow, type Recipient } from "@fedify/fedify";
+import { Follow, Undo, type Recipient } from "@fedify/fedify";
 
 import * as schema from "@/db/schema";
 import { people, personSocialAccounts, remoteFollows } from "@/db/schema";
@@ -334,6 +334,19 @@ function followActivityUri(actorUri: string): string {
   return new URL(`/activities/follow/${encoded}`, baseUrl).href;
 }
 
+function undoFollowActivityUri(actorUri: string): string {
+  const encoded = encodeURIComponent(actorUri).replace(/%/g, "~");
+  return new URL(`/activities/undo-follow/${encoded}`, baseUrl).href;
+}
+
+function remoteFollowRecipient(follow: RemoteFollow): Recipient {
+  return {
+    id: new URL(follow.actor_uri),
+    inboxId: new URL(follow.inbox_uri),
+    endpoints: follow.shared_inbox_uri ? { sharedInbox: new URL(follow.shared_inbox_uri) } : null,
+  };
+}
+
 export async function sendFollowActivity(follow: RemoteFollow): Promise<void> {
   const { federation } = await import("./setup");
   const ctx = federation.createContext(new URL(baseUrl), undefined);
@@ -345,13 +358,26 @@ export async function sendFollowActivity(follow: RemoteFollow): Promise<void> {
     to: new URL(follow.actor_uri),
     published: dateToInstant(follow.followed_at),
   });
-  const recipient: Recipient = {
-    id: new URL(follow.actor_uri),
-    inboxId: new URL(follow.inbox_uri),
-    endpoints: follow.shared_inbox_uri ? { sharedInbox: new URL(follow.shared_inbox_uri) } : null,
-  };
+  await ctx.sendActivity({ identifier: "erik" }, remoteFollowRecipient(follow), activity, {
+    preferSharedInbox: true,
+  });
+}
 
-  await ctx.sendActivity({ identifier: "erik" }, recipient, activity, { preferSharedInbox: true });
+export async function sendUndoFollowActivity(follow: RemoteFollow): Promise<void> {
+  const { federation } = await import("./setup");
+  const ctx = federation.createContext(new URL(baseUrl), undefined);
+  const actorUri = ctx.getActorUri("erik");
+  const activity = new Undo({
+    id: new URL(undoFollowActivityUri(follow.actor_uri)),
+    actor: actorUri,
+    object: new URL(follow.follow_activity_uri),
+    to: new URL(follow.actor_uri),
+    published: dateToInstant(new Date()),
+  });
+
+  await ctx.sendActivity({ identifier: "erik" }, remoteFollowRecipient(follow), activity, {
+    preferSharedInbox: true,
+  });
 }
 
 export async function createOrRetryRemoteFollow({
@@ -412,6 +438,41 @@ export async function createOrRetryRemoteFollow({
   }
 }
 
+export async function cancelPendingRemoteFollow({
+  followId,
+  database = getDefaultDatabase(),
+  deliver = sendUndoFollowActivity,
+}: {
+  followId: number;
+  database?: FollowingDatabase;
+  deliver?: (follow: RemoteFollow) => Promise<void>;
+}): Promise<RemoteFollow | null> {
+  const follow = database.select().from(remoteFollows).where(eq(remoteFollows.id, followId)).get();
+  if (!follow) return null;
+  if (follow.status !== REMOTE_FOLLOW_PENDING_STATUS) {
+    throw new Error("Only pending follow requests can be cancelled");
+  }
+
+  try {
+    await deliver(follow);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    database
+      .update(remoteFollows)
+      .set({ status: REMOTE_FOLLOW_FAILED_STATUS, last_error: message, updated_at: new Date() })
+      .where(eq(remoteFollows.id, follow.id))
+      .run();
+    throw error;
+  }
+
+  return database
+    .update(remoteFollows)
+    .set({ status: REMOTE_FOLLOW_CANCELLED_STATUS, last_error: null, updated_at: new Date() })
+    .where(eq(remoteFollows.id, follow.id))
+    .returning()
+    .get();
+}
+
 export function listRemoteFollows(
   database: FollowingDatabase = getDefaultDatabase()
 ): RemoteFollow[] {
@@ -438,4 +499,11 @@ export function getRemoteFollowForPerson(
   return (
     database.select().from(remoteFollows).where(eq(remoteFollows.person_id, personId)).get() ?? null
   );
+}
+
+export function getRemoteFollowForId(
+  followId: number,
+  database: FollowingDatabase = getDefaultDatabase()
+): RemoteFollow | null {
+  return database.select().from(remoteFollows).where(eq(remoteFollows.id, followId)).get() ?? null;
 }

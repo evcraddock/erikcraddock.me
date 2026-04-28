@@ -36,6 +36,7 @@ const mockSendDeleteActivity = mock(async () => true);
 const mockSendDeleteActivityForUri = mock(async () => true);
 const mockSendUpdateActivity = mock(async () => true);
 const mockSendActorUpdateActivity = mock(async () => true);
+const mockContextSendActivity = mock(async () => {});
 
 // Mock the db module
 mock.module("../../db", () => ({
@@ -57,6 +58,15 @@ mock.module("@/federation/publish", () => ({
   sendDeleteActivityForUri: mockSendDeleteActivityForUri,
   sendUpdateActivity: mockSendUpdateActivity,
   sendActorUpdateActivity: mockSendActorUpdateActivity,
+}));
+
+mock.module("@/federation/setup", () => ({
+  federation: {
+    createContext: mock(() => ({
+      getActorUri: () => new URL("http://localhost:5000/users/erik"),
+      sendActivity: mockContextSendActivity,
+    })),
+  },
 }));
 
 // Set up test data
@@ -1079,7 +1089,20 @@ describe("pages routes", () => {
       const followedHtml = await followedRes.text();
 
       expect(followedHtml).toContain(">Pending</span>");
+      expect(followedHtml).toContain('action="/people/1/follow/cancel"');
       expect(followedHtml).not.toContain('action="/people/1/follow"');
+
+      mockContextSendActivity.mockClear();
+      const cancelRes = await app.request("/people/1/follow/cancel", {
+        method: "POST",
+        headers: { Cookie: `session=${sessionId}` },
+      });
+
+      expect(cancelRes.status).toBe(302);
+      expect(
+        testDb.select().from(remoteFollows).where(eq(remoteFollows.person_id, 1)).get()?.status
+      ).toBe("cancelled");
+      expect(mockContextSendActivity).toHaveBeenCalledTimes(1);
     });
 
     it("shows links from the selected person with full shared link content", async () => {

@@ -12,6 +12,8 @@ import {
   deletePasskey,
 } from "@/auth/passkey";
 import {
+  REMOTE_FOLLOW_PENDING_STATUS,
+  cancelPendingRemoteFollow,
   createOrRetryRemoteFollow,
   getRemoteFollowStatusLabel,
   listRemoteFollows,
@@ -355,6 +357,7 @@ admin.get("/following", async (c) => {
                     <th class="px-3 py-2 text-left text-xs uppercase text-gray-500">Status</th>
                     <th class="px-3 py-2 text-left text-xs uppercase text-gray-500">Person</th>
                     <th class="px-3 py-2 text-left text-xs uppercase text-gray-500">Followed</th>
+                    <th class="px-3 py-2 text-left text-xs uppercase text-gray-500">Actions</th>
                   </tr>
                 </thead>
                 <tbody class="divide-y divide-gray-200 dark:divide-gray-700">
@@ -385,6 +388,20 @@ admin.get("/following", async (c) => {
                         )}
                       </td>
                       <td class="px-3 py-2 text-sm">{formatDateTime(follow.followed_at)}</td>
+                      <td class="px-3 py-2 text-sm">
+                        {follow.status === REMOTE_FOLLOW_PENDING_STATUS ? (
+                          <form method="post" action={`/admin/following/${follow.id}/cancel`}>
+                            <button
+                              class="rounded bg-gray-200 px-3 py-1 text-sm font-semibold text-gray-800 hover:bg-gray-300 dark:bg-gray-700 dark:text-gray-100 dark:hover:bg-gray-600"
+                              type="submit"
+                            >
+                              Cancel request
+                            </button>
+                          </form>
+                        ) : (
+                          <MissingValue />
+                        )}
+                      </td>
                     </tr>
                   ))}
                 </tbody>
@@ -395,6 +412,21 @@ admin.get("/following", async (c) => {
       </div>
     </Layout>
   );
+});
+
+admin.post("/following/:id/cancel", async (c) => {
+  const id = Number(c.req.param("id"));
+  if (!Number.isInteger(id) || id < 1) {
+    return c.redirect("/admin/following?error=Invalid follow request");
+  }
+
+  try {
+    await cancelPendingRemoteFollow({ followId: id });
+    return c.redirect("/admin/following?success=Follow request cancelled");
+  } catch (cause) {
+    const message = cause instanceof Error ? cause.message : String(cause);
+    return c.redirect(`/admin/following?error=${encodeURIComponent(message)}`);
+  }
 });
 
 admin.post("/following", async (c) => {

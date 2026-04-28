@@ -1857,6 +1857,38 @@ describe("Remote following API", () => {
     expect(listBody.data[0].actor_uri).toBe("https://example.social/users/alice");
   });
 
+  it("cancels pending follows", async () => {
+    const follow = testDb
+      .insert(remoteFollows)
+      .values({
+        actor_uri: "https://example.social/users/alice",
+        handle: "@alice@example.social",
+        display_name: "Alice Example",
+        profile_url: "https://example.social/@alice",
+        inbox_uri: "https://example.social/users/alice/inbox",
+        follow_activity_uri: "http://localhost:5000/activities/follow/alice",
+        status: "pending",
+        followed_at: new Date(),
+        created_at: new Date(),
+        updated_at: new Date(),
+      })
+      .returning()
+      .get();
+    const { api } = await import("../api");
+
+    const res = await api.request("/following/cancel", {
+      method: "POST",
+      headers: { ...authHeader, "Content-Type": "application/json" },
+      body: JSON.stringify({ id: follow.id }),
+    });
+    const body = await res.json();
+
+    expect(res.status).toBe(200);
+    expect(body.data.status).toBe("cancelled");
+    expect(testDb.select().from(remoteFollows).get()?.status).toBe("cancelled");
+    expect(mockContextSendActivity).toHaveBeenCalledTimes(1);
+  });
+
   it("rejects unsafe handles without creating follows", async () => {
     const { api } = await import("../api");
 

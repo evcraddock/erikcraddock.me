@@ -2,10 +2,12 @@ import { describe, it, expect } from "bun:test";
 import { createTestDb } from "../../db/test-utils";
 import { people, personSocialAccounts, remoteFollows } from "../../db/schema";
 import {
+  cancelPendingRemoteFollow,
   createOrRetryRemoteFollow,
   parseFediverseHandle,
   resolveRemoteActor,
   isSafeRemoteUrl,
+  REMOTE_FOLLOW_CANCELLED_STATUS,
   REMOTE_FOLLOW_PENDING_STATUS,
   type ResolvedRemoteActor,
 } from "../following";
@@ -141,6 +143,29 @@ describe("ActivityPub following send workflow", () => {
 
     expect(first.id).toBe(second.id);
     expect(first.person_id).toBe(existingPerson.id);
+    expect(testDb.select().from(people).all()).toHaveLength(1);
+    expect(testDb.select().from(remoteFollows).all()).toHaveLength(1);
+  });
+
+  it("cancels pending follows without creating new people", async () => {
+    const testDb = createTestDb();
+    const follow = await createOrRetryRemoteFollow({
+      actor: actor(),
+      database: testDb,
+      deliver: async () => {},
+    });
+    const delivered: string[] = [];
+
+    const cancelled = await cancelPendingRemoteFollow({
+      followId: follow.id,
+      database: testDb,
+      deliver: async (storedFollow) => {
+        delivered.push(storedFollow.follow_activity_uri);
+      },
+    });
+
+    expect(cancelled?.status).toBe(REMOTE_FOLLOW_CANCELLED_STATUS);
+    expect(delivered).toEqual([follow.follow_activity_uri]);
     expect(testDb.select().from(people).all()).toHaveLength(1);
     expect(testDb.select().from(remoteFollows).all()).toHaveLength(1);
   });

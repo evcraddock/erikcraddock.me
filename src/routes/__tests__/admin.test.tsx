@@ -22,6 +22,17 @@ mock.module("@/db", () => ({
   ...require("../../db/schema"),
 }));
 
+const mockContextSendActivity = mock(async () => {});
+
+mock.module("@/federation/setup", () => ({
+  federation: {
+    createContext: mock(() => ({
+      getActorUri: () => new URL("http://localhost:5000/users/erik"),
+      sendActivity: mockContextSendActivity,
+    })),
+  },
+}));
+
 function createAdminSession(): string {
   const sessionId = crypto.randomUUID();
   testDb
@@ -48,6 +59,7 @@ beforeEach(() => {
   testDb.delete(followers).run();
   testDb.delete(sessions).run();
   global.fetch = originalFetch;
+  mockContextSendActivity.mockClear();
 });
 
 describe("admin follower page", () => {
@@ -194,5 +206,39 @@ describe("admin following page", () => {
     expect(html).toContain("Alice Example");
     expect(html).toContain("https://example.social/users/alice");
     expect(html).toContain(">Follow<");
+  });
+
+  it("lets admins cancel pending follow requests", async () => {
+    testDb
+      .insert(remoteFollows)
+      .values({
+        actor_uri: "https://example.social/users/alice",
+        handle: "@alice@example.social",
+        display_name: "Alice Example",
+        profile_url: "https://example.social/@alice",
+        inbox_uri: "https://example.social/users/alice/inbox",
+        follow_activity_uri: "http://localhost:5000/activities/follow/alice",
+        status: "pending",
+        followed_at: new Date(),
+        created_at: new Date(),
+        updated_at: new Date(),
+      })
+      .run();
+
+    const { admin } = await import("../admin");
+
+    const pageRes = await admin.request(authenticatedRequest("/following"));
+    const html = await pageRes.text();
+    expect(html).toContain('action="/admin/following/1/cancel"');
+    expect(html).toContain("Cancel request");
+
+    const cancelRes = await admin.request(authenticatedRequest("/following/1/cancel"), {
+      method: "POST",
+    });
+
+    const stored = testDb.select().from(remoteFollows).get();
+    expect(cancelRes.status).toBe(302);
+    expect(stored?.status).toBe("cancelled");
+    expect(mockContextSendActivity).toHaveBeenCalledTimes(1);
   });
 });

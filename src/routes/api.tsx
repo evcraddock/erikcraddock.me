@@ -47,6 +47,7 @@ import {
   listPendingRemoteComments,
 } from "@/federation/replies";
 import {
+  cancelPendingRemoteFollow,
   createOrRetryRemoteFollow,
   listRemoteFollows,
   resolveRemoteActor,
@@ -2559,6 +2560,25 @@ protectedApi.post("/following/resolve", async (c) => {
   } catch (cause) {
     const message = cause instanceof Error ? cause.message : String(cause);
     return c.json({ error: message }, 400);
+  }
+});
+
+protectedApi.post("/following/cancel", async (c) => {
+  const body = (await c.req.json().catch(() => null)) as { id?: number } | null;
+  const id = Number(body?.id);
+  if (!Number.isInteger(id) || id < 1) {
+    return c.json({ error: "Invalid follow ID" }, 400);
+  }
+
+  try {
+    const follow = await cancelPendingRemoteFollow({ followId: id });
+    if (!follow) {
+      return c.json({ error: "Follow not found" }, 404);
+    }
+    return c.json({ data: { id: follow.id, actor_uri: follow.actor_uri, status: follow.status } });
+  } catch (cause) {
+    const message = cause instanceof Error ? cause.message : String(cause);
+    return c.json({ error: message }, 409);
   }
 });
 
