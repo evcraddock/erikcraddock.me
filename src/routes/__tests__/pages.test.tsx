@@ -23,6 +23,7 @@ import {
   remoteLikes,
   remoteBoosts,
   remoteComments,
+  remoteFollows,
   authors,
   sessions,
 } from "../../db/schema";
@@ -1011,6 +1012,62 @@ describe("pages routes", () => {
       expect(html).toContain('src="https://mastodon.social/avatar.jpg"');
       expect(html).toContain('href="https://mastodon.social/@testauthor"');
       expect(html).toContain(">Follow</a>");
+    });
+
+    it("shows local follow actions and status for authenticated person cards", async () => {
+      const author = testDb
+        .insert(authors)
+        .values({
+          email: `person-follow-${crypto.randomUUID()}@example.com`,
+          created_at: new Date(),
+        })
+        .returning()
+        .get();
+      const sessionId = `person-follow-session-${crypto.randomUUID()}`;
+      testDb
+        .insert(sessions)
+        .values({
+          id: sessionId,
+          author_id: author.id,
+          expires_at: new Date(Date.now() + 60 * 60 * 1000),
+          created_at: new Date(),
+        })
+        .run();
+
+      const app = getApp();
+      const initialRes = await app.request("/people/1", {
+        headers: { Cookie: `session=${sessionId}` },
+      });
+      const initialHtml = await initialRes.text();
+
+      expect(initialHtml).toContain('action="/people/1/follow"');
+      expect(initialHtml).toContain(">Follow</button>");
+
+      testDb
+        .insert(remoteFollows)
+        .values({
+          person_id: 1,
+          actor_uri: "https://mastodon.social/users/testauthor",
+          handle: "@testauthor@mastodon.social",
+          preferred_username: "testauthor",
+          display_name: "Test Author",
+          profile_url: "https://mastodon.social/@testauthor",
+          inbox_uri: "https://mastodon.social/users/testauthor/inbox",
+          follow_activity_uri: "http://localhost:5000/activities/follow/testauthor",
+          status: "pending",
+          followed_at: new Date(),
+          created_at: new Date(),
+          updated_at: new Date(),
+        })
+        .run();
+
+      const followedRes = await app.request("/people/1", {
+        headers: { Cookie: `session=${sessionId}` },
+      });
+      const followedHtml = await followedRes.text();
+
+      expect(followedHtml).toContain(">Pending</span>");
+      expect(followedHtml).not.toContain('action="/people/1/follow"');
     });
 
     it("shows links from the selected person with full shared link content", async () => {

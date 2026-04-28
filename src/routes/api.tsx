@@ -47,6 +47,11 @@ import {
   listPendingRemoteComments,
 } from "@/federation/replies";
 import {
+  createOrRetryRemoteFollow,
+  listRemoteFollows,
+  resolveRemoteActor,
+} from "@/federation/following";
+import {
   federatePost,
   sendDeleteActivity,
   sendDeleteActivityForUri,
@@ -2527,6 +2532,51 @@ registerProtectedRoute(
     return c.json({ data: serializeRemoteComment(comment) });
   }
 );
+
+protectedApi.get("/following", (c) => {
+  const follows = listRemoteFollows().map((follow) => ({
+    id: follow.id,
+    person_id: follow.person_id,
+    actor_uri: follow.actor_uri,
+    handle: follow.handle,
+    display_name: follow.display_name,
+    profile_url: follow.profile_url,
+    status: follow.status,
+    followed_at: follow.followed_at.toISOString(),
+  }));
+  return c.json({ data: follows });
+});
+
+protectedApi.post("/following/resolve", async (c) => {
+  const body = (await c.req.json().catch(() => null)) as { handle?: string } | null;
+  if (!body?.handle) {
+    return c.json({ error: "Handle is required" }, 400);
+  }
+
+  try {
+    const actor = await resolveRemoteActor(body.handle);
+    return c.json({ data: actor });
+  } catch (cause) {
+    const message = cause instanceof Error ? cause.message : String(cause);
+    return c.json({ error: message }, 400);
+  }
+});
+
+protectedApi.post("/following", async (c) => {
+  const body = (await c.req.json().catch(() => null)) as { handle?: string } | null;
+  if (!body?.handle) {
+    return c.json({ error: "Handle is required" }, 400);
+  }
+
+  try {
+    const actor = await resolveRemoteActor(body.handle);
+    const follow = await createOrRetryRemoteFollow({ actor });
+    return c.json({ data: { id: follow.id, actor_uri: follow.actor_uri, status: follow.status } });
+  } catch (cause) {
+    const message = cause instanceof Error ? cause.message : String(cause);
+    return c.json({ error: message }, 400);
+  }
+});
 
 api.route("/", protectedApi);
 

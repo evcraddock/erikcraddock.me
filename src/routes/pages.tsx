@@ -33,6 +33,12 @@ import { logger } from "../utils/logger";
 import { getRemoteLikeCountForPost } from "../federation/likes";
 import { getRemoteBoostCountForPost } from "../federation/boosts";
 import {
+  createOrRetryRemoteFollow,
+  getRemoteFollowForPerson,
+  getRemoteFollowStatusLabel,
+  resolveRemoteActor,
+} from "../federation/following";
+import {
   approveRemoteComment,
   getApprovedRemoteCommentCountForPost,
   getVisibleRemoteCommentsForPost,
@@ -199,6 +205,8 @@ function PersonCard({
   socialAccounts = [],
   showSocialAccounts = true,
   showFollowButton = true,
+  authenticated = false,
+  followStatus = null,
 }: {
   person: Person;
   titleLink?: "detail" | "website";
@@ -206,6 +214,8 @@ function PersonCard({
   socialAccounts?: SocialAccount[];
   showSocialAccounts?: boolean;
   showFollowButton?: boolean;
+  authenticated?: boolean;
+  followStatus?: string | null;
 }) {
   const hostname = getLinkPreviewSiteLabel(person.url, null) ?? person.url;
   const initial = person.name.charAt(0).toUpperCase();
@@ -252,14 +262,31 @@ function PersonCard({
           ) : null}
           {showFollowButton && activityPubAccount ? (
             <div class="mt-3 flex justify-end">
-              <a
-                href={activityPubAccount.url}
-                target="_blank"
-                rel="noopener noreferrer"
-                class="inline-flex rounded-full bg-teal-600 px-3 py-1 text-sm font-semibold text-white transition hover:bg-teal-700 dark:bg-teal-500 dark:text-gray-950 dark:hover:bg-teal-400"
-              >
-                Follow
-              </a>
+              {authenticated ? (
+                followStatus ? (
+                  <span class="inline-flex rounded-full bg-teal-100 px-3 py-1 text-sm font-semibold text-teal-800 dark:bg-teal-900/40 dark:text-teal-200">
+                    {getRemoteFollowStatusLabel(followStatus)}
+                  </span>
+                ) : (
+                  <form method="post" action={`/people/${person.id}/follow`}>
+                    <button
+                      type="submit"
+                      class="inline-flex rounded-full bg-teal-600 px-3 py-1 text-sm font-semibold text-white transition hover:bg-teal-700 dark:bg-teal-500 dark:text-gray-950 dark:hover:bg-teal-400"
+                    >
+                      Follow
+                    </button>
+                  </form>
+                )
+              ) : (
+                <a
+                  href={activityPubAccount.url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  class="inline-flex rounded-full bg-teal-600 px-3 py-1 text-sm font-semibold text-white transition hover:bg-teal-700 dark:bg-teal-500 dark:text-gray-950 dark:hover:bg-teal-400"
+                >
+                  Follow
+                </a>
+              )}
             </div>
           ) : null}
         </div>
@@ -2801,6 +2828,35 @@ export function createPagesRoutes(db: Database): Hono {
     );
   });
 
+  pages.post("/people/:id/follow", async (c) => {
+    if (!getAuthenticatedUserEmail(c, db)) {
+      return c.redirect("/login");
+    }
+
+    const id = Number(c.req.param("id"));
+    if (!Number.isInteger(id) || id < 1) {
+      return c.redirect("/people?error=Invalid person");
+    }
+
+    const activityPubAccount = getPersonSocialAccounts(db, id).find(
+      (account) => account.is_activitypub
+    );
+    if (!activityPubAccount) {
+      return c.redirect(
+        `/people/${id}?error=${encodeURIComponent("No ActivityPub account found")}`
+      );
+    }
+
+    try {
+      const actor = await resolveRemoteActor(activityPubAccount.url);
+      await createOrRetryRemoteFollow({ actor });
+      return c.redirect(`/people/${id}?success=${encodeURIComponent("Follow request sent")}`);
+    } catch (cause) {
+      const message = cause instanceof Error ? cause.message : String(cause);
+      return c.redirect(`/people/${id}?error=${encodeURIComponent(message)}`);
+    }
+  });
+
   // Person detail page
   pages.get("/people/:id", (c) => {
     const id = parseInt(c.req.param("id") ?? "", 10);
@@ -2829,6 +2885,8 @@ export function createPagesRoutes(db: Database): Hono {
 
     const authoredSources = getSourcesAuthoredByPerson(db, person.id);
     const socialAccounts = getPersonSocialAccounts(db, person.id);
+    const isAuthenticated = Boolean(getAuthenticatedUserEmail(c, db));
+    const followStatus = getRemoteFollowForPerson(person.id, db)?.status ?? null;
     const personLinks: PostWithSource[] = withEngagementCounts(
       db,
       db
@@ -2855,6 +2913,8 @@ export function createPagesRoutes(db: Database): Hono {
               titleLink="website"
               authoredSources={authoredSources}
               socialAccounts={socialAccounts}
+              authenticated={isAuthenticated}
+              followStatus={followStatus}
             />
           </aside>
           <div class="overflow-hidden border-x border-gray-200 bg-white dark:border-gray-800 dark:bg-gray-900 sm:rounded-2xl sm:border">

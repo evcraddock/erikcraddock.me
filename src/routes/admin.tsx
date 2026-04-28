@@ -11,6 +11,13 @@ import {
   verifyAndStorePasskey,
   deletePasskey,
 } from "@/auth/passkey";
+import {
+  createOrRetryRemoteFollow,
+  getRemoteFollowStatusLabel,
+  listRemoteFollows,
+  resolveRemoteActor,
+  type ResolvedRemoteActor,
+} from "@/federation/following";
 
 export const admin = new Hono();
 
@@ -47,6 +54,11 @@ function AdminNav({ isAdmin }: { isAdmin: boolean }) {
         <li>
           <a href="/admin/followers" class="text-blue-600 dark:text-blue-400 hover:underline">
             Followers
+          </a>
+        </li>
+        <li>
+          <a href="/admin/following" class="text-blue-600 dark:text-blue-400 hover:underline">
+            Following
           </a>
         </li>
         {isAdmin && (
@@ -110,6 +122,32 @@ function MissingValue() {
   return <span class="text-gray-400 dark:text-gray-500">Not provided</span>;
 }
 
+function StatusBadge({ status }: { status: string }) {
+  return (
+    <span class="inline-flex rounded-full bg-yellow-100 px-2 py-1 text-xs font-semibold text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-200">
+      {getRemoteFollowStatusLabel(status)}
+    </span>
+  );
+}
+
+function ResolvedActorPreview({ actor }: { actor: ResolvedRemoteActor }) {
+  return (
+    <div class="mb-6 rounded-lg border border-blue-200 bg-blue-50 p-4 dark:border-blue-800 dark:bg-blue-900/20">
+      <h2 class="mb-2 text-lg font-semibold text-blue-950 dark:text-blue-100">Resolved account</h2>
+      <p class="text-sm text-blue-900 dark:text-blue-200">
+        {actor.displayName ?? actor.preferredUsername ?? actor.handle ?? actor.actorUri}
+      </p>
+      <p class="break-all text-xs text-blue-700 dark:text-blue-300">{actor.actorUri}</p>
+      <form method="post" action="/admin/following" class="mt-4">
+        <input type="hidden" name="actor" value={actor.actorUri} />
+        <button class="rounded bg-blue-600 px-4 py-2 text-white hover:bg-blue-700" type="submit">
+          Follow
+        </button>
+      </form>
+    </div>
+  );
+}
+
 /**
  * GET /admin - Admin dashboard
  */
@@ -140,6 +178,16 @@ admin.get("/", (c) => {
             <h2 class="text-lg font-semibold mb-2">ActivityPub Followers</h2>
             <p class="text-sm text-gray-500 dark:text-gray-400">
               Inspect remote Fediverse accounts that follow this site.
+            </p>
+          </a>
+
+          <a
+            href="/admin/following"
+            class="block bg-white dark:bg-gray-800 rounded-lg shadow p-6 hover:ring-2 hover:ring-blue-500"
+          >
+            <h2 class="text-lg font-semibold mb-2">Following</h2>
+            <p class="text-sm text-gray-500 dark:text-gray-400">
+              Follow Fediverse accounts from this site actor.
             </p>
           </a>
         </div>
@@ -234,6 +282,138 @@ admin.get("/followers", (c) => {
       </div>
     </Layout>
   );
+});
+
+/**
+ * GET /admin/following - ActivityPub following management
+ */
+admin.get("/following", async (c) => {
+  const auth = c.get("auth");
+  const handle = c.req.query("handle")?.trim() ?? "";
+  const success = c.req.query("success");
+  const error = c.req.query("error");
+  let resolvedActor: ResolvedRemoteActor | null = null;
+  let resolveError: string | null = null;
+
+  if (handle) {
+    try {
+      resolvedActor = await resolveRemoteActor(handle);
+    } catch (cause) {
+      resolveError = cause instanceof Error ? cause.message : String(cause);
+    }
+  }
+
+  const follows = listRemoteFollows();
+
+  return c.html(
+    <Layout title="Following | Admin">
+      <div class="mx-auto max-w-5xl">
+        <AdminHeader title="Following" isAdmin={auth.isAdmin} />
+
+        {success && (
+          <div class="mb-6 rounded-lg border border-green-200 bg-green-50 p-4 text-green-800 dark:border-green-800 dark:bg-green-900/20 dark:text-green-200">
+            {success}
+          </div>
+        )}
+        {(error || resolveError) && (
+          <div class="mb-6 rounded-lg border border-red-200 bg-red-50 p-4 text-red-800 dark:border-red-800 dark:bg-red-900/20 dark:text-red-200">
+            {error ?? resolveError}
+          </div>
+        )}
+
+        <div class="mb-6 rounded-lg bg-white p-6 shadow dark:bg-gray-800">
+          <h2 class="mb-4 text-lg font-semibold">Follow a Fediverse account</h2>
+          <form method="get" action="/admin/following" class="flex flex-col gap-3 sm:flex-row">
+            <input
+              class="flex-1 rounded border border-gray-300 px-3 py-2 dark:border-gray-700 dark:bg-gray-900"
+              name="handle"
+              placeholder="@alice@example.social"
+              type="text"
+              value={handle}
+            />
+            <button
+              class="rounded bg-blue-600 px-4 py-2 text-white hover:bg-blue-700"
+              type="submit"
+            >
+              Resolve
+            </button>
+          </form>
+        </div>
+
+        {resolvedActor && <ResolvedActorPreview actor={resolvedActor} />}
+
+        <div class="rounded-lg bg-white p-6 shadow dark:bg-gray-800">
+          <h2 class="mb-4 text-lg font-semibold">Stored follows</h2>
+          {follows.length === 0 ? (
+            <p class="text-gray-600 dark:text-gray-300">No followed accounts yet.</p>
+          ) : (
+            <div class="overflow-x-auto">
+              <table class="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+                <thead>
+                  <tr>
+                    <th class="px-3 py-2 text-left text-xs uppercase text-gray-500">Account</th>
+                    <th class="px-3 py-2 text-left text-xs uppercase text-gray-500">Status</th>
+                    <th class="px-3 py-2 text-left text-xs uppercase text-gray-500">Person</th>
+                    <th class="px-3 py-2 text-left text-xs uppercase text-gray-500">Followed</th>
+                  </tr>
+                </thead>
+                <tbody class="divide-y divide-gray-200 dark:divide-gray-700">
+                  {follows.map((follow) => (
+                    <tr>
+                      <td class="px-3 py-2 text-sm">
+                        <a
+                          class="break-all text-blue-600 hover:underline"
+                          href={follow.profile_url ?? follow.actor_uri}
+                        >
+                          {follow.display_name ?? follow.handle ?? follow.actor_uri}
+                        </a>
+                        <div class="break-all text-xs text-gray-500">{follow.actor_uri}</div>
+                      </td>
+                      <td class="px-3 py-2 text-sm">
+                        <StatusBadge status={follow.status} />
+                      </td>
+                      <td class="px-3 py-2 text-sm">
+                        {follow.person_id ? (
+                          <a
+                            class="text-blue-600 hover:underline"
+                            href={`/people/${follow.person_id}`}
+                          >
+                            Person #{follow.person_id}
+                          </a>
+                        ) : (
+                          <MissingValue />
+                        )}
+                      </td>
+                      <td class="px-3 py-2 text-sm">{formatDateTime(follow.followed_at)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      </div>
+    </Layout>
+  );
+});
+
+admin.post("/following", async (c) => {
+  const form = await c.req.formData();
+  const actorInput = String(form.get("actor") ?? "").trim();
+  if (!actorInput) {
+    return c.redirect("/admin/following?error=Fediverse account is required");
+  }
+
+  try {
+    const actor = await resolveRemoteActor(actorInput);
+    const follow = await createOrRetryRemoteFollow({ actor });
+    return c.redirect(
+      `/admin/following?success=${encodeURIComponent(`Follow request sent to ${follow.display_name ?? follow.handle ?? follow.actor_uri}`)}`
+    );
+  } catch (cause) {
+    const message = cause instanceof Error ? cause.message : String(cause);
+    return c.redirect(`/admin/following?error=${encodeURIComponent(message)}`);
+  }
 });
 
 /**

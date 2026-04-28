@@ -13,6 +13,7 @@ import {
   postTags,
   remoteLikes,
   remoteComments,
+  remoteFollows,
 } from "../../db/schema";
 import { eq } from "drizzle-orm";
 
@@ -31,9 +32,14 @@ mock.module("@/db", () => ({
   ...require("../../db/schema"),
 }));
 
+const mockContextSendActivity = mock(async () => {});
+
 mock.module("@/federation/setup", () => ({
   federation: {
-    createContext: mock(() => {}),
+    createContext: mock(() => ({
+      getActorUri: () => new URL("http://localhost:5000/users/erik"),
+      sendActivity: mockContextSendActivity,
+    })),
     sendActivity: mock(() => {}),
   },
   createFedifyFederation: mock(() => {}),
@@ -73,6 +79,7 @@ mock.module("@/auth/api-key", () => {
 });
 
 beforeEach(() => {
+  testDb.delete(remoteFollows).run();
   testDb.delete(remoteComments).run();
   testDb.delete(remoteLikes).run();
   testDb.delete(postTags).run();
@@ -89,6 +96,7 @@ beforeEach(() => {
   mockSendDeleteActivityForUri.mockClear();
   mockSendUpdateActivity.mockClear();
   mockSendActorUpdateActivity.mockClear();
+  mockContextSendActivity.mockClear();
 });
 
 const authHeader = { Authorization: "Bearer ek_test" };
@@ -1779,5 +1787,86 @@ describe("/api/people", () => {
     expect(res.status).toBe(404);
     const json = await res.json();
     expect(json.error).toBe("Person not found");
+  });
+});
+
+describe("Remote following API", () => {
+  function mockRemoteActorFetch(): void {
+    global.fetch = mock(async (input: URL | RequestInfo) => {
+      const url = input instanceof URL ? input.href : String(input);
+      if (url.startsWith("https://example.social/.well-known/webfinger")) {
+        return new Response(
+          JSON.stringify({
+            links: [
+              {
+                rel: "self",
+                type: "application/activity+json",
+                href: "https://example.social/users/alice",
+              },
+            ],
+          })
+        );
+      }
+
+      return new Response(
+        JSON.stringify({
+          id: "https://example.social/users/alice",
+          preferredUsername: "alice",
+          name: "Alice Example",
+          url: "https://example.social/@alice",
+          inbox: "https://example.social/users/alice/inbox",
+          endpoints: { sharedInbox: "https://example.social/inbox" },
+        })
+      );
+    }) as unknown as typeof fetch;
+  }
+
+  it("resolves a remote actor without creating a follow", async () => {
+    mockRemoteActorFetch();
+    const { api } = await import("../api");
+
+    const res = await api.request("/following/resolve", {
+      method: "POST",
+      headers: { ...authHeader, "Content-Type": "application/json" },
+      body: JSON.stringify({ handle: "@alice@example.social" }),
+    });
+    const body = await res.json();
+
+    expect(res.status).toBe(200);
+    expect(body.data.actorUri).toBe("https://example.social/users/alice");
+    expect(testDb.select().from(remoteFollows).all()).toHaveLength(0);
+  });
+
+  it("creates a pending follow and lists stored follows", async () => {
+    mockRemoteActorFetch();
+    const { api } = await import("../api");
+
+    const createRes = await api.request("/following", {
+      method: "POST",
+      headers: { ...authHeader, "Content-Type": "application/json" },
+      body: JSON.stringify({ handle: "@alice@example.social" }),
+    });
+    const createBody = await createRes.json();
+
+    const listRes = await api.request("/following", { headers: authHeader });
+    const listBody = await listRes.json();
+
+    expect(createRes.status).toBe(200);
+    expect(createBody.data.status).toBe("pending");
+    expect(listBody.data).toHaveLength(1);
+    expect(listBody.data[0].actor_uri).toBe("https://example.social/users/alice");
+  });
+
+  it("rejects unsafe handles without creating follows", async () => {
+    const { api } = await import("../api");
+
+    const res = await api.request("/following/resolve", {
+      method: "POST",
+      headers: { ...authHeader, "Content-Type": "application/json" },
+      body: JSON.stringify({ handle: "@alice@localhost" }),
+    });
+
+    expect(res.status).toBe(400);
+    expect(testDb.select().from(remoteFollows).all()).toHaveLength(0);
   });
 });
