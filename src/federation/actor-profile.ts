@@ -3,7 +3,7 @@ import { Endpoints, Image, Person, PropertyValue, Update, type ActorKeyPair } fr
 const ACTOR_NAME = "Erik Craddock";
 const ACTOR_SUMMARY = "Writer, coder, and musician — not always in that order.";
 
-interface ActorProfileField {
+export interface ActorProfileField {
   name: string;
   href: string;
   text: string;
@@ -51,6 +51,13 @@ function escapeHtml(value: string): string {
 
 function resolveProfileFieldUrl(field: ActorProfileField, canonicalOrigin: string | URL): URL {
   return new URL(field.href, canonicalOrigin);
+}
+
+export function getPublicProfileFields(canonicalOrigin: string | URL): ActorProfileField[] {
+  return PUBLIC_PROFILE_FIELDS.map((field) => ({
+    ...field,
+    href: resolveProfileFieldUrl(field, canonicalOrigin).toString(),
+  }));
 }
 
 function profileFieldToHtml(field: ActorProfileField, canonicalOrigin: string | URL): string {

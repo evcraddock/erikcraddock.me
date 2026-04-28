@@ -9,6 +9,7 @@ import {
   buildActorMetadata,
   buildActorProfile,
   buildActorUpdateActivity,
+  getPublicProfileFields,
   type ActorProfileUris,
 } from "../actor-profile";
 
@@ -59,6 +60,27 @@ function attachmentMap(json: Record<string, unknown>): Map<string, Record<string
 }
 
 describe("actor profile metadata", () => {
+  it("exposes structured public profile fields for page rendering", () => {
+    expect(getPublicProfileFields(origin)).toEqual([
+      { name: "Website", href: "https://erikcraddock.me/", text: "erikcraddock.me" },
+      {
+        name: "GitHub",
+        href: "https://github.com/evcraddock",
+        text: "github.com/evcraddock",
+      },
+      {
+        name: "LinkedIn",
+        href: "https://www.linkedin.com/in/erik-craddock-42aa9815",
+        text: "linkedin.com/in/erik-craddock-42aa9815",
+      },
+      {
+        name: "YouTube",
+        href: "https://youtube.com/@ErikCraddock",
+        text: "youtube.com/@ErikCraddock",
+      },
+    ]);
+  });
+
   it("builds Mastodon-compatible PropertyValue profile fields", async () => {
     const metadata = buildActorMetadata(origin);
 

@@ -23,6 +23,7 @@ import { listTags } from "../services/tags";
 import { fetchLinkPreview } from "../services/link-preview";
 import { postToObject, PublishedPost } from "../federation/post-object";
 import { baseUrl } from "../federation/utils";
+import { getPublicProfileFields } from "../federation/actor-profile";
 import { logger } from "../utils/logger";
 import { getRemoteLikeCountForPost } from "../federation/likes";
 
@@ -1066,6 +1067,21 @@ function FeedProfileCard({
               <dd class="font-semibold text-gray-950 dark:text-gray-50">{postCount}</dd>
             </div>
           </dl>
+          <div class="mt-4 grid grid-cols-2 gap-3 border-t border-gray-200 pt-4 text-sm dark:border-gray-800">
+            {getPublicProfileFields(baseUrl).map((field) => (
+              <a
+                key={field.name}
+                href={field.href}
+                rel="me noopener noreferrer"
+                target={field.href.startsWith(baseUrl) ? undefined : "_blank"}
+                class="text-gray-600 underline-offset-4 hover:text-teal-700 hover:underline dark:text-gray-400 dark:hover:text-teal-300"
+              >
+                <span class="font-medium text-gray-900 dark:text-gray-100">{field.name}</span>
+                <span class="sr-only">: </span>
+                <span class="block truncate">{field.text}</span>
+              </a>
+            ))}
+          </div>
         </div>
       </div>
     </section>

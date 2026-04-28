@@ -580,6 +580,21 @@ describe("pages routes", () => {
       expect(html).toContain("Follow");
     });
 
+    it("renders centralized public profile links in the actor card", async () => {
+      const app = getApp();
+      const res = await app.request("/feed");
+      const html = await res.text();
+
+      expect(html).toMatch(/href="http:\/\/[^"]+\/"/);
+      expect(html).toContain("erikcraddock.me");
+      expect(html).toContain('href="https://github.com/evcraddock"');
+      expect(html).toContain("github.com/evcraddock");
+      expect(html).toContain('href="https://www.linkedin.com/in/erik-craddock-42aa9815"');
+      expect(html).toContain("linkedin.com/in/erik-craddock-42aa9815");
+      expect(html).toContain('href="https://youtube.com/@ErikCraddock"');
+      expect(html).toContain("youtube.com/@ErikCraddock");
+    });
+
     it("shows a social media card above recommended sites", async () => {
       const app = getApp();
       const res = await app.request("/feed");
