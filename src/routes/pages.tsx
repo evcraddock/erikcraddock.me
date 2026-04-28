@@ -31,6 +31,7 @@ import { baseUrl, dateToInstant } from "../federation/utils";
 import { getPublicProfileFields } from "../federation/actor-profile";
 import { logger } from "../utils/logger";
 import { getRemoteLikeCountForPost } from "../federation/likes";
+import { getRemoteBoostCountForPost } from "../federation/boosts";
 import {
   approveRemoteComment,
   getApprovedRemoteCommentCountForPost,
@@ -65,8 +66,12 @@ type SourceWithAuthors = Source & {
   social_accounts: SourceSocialAccount[];
 };
 type Tag = { id: number; name: string; slug: string };
-type PostWithLikeCount = Post & { like_count?: number; reply_count?: number };
-type PostWithSource = PostWithLikeCount & { source?: Source | null; author?: Person | null };
+type PostWithEngagementCounts = Post & {
+  like_count?: number;
+  reply_count?: number;
+  boost_count?: number;
+};
+type PostWithSource = PostWithEngagementCounts & { source?: Source | null; author?: Person | null };
 
 /** Max length for showing full note content inline */
 const NOTE_INLINE_MAX_LENGTH = 280;
@@ -801,12 +806,15 @@ function TagBadges({ tags }: { tags: Tag[] }) {
 function EngagementRow({
   likeCount = 0,
   replyCount = 0,
+  boostCount = 0,
 }: {
   likeCount?: number;
   replyCount?: number;
+  boostCount?: number;
 }) {
   const likeLabel = likeCount === 1 ? "Like" : "Likes";
   const replyLabel = replyCount === 1 ? "Reply" : "Replies";
+  const boostLabel = boostCount === 1 ? "Boost" : "Boosts";
 
   return (
     <div class="mt-4 flex items-center justify-around border-t border-gray-100 pt-3 text-sm text-gray-500 dark:border-gray-800 dark:text-gray-400">
@@ -819,9 +827,14 @@ function EngagementRow({
           {replyCount} {replyLabel}
         </span>
       </span>
-      <span class="inline-flex items-center gap-2" aria-label="0 ActivityPub boosts">
+      <span
+        class="inline-flex items-center gap-2"
+        aria-label={`${boostCount} ActivityPub ${boostLabel.toLowerCase()}`}
+      >
         <span aria-hidden="true">↻</span>
-        <span>0 Boosts</span>
+        <span>
+          {boostCount} {boostLabel}
+        </span>
       </span>
       <span
         class="inline-flex items-center gap-2"
@@ -841,7 +854,7 @@ function ArticleCard({
   getBannerUrl,
   tags: postTags = [],
 }: {
-  post: PostWithLikeCount;
+  post: PostWithEngagementCounts;
   getBannerUrl: (id: number) => string | null;
   tags?: Tag[];
 }) {
@@ -894,7 +907,11 @@ function ArticleCard({
               </div>
             )}
           </div>
-          <EngagementRow likeCount={post.like_count} replyCount={post.reply_count} />
+          <EngagementRow
+            likeCount={post.like_count}
+            replyCount={post.reply_count}
+            boostCount={post.boost_count}
+          />
         </div>
       </a>
     </article>
@@ -908,7 +925,7 @@ function ArticleCardsSection({
   getTagsForPost,
   hasMore,
 }: {
-  articles: PostWithLikeCount[];
+  articles: PostWithEngagementCounts[];
   getBannerUrl: (id: number) => string | null;
   getTagsForPost: (postId: number) => Tag[];
   hasMore: boolean;
@@ -1372,7 +1389,11 @@ function FeedPost({
       {isLink && <FeedLinkPreview post={post} />}
 
       <FeedPostMeta post={post} tags={postTags} />
-      <EngagementRow likeCount={post.like_count} replyCount={post.reply_count} />
+      <EngagementRow
+        likeCount={post.like_count}
+        replyCount={post.reply_count}
+        boostCount={post.boost_count}
+      />
     </article>
   );
 }
@@ -1427,7 +1448,11 @@ function SingleFeedPost({
       {isLink && <FeedLinkPreview post={post} />}
 
       <FeedPostMeta post={post} tags={postTags} />
-      <EngagementRow likeCount={post.like_count} replyCount={post.reply_count} />
+      <EngagementRow
+        likeCount={post.like_count}
+        replyCount={post.reply_count}
+        boostCount={post.boost_count}
+      />
     </article>
   );
 }
@@ -1534,7 +1559,11 @@ function PostCard({ post, tags: postTags = [] }: { post: PostWithSource; tags?: 
           )}
         </div>
       </a>
-      <EngagementRow likeCount={post.like_count} replyCount={post.reply_count} />
+      <EngagementRow
+        likeCount={post.like_count}
+        replyCount={post.reply_count}
+        boostCount={post.boost_count}
+      />
     </article>
   );
 }
@@ -1624,14 +1653,15 @@ function getSourcesAuthoredByPerson(db: Database, personId: number): Source[] {
     .map((row) => row.source);
 }
 
-function withLikeCounts<T extends { id: number }>(
+function withEngagementCounts<T extends { id: number }>(
   db: Database,
   postList: T[]
-): Array<T & { like_count: number }> {
+): Array<T & { like_count: number; reply_count: number; boost_count: number }> {
   return postList.map((post) => ({
     ...post,
     like_count: getRemoteLikeCountForPost(post.id, db),
     reply_count: getApprovedRemoteCommentCountForPost(post.id, db),
+    boost_count: getRemoteBoostCountForPost(post.id, db),
   }));
 }
 
@@ -1881,7 +1911,7 @@ export function createPagesRoutes(db: Database): Hono {
 
     // Check if there are more articles beyond what we display
     const hasMoreArticles = fetchedArticles.length > HOME_ARTICLES_LIMIT;
-    const recentArticles = withLikeCounts(db, fetchedArticles.slice(0, HOME_ARTICLES_LIMIT));
+    const recentArticles = withEngagementCounts(db, fetchedArticles.slice(0, HOME_ARTICLES_LIMIT));
 
     // Get all banner IDs for the articles
     const bannerIds = recentArticles
@@ -1995,7 +2025,7 @@ export function createPagesRoutes(db: Database): Hono {
 
     // Fetch articles for current page
     const offset = (page - 1) * ARTICLES_PER_PAGE;
-    const pageArticles = withLikeCounts(
+    const pageArticles = withEngagementCounts(
       db,
       db
         .select()
@@ -2161,7 +2191,7 @@ export function createPagesRoutes(db: Database): Hono {
       .offset(offset)
       .all();
 
-    const pagePosts: PostWithSource[] = withLikeCounts(
+    const pagePosts: PostWithSource[] = withEngagementCounts(
       db,
       results.map((row) => ({
         ...row.post,
@@ -2799,7 +2829,7 @@ export function createPagesRoutes(db: Database): Hono {
 
     const authoredSources = getSourcesAuthoredByPerson(db, person.id);
     const socialAccounts = getPersonSocialAccounts(db, person.id);
-    const personLinks: PostWithSource[] = withLikeCounts(
+    const personLinks: PostWithSource[] = withEngagementCounts(
       db,
       db
         .select({
@@ -2875,7 +2905,7 @@ export function createPagesRoutes(db: Database): Hono {
       );
     }
 
-    const sourceLinks: PostWithSource[] = withLikeCounts(
+    const sourceLinks: PostWithSource[] = withEngagementCounts(
       db,
       db
         .select({
@@ -3147,6 +3177,7 @@ export function createPagesRoutes(db: Database): Hono {
       author,
       like_count: getRemoteLikeCountForPost(post.id, db),
       reply_count: getApprovedRemoteCommentCountForPost(post.id, db),
+      boost_count: getRemoteBoostCountForPost(post.id, db),
     };
     const isAuthenticated = Boolean(getAuthenticatedUserEmail(c, db));
     const remoteComments = getVisibleRemoteCommentsForPost(post.id, {
@@ -3258,7 +3289,7 @@ export function createPagesRoutes(db: Database): Hono {
       .all();
 
     // Transform to PostWithSource
-    const taggedPosts: PostWithSource[] = withLikeCounts(
+    const taggedPosts: PostWithSource[] = withEngagementCounts(
       db,
       results.map((row) => ({
         ...row.post,
