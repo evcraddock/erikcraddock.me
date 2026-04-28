@@ -3,6 +3,7 @@ import {
   Follow,
   Undo,
   Like,
+  Announce,
   Accept,
   isActor,
   InProcessMessageQueue,
@@ -15,6 +16,7 @@ import { getOrigin } from "./utils";
 import { logger } from "@/utils/logger";
 import { buildActorProfile } from "./actor-profile";
 import { handleLikeActivity } from "./likes";
+import { handleAnnounceActivity } from "./boosts";
 
 // Context type for federation - we use void since we don't need request-specific data
 export type FederationContext = void;
@@ -172,6 +174,9 @@ export function createFedifyFederation() {
     })
     .on(Like, async (_ctx, like) => {
       await handleLikeActivity(like);
+    })
+    .on(Announce, async (_ctx, announce) => {
+      await handleAnnounceActivity(announce);
     });
 
   // Set up outbox dispatcher - lists activities sent by this actor

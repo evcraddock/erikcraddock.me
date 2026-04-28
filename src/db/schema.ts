@@ -121,6 +121,20 @@ export const remoteLikes = sqliteTable("remote_likes", {
   received_at: integer("received_at", { mode: "timestamp" }).notNull(),
 });
 
+// ActivityPub boosts received from remote actors
+export const remoteBoosts = sqliteTable("remote_boosts", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  post_id: integer("post_id")
+    .notNull()
+    .references(() => posts.id, { onDelete: "cascade" }),
+  object_uri: text("object_uri").notNull(),
+  activity_uri: text("activity_uri").notNull().unique(),
+  actor_uri: text("actor_uri").notNull(),
+  actor_name: text("actor_name"),
+  raw_object_uri: text("raw_object_uri").notNull(),
+  received_at: integer("received_at", { mode: "timestamp" }).notNull(),
+});
+
 // Actor keys for ActivityPub signing
 export const actorKeys = sqliteTable("actor_keys", {
   id: integer("id").primaryKey({ autoIncrement: true }),
