@@ -25,7 +25,62 @@ function loadPayload(): FollowingEndpointPayload {
   }
 
   const script = String.raw`
+    import { db, remoteFollows } from "./src/db";
     import { federation } from "./src/federation/setup";
+
+    const now = new Date("2026-04-20T12:00:00.000Z");
+    db.insert(remoteFollows).values([
+      {
+        actor_uri: "https://example.social/users/accepted",
+        handle: "@accepted@example.social",
+        display_name: "Accepted Account",
+        profile_url: "https://example.social/@accepted",
+        inbox_uri: "https://example.social/users/accepted/inbox",
+        follow_activity_uri: "http://localhost:5000/activities/follow/accepted",
+        status: "accepted",
+        followed_at: now,
+        accepted_at: now,
+        created_at: now,
+        updated_at: now,
+      },
+      {
+        actor_uri: "https://example.social/users/pending",
+        handle: "@pending@example.social",
+        display_name: "Pending Account",
+        profile_url: "https://example.social/@pending",
+        inbox_uri: "https://example.social/users/pending/inbox",
+        follow_activity_uri: "http://localhost:5000/activities/follow/pending",
+        status: "pending",
+        followed_at: now,
+        created_at: now,
+        updated_at: now,
+      },
+      {
+        actor_uri: "https://example.social/users/rejected",
+        handle: "@rejected@example.social",
+        display_name: "Rejected Account",
+        profile_url: "https://example.social/@rejected",
+        inbox_uri: "https://example.social/users/rejected/inbox",
+        follow_activity_uri: "http://localhost:5000/activities/follow/rejected",
+        status: "rejected",
+        followed_at: now,
+        rejected_at: now,
+        created_at: now,
+        updated_at: now,
+      },
+      {
+        actor_uri: "https://example.social/users/cancelled",
+        handle: "@cancelled@example.social",
+        display_name: "Cancelled Account",
+        profile_url: "https://example.social/@cancelled",
+        inbox_uri: "https://example.social/users/cancelled/inbox",
+        follow_activity_uri: "http://localhost:5000/activities/follow/cancelled",
+        status: "cancelled",
+        followed_at: now,
+        created_at: now,
+        updated_at: now,
+      },
+    ]).run();
 
     function activityRequest(path) {
       return new Request("http://localhost:5000" + path, {
@@ -92,17 +147,26 @@ describe("ActivityPub following collection", () => {
     expect(result.actor.outbox).toBe("http://localhost:5000/users/erik/outbox");
   });
 
-  it("returns an empty following collection for erik", () => {
+  it("returns accepted follows for erik", () => {
     const result = loadPayload();
 
     expect(result.followingStatus).toBe(200);
     expect(result.following).toMatchObject({
       id: "http://localhost:5000/users/erik/following",
       type: "OrderedCollection",
-      totalItems: 0,
+      totalItems: 1,
     });
-    expect(result.following.items).toBeUndefined();
-    expect(result.following.orderedItems).toBeUndefined();
+    expect(result.following.orderedItems ?? result.following.items).toEqual([
+      "https://example.social/users/accepted",
+    ]);
+  });
+
+  it("excludes non-accepted follows from erik's following collection", () => {
+    const result = loadPayload();
+
+    expect(JSON.stringify(result.following)).not.toContain("pending");
+    expect(JSON.stringify(result.following)).not.toContain("rejected");
+    expect(JSON.stringify(result.following)).not.toContain("cancelled");
   });
 
   it("returns not found for non-erik following collections", () => {

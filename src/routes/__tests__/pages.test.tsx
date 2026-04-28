@@ -1105,6 +1105,62 @@ describe("pages routes", () => {
       expect(mockContextSendActivity).toHaveBeenCalledTimes(1);
     });
 
+    it("renders authenticated person card status labels consistently", async () => {
+      const author = testDb
+        .insert(authors)
+        .values({
+          email: `person-status-${crypto.randomUUID()}@example.com`,
+          created_at: new Date(),
+        })
+        .returning()
+        .get();
+      const sessionId = `person-status-session-${crypto.randomUUID()}`;
+      testDb
+        .insert(sessions)
+        .values({
+          id: sessionId,
+          author_id: author.id,
+          expires_at: new Date(Date.now() + 60 * 60 * 1000),
+          created_at: new Date(),
+        })
+        .run();
+
+      const app = getApp();
+      const statuses = [
+        ["accepted", "Following"],
+        ["rejected", "Rejected"],
+        ["failed", "Failed"],
+        ["cancelled", "Cancelled"],
+      ] as const;
+
+      for (const [status, label] of statuses) {
+        testDb.delete(remoteFollows).run();
+        testDb
+          .insert(remoteFollows)
+          .values({
+            person_id: 1,
+            actor_uri: `https://mastodon.social/users/testauthor-${status}`,
+            handle: `@testauthor-${status}@mastodon.social`,
+            preferred_username: `testauthor-${status}`,
+            display_name: "Test Author",
+            profile_url: `https://mastodon.social/@testauthor-${status}`,
+            inbox_uri: `https://mastodon.social/users/testauthor-${status}/inbox`,
+            follow_activity_uri: `http://localhost:5000/activities/follow/testauthor-${status}`,
+            status,
+            followed_at: new Date(),
+            created_at: new Date(),
+            updated_at: new Date(),
+          })
+          .run();
+
+        const res = await app.request("/people/1", {
+          headers: { Cookie: `session=${sessionId}` },
+        });
+        const html = await res.text();
+        expect(html).toContain(`>${label}</span>`);
+      }
+    });
+
     it("shows links from the selected person with full shared link content", async () => {
       const app = getApp();
       const res = await app.request("/people/1");
