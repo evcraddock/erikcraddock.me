@@ -2,6 +2,7 @@ import {
   createFederation,
   Follow,
   Undo,
+  Like,
   Accept,
   isActor,
   InProcessMessageQueue,
@@ -13,6 +14,7 @@ import { getOutboxActivities, getPublishedPostCount } from "./outbox";
 import { getOrigin } from "./utils";
 import { logger } from "@/utils/logger";
 import { buildActorProfile } from "./actor-profile";
+import { handleLikeActivity } from "./likes";
 
 // Context type for federation - we use void since we don't need request-specific data
 export type FederationContext = void;
@@ -167,6 +169,9 @@ export function createFedifyFederation() {
       if (removed) {
         logger.info("federation", `Unfollowed by: ${actor.id.href}`);
       }
+    })
+    .on(Like, async (_ctx, like) => {
+      await handleLikeActivity(like);
     });
 
   // Set up outbox dispatcher - lists activities sent by this actor
