@@ -14,6 +14,7 @@ import {
 import { getOrCreateKeyPairs } from "./keys";
 import { addFollower, removeFollower, getAllFollowers, getFollowerCount } from "./followers";
 import { getOutboxActivities, getPublishedPostCount } from "./outbox";
+import { getFeaturedPostCount, getFeaturedPostObjects } from "./featured";
 import { getOrigin } from "./utils";
 import { logger } from "@/utils/logger";
 import { buildActorProfile } from "./actor-profile";
@@ -104,6 +105,7 @@ export function createFedifyFederation() {
           outbox: ctx.getOutboxUri(identifier),
           followers: ctx.getFollowersUri(identifier),
           following: ctx.getFollowingUri(identifier),
+          featured: ctx.getFeaturedUri(identifier),
           sharedInbox: ctx.getInboxUri(),
         },
         keys,
@@ -244,6 +246,19 @@ export function createFedifyFederation() {
     .setCounter((_ctx, identifier) =>
       identifier === "erik" ? listAcceptedRemoteFollows().length : null
     );
+
+  // Set up featured collection dispatcher - returns published posts pinned to the actor profile
+  federation
+    .setFeaturedDispatcher("/users/{identifier}/featured", async (ctx, identifier) => {
+      if (identifier !== "erik") {
+        return null;
+      }
+
+      return {
+        items: getFeaturedPostObjects(ctx.getActorUri(identifier), ctx.getFollowersUri(identifier)),
+      };
+    })
+    .setCounter((_ctx, identifier) => (identifier === "erik" ? getFeaturedPostCount() : null));
 
   // Set up followers collection dispatcher - returns list of followers
   federation
