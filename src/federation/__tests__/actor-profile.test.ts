@@ -21,6 +21,7 @@ const uris: ActorProfileUris = {
   outbox: new URL("/users/erik/outbox", origin),
   followers: new URL("/users/erik/followers", origin),
   following: new URL("/users/erik/following", origin),
+  featured: new URL("/users/erik/featured", origin),
   sharedInbox: new URL("/inbox", origin),
 };
 
@@ -130,6 +131,7 @@ describe("actor profile metadata", () => {
       outbox: "https://erikcraddock.me/users/erik/outbox",
       followers: "https://erikcraddock.me/users/erik/followers",
       following: "https://erikcraddock.me/users/erik/following",
+      featured: "https://erikcraddock.me/users/erik/featured",
       url: "https://erikcraddock.me/",
     });
     expect(json.publicKey).toBeDefined();
@@ -166,6 +168,7 @@ describe("actor profile metadata", () => {
       id: "https://erikcraddock.me/users/erik#update-test",
       actor: "https://erikcraddock.me/users/erik",
     });
+    expect(updateObject.featured).toBe("https://erikcraddock.me/users/erik/featured");
     expect(attachmentMap(updateObject)).toEqual(attachmentMap(actorJson));
   });
 });

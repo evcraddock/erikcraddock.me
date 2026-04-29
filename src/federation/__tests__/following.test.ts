@@ -10,6 +10,8 @@ interface FollowingEndpointPayload {
   actor: Record<string, unknown>;
   followingStatus: number;
   following: Record<string, unknown>;
+  featuredStatus: number;
+  featured: Record<string, unknown>;
   missingStatus: number;
 }
 
@@ -25,10 +27,57 @@ function loadPayload(): FollowingEndpointPayload {
   }
 
   const script = String.raw`
-    import { db, remoteFollows } from "./src/db";
+    import { db, posts, remoteFollows } from "./src/db";
     import { federation } from "./src/federation/setup";
 
     const now = new Date("2026-04-20T12:00:00.000Z");
+    db.insert(posts).values([
+      {
+        slug: "featured-new",
+        type: "article",
+        title: "Featured New",
+        content: "Featured new content",
+        excerpt: "Featured new excerpt",
+        is_featured: true,
+        published_at: new Date("2026-04-22T12:00:00.000Z"),
+        created_at: new Date("2026-04-22T12:00:00.000Z"),
+        updated_at: new Date("2026-04-22T12:00:00.000Z"),
+      },
+      {
+        slug: "not-featured",
+        type: "article",
+        title: "Not Featured",
+        content: "Not featured content",
+        excerpt: "Not featured excerpt",
+        is_featured: false,
+        published_at: new Date("2026-04-21T12:00:00.000Z"),
+        created_at: new Date("2026-04-21T12:00:00.000Z"),
+        updated_at: new Date("2026-04-21T12:00:00.000Z"),
+      },
+      {
+        slug: "featured-draft",
+        type: "article",
+        title: "Featured Draft",
+        content: "Featured draft content",
+        excerpt: "Featured draft excerpt",
+        is_featured: true,
+        published_at: null,
+        created_at: new Date("2026-04-23T12:00:00.000Z"),
+        updated_at: new Date("2026-04-23T12:00:00.000Z"),
+      },
+      {
+        slug: "featured-old",
+        type: "note",
+        title: null,
+        content: "Featured old note",
+        excerpt: "Featured old note",
+        is_featured: true,
+        published_at: new Date("2026-04-19T12:00:00.000Z"),
+        created_at: new Date("2026-04-19T12:00:00.000Z"),
+        updated_at: new Date("2026-04-19T12:00:00.000Z"),
+      },
+    ]).run();
+
     db.insert(remoteFollows).values([
       {
         actor_uri: "https://example.social/users/accepted",
@@ -94,6 +143,9 @@ function loadPayload(): FollowingEndpointPayload {
     const followingResponse = await federation.fetch(activityRequest("/users/erik/following"), {
       contextData: undefined,
     });
+    const featuredResponse = await federation.fetch(activityRequest("/users/erik/featured"), {
+      contextData: undefined,
+    });
     const missingResponse = await federation.fetch(activityRequest("/users/alice/following"), {
       contextData: undefined,
       onNotFound: async () => new Response("Not found", { status: 404 }),
@@ -104,6 +156,8 @@ function loadPayload(): FollowingEndpointPayload {
       actor: await actorResponse.json(),
       followingStatus: followingResponse.status,
       following: await followingResponse.json(),
+      featuredStatus: featuredResponse.status,
+      featured: await featuredResponse.json(),
       missingStatus: missingResponse.status,
     }));
   `;
@@ -143,6 +197,7 @@ describe("ActivityPub following collection", () => {
 
     expect(result.actorStatus).toBe(200);
     expect(result.actor.following).toBe("http://localhost:5000/users/erik/following");
+    expect(result.actor.featured).toBe("http://localhost:5000/users/erik/featured");
     expect(result.actor.followers).toBe("http://localhost:5000/users/erik/followers");
     expect(result.actor.outbox).toBe("http://localhost:5000/users/erik/outbox");
   });
@@ -167,6 +222,27 @@ describe("ActivityPub following collection", () => {
     expect(JSON.stringify(result.following)).not.toContain("pending");
     expect(JSON.stringify(result.following)).not.toContain("rejected");
     expect(JSON.stringify(result.following)).not.toContain("cancelled");
+  });
+
+  it("returns only published featured posts in newest-first order", () => {
+    const result = loadPayload();
+    const featuredItems = (result.featured.orderedItems ?? result.featured.items) as Record<
+      string,
+      unknown
+    >[];
+
+    expect(result.featuredStatus).toBe(200);
+    expect(result.featured).toMatchObject({
+      id: "http://localhost:5000/users/erik/featured",
+      type: "OrderedCollection",
+      totalItems: 2,
+    });
+    expect(featuredItems.map((item) => item.id)).toEqual([
+      "http://localhost:5000/posts/featured-new",
+      "http://localhost:5000/posts/featured-old",
+    ]);
+    expect(JSON.stringify(result.featured)).not.toContain("not-featured");
+    expect(JSON.stringify(result.featured)).not.toContain("featured-draft");
   });
 
   it("returns not found for non-erik following collections", () => {

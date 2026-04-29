@@ -208,6 +208,7 @@ const PostListItemSchema = z
     title: NullableStringSchema,
     excerpt: NullableStringSchema,
     published_at: IsoDateTimeSchema.nullable(),
+    is_featured: z.boolean().openapi({ example: false }),
     source_id: z.number().int().nullable(),
     author_id: z.number().int().nullable(),
     source: SourceSummarySchema.nullable(),
@@ -271,6 +272,7 @@ const PostSchema = z
     source_id: z.number().int().nullable(),
     author_id: z.number().int().nullable(),
     banner_image_id: z.number().int().nullable(),
+    is_featured: z.boolean().openapi({ example: false }),
     banner_url: NullableStringSchema,
     source: SourceSummarySchema.nullable(),
     author: PersonSummarySchema.nullable(),
@@ -332,6 +334,7 @@ const CreatePostBodySchema = z
     author_id: z.number().int().optional().nullable(),
     tags: z.array(z.string()).optional(),
     banner_image_id: z.number().int().optional().nullable(),
+    is_featured: z.boolean().optional().openapi({ example: false }),
     published_at: z.string().optional().nullable().openapi({ example: "2024-03-15T10:30:00Z" }),
   })
   .openapi("CreatePostBody");
@@ -346,6 +349,7 @@ const UpdatePostBodySchema = z
     author_id: z.number().int().optional().nullable(),
     tags: z.array(z.string()).optional(),
     banner_image_id: z.number().int().optional().nullable(),
+    is_featured: z.boolean().optional(),
   })
   .openapi("UpdatePostBody");
 
@@ -685,6 +689,7 @@ function hasFederatedPostChanges(
     source_id: number | null;
     author_id: number | null;
     banner_image_id: number | null;
+    is_featured: boolean;
   },
   input: {
     title?: string | null;
@@ -695,6 +700,7 @@ function hasFederatedPostChanges(
     author_id?: number | null;
     tags?: string[];
     banner_image_id?: number | null;
+    is_featured?: boolean;
   }
 ): boolean {
   if (input.title !== undefined && (input.title?.trim() || null) !== existingPost.title) {
@@ -725,6 +731,10 @@ function hasFederatedPostChanges(
     input.banner_image_id !== undefined &&
     input.banner_image_id !== existingPost.banner_image_id
   ) {
+    return true;
+  }
+
+  if (input.is_featured !== undefined && input.is_featured !== existingPost.is_featured) {
     return true;
   }
 
@@ -866,6 +876,7 @@ registerProtectedRoute(
       author_id,
       tags,
       banner_image_id,
+      is_featured,
       published_at,
     } = body;
 
@@ -925,6 +936,10 @@ registerProtectedRoute(
       return c.json({ error: "author_id must be a number" }, 400);
     }
 
+    if (is_featured !== undefined && typeof is_featured !== "boolean") {
+      return c.json({ error: "is_featured must be a boolean" }, 400);
+    }
+
     let publishedAtDate: Date | null = null;
     if (published_at !== undefined && published_at !== null) {
       if (typeof published_at !== "string") {
@@ -954,6 +969,7 @@ registerProtectedRoute(
         author_id: author_id ?? null,
         tags: tags || [],
         banner_image_id: banner_image_id ?? null,
+        is_featured: is_featured ?? false,
         published_at: publishedAtDate,
       });
 
@@ -1048,7 +1064,17 @@ registerProtectedRoute(
     }
 
     const body = await c.req.json();
-    const { title, content, excerpt, url, source_id, author_id, tags, banner_image_id } = body;
+    const {
+      title,
+      content,
+      excerpt,
+      url,
+      source_id,
+      author_id,
+      tags,
+      banner_image_id,
+      is_featured,
+    } = body;
 
     if (tags !== undefined && !Array.isArray(tags)) {
       return c.json({ error: "Tags must be an array" }, 400);
@@ -1070,6 +1096,10 @@ registerProtectedRoute(
       return c.json({ error: "author_id must be a number" }, 400);
     }
 
+    if (is_featured !== undefined && typeof is_featured !== "boolean") {
+      return c.json({ error: "is_featured must be a boolean" }, 400);
+    }
+
     try {
       const existingPost = getPost(id);
       if (!existingPost) {
@@ -1085,6 +1115,7 @@ registerProtectedRoute(
         author_id,
         tags,
         banner_image_id,
+        is_featured,
       });
       const nextUrl = url !== undefined ? url?.trim() || null : existingPost.url;
       const linkPreview =
@@ -1120,6 +1151,7 @@ registerProtectedRoute(
         author_id,
         tags,
         banner_image_id,
+        is_featured,
       });
 
       if (!post) {
@@ -1406,7 +1438,17 @@ registerProtectedRoute(
     }
 
     const body = await c.req.json();
-    const { title, content, excerpt, url, source_id, author_id, tags, banner_image_id } = body;
+    const {
+      title,
+      content,
+      excerpt,
+      url,
+      source_id,
+      author_id,
+      tags,
+      banner_image_id,
+      is_featured,
+    } = body;
 
     if (tags !== undefined && !Array.isArray(tags)) {
       return c.json({ error: "Tags must be an array" }, 400);
@@ -1428,6 +1470,10 @@ registerProtectedRoute(
       return c.json({ error: "author_id must be a number" }, 400);
     }
 
+    if (is_featured !== undefined && typeof is_featured !== "boolean") {
+      return c.json({ error: "is_featured must be a boolean" }, 400);
+    }
+
     try {
       const shouldFederateUpdate = hasFederatedPostChanges(existingPost, {
         title,
@@ -1438,6 +1484,7 @@ registerProtectedRoute(
         author_id,
         tags,
         banner_image_id,
+        is_featured,
       });
       const nextUrl = url !== undefined ? url?.trim() || null : existingPost.url;
       const linkPreview =
@@ -1469,6 +1516,7 @@ registerProtectedRoute(
         author_id,
         tags,
         banner_image_id,
+        is_featured,
       });
 
       if (!post) {

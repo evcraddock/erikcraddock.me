@@ -1,0 +1,1 @@
+ALTER TABLE `posts` ADD `is_featured` integer DEFAULT false NOT NULL;

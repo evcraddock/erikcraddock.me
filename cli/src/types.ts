@@ -29,6 +29,7 @@ export interface PostListItem {
   title: string | null;
   excerpt: string | null;
   published_at: string | null;
+  is_featured: boolean;
   source_id: number | null;
   author_id: number | null;
   source: Source | null;
@@ -67,6 +68,7 @@ export interface Post {
   source: Source | null;
   author_id: number | null;
   author: Person | null;
+  is_featured: boolean;
   published_at: string | null;
   created_at: string;
   updated_at: string;

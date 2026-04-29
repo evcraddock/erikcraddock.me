@@ -11,6 +11,7 @@ export interface PostListItem {
   title: string | null;
   excerpt: string | null;
   published_at: string | null;
+  is_featured: boolean;
   source_id: number | null;
   author_id: number | null;
   source: SourceSummary | null;
@@ -152,6 +153,7 @@ export function listPosts(options: ListPostsOptions = {}): PostListItem[] {
       title: posts.title,
       excerpt: posts.excerpt,
       published_at: posts.published_at,
+      is_featured: posts.is_featured,
       source_id: posts.source_id,
       author_id: posts.author_id,
     })
@@ -190,6 +192,7 @@ export function listPosts(options: ListPostsOptions = {}): PostListItem[] {
       title: post.title,
       excerpt: post.excerpt,
       published_at: post.published_at?.toISOString() ?? null,
+      is_featured: post.is_featured,
       source_id: post.source_id,
       author_id: post.author_id,
       source: post.source_id ? getSourceSummary(post.source_id) : null,
@@ -216,6 +219,7 @@ export interface CreatePostInput {
   author_id?: number | null;
   tags?: string[]; // Tag slugs
   banner_image_id?: number | null;
+  is_featured?: boolean;
   published_at?: Date | null; // For imports - set to create as already published
 }
 
@@ -271,6 +275,7 @@ export function createPost(input: CreatePostInput) {
     author_id,
     tags: tagSlugs,
     banner_image_id,
+    is_featured,
     published_at,
   } = input;
 
@@ -318,6 +323,7 @@ export function createPost(input: CreatePostInput) {
       source_id: source_id ?? null,
       author_id: author_id ?? null,
       banner_image_id: banner_image_id ?? null,
+      is_featured: is_featured ?? false,
       created_at: published_at ?? now,
       updated_at: published_at ?? now,
       published_at: published_at ?? null,
@@ -381,6 +387,7 @@ export interface UpdatePostInput {
   author_id?: number | null;
   tags?: string[]; // Tag slugs
   banner_image_id?: number | null;
+  is_featured?: boolean;
 }
 
 /**
@@ -406,6 +413,7 @@ export function updatePost(id: number, input: UpdatePostInput) {
     author_id,
     tags: tagSlugs,
     banner_image_id,
+    is_featured,
   } = input;
 
   // Validate banner_image_id if provided
@@ -445,6 +453,7 @@ export function updatePost(id: number, input: UpdatePostInput) {
   if (source_id !== undefined) updates.source_id = source_id;
   if (author_id !== undefined) updates.author_id = author_id;
   if (banner_image_id !== undefined) updates.banner_image_id = banner_image_id;
+  if (is_featured !== undefined) updates.is_featured = is_featured;
 
   // Update post
   db.update(posts).set(updates).where(eq(posts.id, id)).run();
