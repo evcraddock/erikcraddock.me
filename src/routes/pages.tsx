@@ -39,6 +39,7 @@ import {
   createOrRetryRemoteFollow,
   getRemoteFollowForPerson,
   getRemoteFollowStatusLabel,
+  listAcceptedRemoteFollows,
   resolveRemoteActor,
   unfollowRemoteFollow,
 } from "../federation/following";
@@ -2184,7 +2185,7 @@ export function createPagesRoutes(db: Database): Hono {
     const totalPosts = countResult.length;
     const totalPages = Math.ceil(totalPosts / FEED_POSTS_PER_PAGE);
     const followerCount = db.select().from(followers).all().length;
-    const followingCount = 0;
+    const followingCount = listAcceptedRemoteFollows(db).length;
 
     // Handle no posts
     if (totalPosts === 0) {
@@ -3297,7 +3298,7 @@ export function createPagesRoutes(db: Database): Hono {
       .where(isNotNull(posts.published_at))
       .all().length;
     const followerCount = db.select().from(followers).all().length;
-    const followingCount = 0;
+    const followingCount = listAcceptedRemoteFollows(db).length;
     const feedPost: PostWithSource = {
       ...post,
       source,
