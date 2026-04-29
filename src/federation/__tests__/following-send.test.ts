@@ -94,6 +94,91 @@ describe("ActivityPub following send workflow", () => {
     expect(resolved.inboxUri).toBe("https://example.social/users/alice/inbox");
   });
 
+  it("resolves Mastodon profile URLs through WebFinger", async () => {
+    const requestedUrls: string[] = [];
+    const fetcher = async (input: URL | RequestInfo) => {
+      const url = input instanceof URL ? input.href : String(input);
+      requestedUrls.push(url);
+      if (url.startsWith("https://hachyderm.io/.well-known/webfinger")) {
+        return jsonResponse({
+          links: [
+            {
+              rel: "self",
+              type: "application/activity+json",
+              href: "https://hachyderm.io/users/mitsuhiko",
+            },
+          ],
+        });
+      }
+
+      return jsonResponse({
+        id: "https://hachyderm.io/users/mitsuhiko",
+        preferredUsername: "mitsuhiko",
+        name: "Armin Ronacher",
+        url: "https://hachyderm.io/@mitsuhiko",
+        inbox: "https://hachyderm.io/users/mitsuhiko/inbox",
+        endpoints: { sharedInbox: "https://hachyderm.io/inbox" },
+      });
+    };
+
+    const resolved = await resolveRemoteActor(
+      "https://hachyderm.io/@mitsuhiko",
+      fetcher as typeof fetch
+    );
+
+    expect(requestedUrls[0]).toBe(
+      "https://hachyderm.io/.well-known/webfinger?resource=acct%3Amitsuhiko%40hachyderm.io"
+    );
+    expect(requestedUrls).not.toContain("https://hachyderm.io/@mitsuhiko");
+    expect(resolved.actorUri).toBe("https://hachyderm.io/users/mitsuhiko");
+    expect(resolved.handle).toBe("@mitsuhiko@hachyderm.io");
+    expect(resolved.profileUrl).toBe("https://hachyderm.io/@mitsuhiko");
+  });
+
+  it("retries actor fetches with a signed document loader after authorization failures", async () => {
+    const fetcher = async (input: URL | RequestInfo) => {
+      const url = input instanceof URL ? input.href : String(input);
+      if (url.startsWith("https://hachyderm.io/.well-known/webfinger")) {
+        return jsonResponse({
+          links: [
+            {
+              rel: "self",
+              type: "application/activity+json",
+              href: "https://hachyderm.io/users/mitsuhiko",
+            },
+          ],
+        });
+      }
+
+      return new Response(null, { status: 401 });
+    };
+    const signedRequests: string[] = [];
+    const signedDocumentLoader = async (url: string) => {
+      signedRequests.push(url);
+      return {
+        contextUrl: null,
+        documentUrl: url,
+        document: {
+          id: "https://hachyderm.io/users/mitsuhiko",
+          preferredUsername: "mitsuhiko",
+          name: "Armin Ronacher",
+          url: "https://hachyderm.io/@mitsuhiko",
+          inbox: "https://hachyderm.io/users/mitsuhiko/inbox",
+        },
+      };
+    };
+
+    const resolved = await resolveRemoteActor(
+      "@mitsuhiko@hachyderm.io",
+      fetcher as typeof fetch,
+      signedDocumentLoader
+    );
+
+    expect(signedRequests).toEqual(["https://hachyderm.io/users/mitsuhiko"]);
+    expect(resolved.actorUri).toBe("https://hachyderm.io/users/mitsuhiko");
+    expect(resolved.inboxUri).toBe("https://hachyderm.io/users/mitsuhiko/inbox");
+  });
+
   it("stores pending follows and creates a linked person/social account", async () => {
     const testDb = createTestDb();
     const delivered: string[] = [];
