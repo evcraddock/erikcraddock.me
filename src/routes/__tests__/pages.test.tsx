@@ -608,6 +608,35 @@ describe("pages routes", () => {
       expect(html).toContain("rounded-full");
     });
 
+    it("shows accepted remote follow count in the profile card", async () => {
+      testDb.delete(remoteFollows).run();
+      const now = new Date();
+      testDb
+        .insert(remoteFollows)
+        .values({
+          actor_uri: "https://example.social/users/followed",
+          handle: "@followed@example.social",
+          preferred_username: "followed",
+          display_name: "Followed Person",
+          profile_url: "https://example.social/@followed",
+          inbox_uri: "https://example.social/users/followed/inbox",
+          shared_inbox_uri: "https://example.social/inbox",
+          follow_activity_uri: "http://localhost:5000/activities/follow/followed",
+          status: "accepted",
+          followed_at: now,
+          accepted_at: now,
+          created_at: now,
+          updated_at: now,
+        })
+        .run();
+
+      const app = getApp();
+      const res = await app.request("/feed");
+      const html = await res.text();
+
+      expect(html).toMatch(/<dt[^>]*>Following<\/dt>\s*<dd[^>]*>1<\/dd>/);
+    });
+
     it("links the actor card follow button to the Fediverse follow flow", async () => {
       const app = getApp();
       const res = await app.request("/feed");
